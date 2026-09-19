@@ -13,3 +13,13 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Generated files
+generated/
+*.generated.*
+
+# Prisma
+**/src/generated/
