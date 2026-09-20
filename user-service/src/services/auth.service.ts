@@ -3,7 +3,7 @@ import { prisma } from "../libs/prisma.js";
 import type { LoginInput } from "../schemas/auth.schema.js";
 import { AppError } from "../errors/errors.js";
 import { generateAccessToken } from "../libs/accessToken.js";
-import { generateRefreshToken } from "../libs/refreshToken.js";
+import { generateRefreshToken, verifyRefreshToken } from "../libs/refreshToken.js";
 import { REFRESH_TOKEN_MAX_AGE } from "../constants/auth.constants.js";
 
 export async function loginUser(input: LoginInput) {
@@ -60,4 +60,19 @@ export async function loginUser(input: LoginInput) {
             role: user.role,
         },
     };
+}
+
+export async function logoutUser(refreshToken: string) {
+    // Verify the refresh token using jwt and the secret key
+    const payload = verifyRefreshToken(refreshToken);
+
+    await prisma.refreshToken.updateMany({
+        where: {
+            tokenId: payload.jti,
+            revokedAt: null,
+        },
+        data: {
+            revokedAt: new Date(),
+        }
+    });
 }

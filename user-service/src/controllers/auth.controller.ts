@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import { loginSchema } from "../schemas/auth.schema.js";
-import { loginUser } from "../services/auth.service.js";
+import { loginUser, logoutUser } from "../services/auth.service.js";
 import { AppError } from "../errors/errors.js";
-import { logoutUser, refreshAccessToken } from "../services/refresh.service.js";
+import { refreshAccessToken } from "../services/refresh.service.js";
 import { refreshTokenCookieOptions } from "../libs/cookies.js";
 
 export async function login(req: Request, res: Response) {
@@ -22,5 +22,27 @@ export async function login(req: Request, res: Response) {
             accessToken: data.accessToken,
             user: data.user,
         },
+    });
+}
+
+export async function logout(req: Request, res: Response) {
+    const refreshToken = req.signedCookies.refreshToken;
+
+    // Clear the refresh token cookie
+    res.clearCookie("refreshToken", refreshTokenCookieOptions);
+
+    if (refreshToken) {
+        try {
+            await logoutUser(refreshToken);
+            console.log("Logout successful");
+        } catch (error) {
+            console.error("Error during logout:", error);
+            // Even if there's an error during logout, we still want
+            // to clear the cookie and log the user out.
+        }
+    }
+    return res.status(200).json({
+        success: true,
+        message: "Logged out successfully",
     });
 }
