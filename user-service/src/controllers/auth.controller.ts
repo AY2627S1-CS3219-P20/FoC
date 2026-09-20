@@ -46,3 +46,26 @@ export async function logout(req: Request, res: Response) {
         message: "Logged out successfully",
     });
 }
+
+export async function refresh(req: Request, res: Response) {
+    const refreshToken = req.signedCookies.refreshToken;
+    console.log("Refresh token received:", refreshToken);
+
+    // Check if the refresh token is present in the cookies
+    if (!refreshToken) {
+        console.log("No refresh token found in cookies");
+        throw new AppError("Invalid, please sign out and back in", 401);
+    }
+
+    const result = await refreshAccessToken(refreshToken);
+    res.cookie("refreshToken", result.refreshToken, refreshTokenCookieOptions);
+    console.log("Refresh token rotation successful");
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            accessToken: result.accessToken,
+            user: result.user,
+        },
+    });
+}
