@@ -10,7 +10,7 @@ import { useState } from "react";
 
 const LoginForm = () => {
     const [eyeOff, setEyeOff] = useState(true);
-    const { login, isPending, isError, error } = useLogin();
+    const { login, isPending } = useLogin();
 
     const form = useForm({
         defaultValues: {
@@ -91,7 +91,7 @@ const LoginForm = () => {
                         className="w-fit"
                         variant="indigo"
                         size="lg"
-                    // isLoading={isPending}
+                        isLoading={isPending}
                     >
                         Log In
                     </Button>
