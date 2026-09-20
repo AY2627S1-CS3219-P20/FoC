@@ -23,6 +23,7 @@ function getEnvNumber(name: string): number {
 
 const config = {
     port: getEnvNumber("PORT"),
+    nodeEnv: getEnv("NODE_ENV"),
     databaseUrl: getEnv("DATABASE_URL"),
     jwtPrivateKeyPath: getEnv("JWT_PRIVATE_KEY_PATH"),
     jwtRefreshTokenKey: getEnv("JWT_REFRESH_TOKEN_KEY"),
