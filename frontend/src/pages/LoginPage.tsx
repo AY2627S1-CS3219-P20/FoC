@@ -11,7 +11,7 @@ const LoginPage = () => {
                         src={Logo}
                         alt="Logo"
                     />
-                    <p className="font-bold text-2xl">Arron</p>
+                    <p className="font-bold text-2xl text-indigo-900">Aaron</p>
                 </div>
                 <Card className="w-xs md:w-md p-5!">
                     <LoginForm />
