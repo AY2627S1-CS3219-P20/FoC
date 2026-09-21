@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import queryClient from '@/lib/queryClient';
 import { AuthProvider } from "@/context/AuthContext";
 import LoginPage from '@/pages/LoginPage';
+import SupplierPage from '@/pages/SupplierPage';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import HomePage from '@/pages/HomePage';
 
@@ -17,6 +18,7 @@ const AppRouter = () => {
                         {/* Protected routes - redirect to login page if not authenticated */}
                         <Route element={<ProtectedRoute />}>
                             <Route path="/home" element={<HomePage />} />
+                            <Route path="/suppliers" element={<SupplierPage />} />
                         </Route>
                     </Routes>
                 </AuthProvider>
