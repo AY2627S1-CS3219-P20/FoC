@@ -1,0 +1,91 @@
+import "dotenv/config";
+import * as fs from "fs";
+import * as path from "path";
+import { parse } from 'csv-parse/sync';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient, SupplierType } from "../src/generated/prisma/client.ts";
+
+const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL!,
+});
+
+const prisma = new PrismaClient({
+    adapter,
+});
+
+async function main() {
+    const csvFilePath = path.resolve('../data/csv/supplier-seed-data.csv');
+    const content = fs.readFileSync(csvFilePath, 'utf-8'); // read file
+    const rows = parse(content, {
+        columns: true, // keep column headers
+        skip_empty_lines: true,
+        trim: true // ignore empty spaces used to align csv columns
+    }) as Record<string, string>[]; // get content in the form of an array of rows
+
+    // helper functions
+    type SupplierType = "FOOD" | "RETAIL" | "FACILITIES"
+    function enforceSupplierType(raw: string): SupplierType {
+        if (raw.includes("Shopping")) {
+            return "RETAIL";
+        } else if (raw.includes("Food")) {
+            return "FOOD";
+        } else {
+            return "FACILITIES";
+        }
+    };
+
+    function parse24hFormattedTime(raw: string): Date {
+        // raw is in the format of "hhmmhrs"
+        const hour = Number(raw.trim().substring(0,2));
+        const minute = Number(raw.trim().substring(2,4));
+        return new Date(Date.UTC(1970, 0, 1, hour, minute, 0)); // default to the 0th second
+    }
+
+    type Days = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY"
+    const days: Days[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+
+    for (const row of rows) {
+        const supplier = await prisma.supplier.upsert({
+            where: {
+                name: row.Name,
+            },
+            create: {
+                name: row.Name,
+                type: enforceSupplierType(row.Type),
+                status: "ACTIVATED", // default to every supplier being activated
+                building: row.Building,
+                floor: Number(row.Floor),
+                description: row["Location Description"],
+                address: row.Address,
+                latitude: Number(row.latitude) || null, // field may be null
+                longitude: Number(row.longitude) || null, // field may be null
+                imageUrl: row.imageUrl || null, // field may be null
+            },
+            update: {}
+        }) 
+
+        for (const day of days) {
+            const openingHours = await prisma.openingHours.upsert({
+                where: {
+                    id: supplier.id,
+                },
+                create: {
+                    supplierId: supplier.id,
+                    day: day,
+                    openingTime: parse24hFormattedTime(row.StartingTime),
+                    closingTime: parse24hFormattedTime(row.ClosingTime),
+                },
+                update: {}
+            })
+        }
+    }
+};
+
+main()
+    .catch((error) => {
+        console.error(error);
+        process.exit(1);
+    })
+    .finally(async () => {
+        await prisma.$disconnect();
+    });
