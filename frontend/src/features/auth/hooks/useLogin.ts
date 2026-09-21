@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { loginService } from "@/features/auth/services/auth.service";
 import { setToken } from "@/utils/token";
 import useAuthStore from "@/store/authStore";
@@ -11,6 +11,7 @@ import { toast } from "react-toastify";
 
 const useLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const setUser = useAuthStore((state) => state.setUser);
 
   const { mutate, isPending, isError, error } = useMutation<
@@ -28,7 +29,9 @@ const useLogin = () => {
       }
     },
     onSuccess: () => {
-      navigate("/supplier");
+      const from = location.state?.from?.pathname || "/home";
+      navigate(from, { replace: true });
+      
       toast.success("Login successful!");
     },
     onError: (error) => {
