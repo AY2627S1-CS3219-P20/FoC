@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SupplierType {
+  FOOD
+  RETAIL
+  FACILITIES
+}
+
+enum SupplierStatus {
+  ACTIVATED
+  DEACTIVATED
+}
+
+enum Day {
+  MONDAY 
+  TUESDAY
+  WEDNESDAY
+  THURSDAY 
+  FRIDAY 
+  SATURDAY
+  SUNDAY
+}
+
+model Supplier {
+  id String @id @default(uuid())
+  name String @unique
+  type SupplierType 
+  status SupplierStatus @default(ACTIVATED)
+  building String
+  floor Int
+  description String
+  address String
+  openingHours OpeningHours[]
+  latitude Float?
+  longitude Float?
+  imageUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OpeningHours {
+  id String @id @default(uuid()) // primary key for the opening hours table
+  supplierId String
+  day Day
+  openingTime DateTime @db.Time(0)
+  closingTime DateTime @db.Time(0)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
