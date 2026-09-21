@@ -1,0 +1,11 @@
+# dependencies
+node_modules
+# Keep environment variables out of version control
+.env
+
+# unused folders
+.agents
+.claude
+.windsurf
+
+/src/generated/prisma
