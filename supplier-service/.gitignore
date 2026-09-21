@@ -8,9 +8,10 @@ key
 *.pem
 *.key
 
-# unused folders
+# unused folders (agents)
 .agents
 .claude
 .windsurf
+skills-lock.json
 
 /src/generated/prisma
