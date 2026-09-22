@@ -11,17 +11,3 @@ export interface ApiErrorResponse {
     code: string;
     message: string;
 }
-
-export interface ApiUser {
-    id: string;
-    email: string;
-    username: string;
-    phoneNumber: string;
-    role: "student" | "admin";
-}
-
-// Authentication
-export interface AuthData {
-    user: ApiUser;
-    accessToken: string;
-}
