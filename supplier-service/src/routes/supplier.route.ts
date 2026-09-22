@@ -6,13 +6,22 @@ import {
     viewAllSuppliers,
     createSupplier,
     updateSupplier,
+    uploadSupplierImage,
+    serveAsset,
 } from "../controllers/supplier.controller.js";
+import { upload } from "../libs/upload.js";
 import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
 
 const supplierRouter = Router();
 
+// Public: serve an uploaded image by filename
+supplierRouter.get("/assets/:file", serveAsset);
+
 // All supplier endpoints require authentication
 supplierRouter.use(authenticate);
+
+// Admin: upload a supplier location image
+supplierRouter.post("/upload-image", requireAdmin, upload.single("image"), uploadSupplierImage);
 
 // View all available suppliers (F1)
 supplierRouter.get("/", viewAllAvailableSuppliers);

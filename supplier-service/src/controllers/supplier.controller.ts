@@ -10,6 +10,13 @@ import {
     updateSupplierSchema,
 } from "../schemas/supplier.schema.js";
 import { AppError } from "../errors/errors.js";
+import {
+    upload,
+    buildAssetUrl,
+    getContentType,
+    resolveSafeUploadPath,
+} from "../libs/upload.js";
+import fs from "node:fs/promises";
 
 export async function viewAllAvailableSuppliers(req: Request, res: Response) {
     console.log("Fetching all suppliers...");
@@ -63,4 +70,33 @@ export async function updateSupplier(req: Request, res: Response) {
         code: "SUCCESS",
         data: supplier,
     });
+}
+
+export async function uploadSupplierImage(req: Request, res: Response) {
+    if (!req.file) {
+        throw new AppError("No image file provided", 400, "BAD_REQUEST");
+    }
+
+    const imageUrl = buildAssetUrl(req, req.file.filename);
+
+    return res.status(201).json({
+        success: true,
+        code: "SUCCESS",
+        data: { imageUrl },
+    });
+}
+
+export async function serveAsset(req: Request, res: Response) {
+    const filename = req.params.file as string;
+    const safePath = resolveSafeUploadPath(filename);
+
+    try {
+        await fs.access(safePath);
+    } catch {
+        throw new AppError("Image not found", 404, "NOT_FOUND");
+    }
+
+    res.setHeader("Content-Type", getContentType(filename));
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.sendFile(safePath);
 }

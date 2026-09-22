@@ -1,5 +1,7 @@
 import createApiClient from "./axios";
+import axios from "axios";
 import { ENDPOINTS } from "@/api/endpoints";
+import { getToken } from "@/utils/token";
 import type { ApiResponse, CreateSupplierInput, UpdateSupplierInput, Supplier } from "@/types/api.types";
 import { parseError } from "@/utils/errorHandler";
 
@@ -50,6 +52,29 @@ export const updateSupplier = async (id: string, input: UpdateSupplierInput): Pr
         const url = ENDPOINTS.supplier.updateSupplier.replace(":id", id);
         const response = await supplierApi.patch<ApiResponse<Supplier>>(url, input);
         return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const uploadSupplierImage = async (file: File): Promise<string> => {
+    try {
+        const formData = new FormData();
+        formData.append("image", file);
+        const token = getToken();
+        const response = await axios.post<ApiResponse<{ imageUrl: string }>>(
+            `${import.meta.env.VITE_SUPPLIER_API_BASE_URL}${ENDPOINTS.supplier.uploadSupplierImage}`,
+            formData,
+            {
+                withCredentials: true,
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            },
+        );
+        const body = response.data.data;
+        if (!body) {
+            throw new Error("No image URL returned from server");
+        }
+        return body.imageUrl;
     } catch (error) {
         throw parseError(error);
     }

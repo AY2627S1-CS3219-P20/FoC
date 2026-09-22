@@ -21,6 +21,9 @@ node_modules/
 generated/
 *.generated.*
 
+# Uploaded supplier images
+**/uploads/
+
 # Prisma
 **/src/generated/
 

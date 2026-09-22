@@ -7,6 +7,7 @@ import { Field, FieldError, FieldGroup, FieldLabel, FieldContent } from "@/compo
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import ImageUploadField from "@/features/supplier/components/ImageUploadField";
 import {
   supplierFormSchema,
   supplierDayValues,
@@ -323,16 +324,12 @@ const SupplierForm = ({
             const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Image URL (Optional)</FieldLabel>
+                <FieldLabel htmlFor={field.name}>Location Image (Optional)</FieldLabel>
                 <FieldContent>
-                  <Input
-                    id={field.name}
-                    name={field.name}
+                  <ImageUploadField
                     value={field.state.value}
+                    onChange={(value) => field.handleChange(value)}
                     onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    aria-invalid={isInvalid}
-                    placeholder="Optional location photo"
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}
                 </FieldContent>

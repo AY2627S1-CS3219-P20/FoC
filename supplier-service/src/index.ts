@@ -4,8 +4,11 @@ import "dotenv/config";
 import supplierRouter from "./routes/supplier.route.js";
 import config from "./config/config.js";
 import { errorHandler } from "./middleware/error.middleware.js";
+import { ensureUploadsDir } from "./libs/upload.js";
 
 const app = express();
+
+await ensureUploadsDir();
 
 app.use(
     cors({

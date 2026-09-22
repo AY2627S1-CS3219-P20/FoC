@@ -17,6 +17,7 @@ export const ENDPOINTS = {
         createSupplier: `${BASE_SUPPLIER}/`,
         updateSupplier: `${BASE_SUPPLIER}/:id`,
         deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
+        uploadSupplierImage: `${BASE_SUPPLIER}/upload-image`,
     },
 
 } as const;
