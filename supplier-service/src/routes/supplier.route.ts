@@ -3,9 +3,9 @@ import { authenticate } from "../middleware/auth.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import {
     viewAllAvailableSuppliers,
+    viewAllSuppliers,
     createSupplier,
     updateSupplier,
-    deactivateSupplier,
 } from "../controllers/supplier.controller.js";
 import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
 
@@ -16,6 +16,9 @@ supplierRouter.use(authenticate);
 
 // View all available suppliers (F1)
 supplierRouter.get("/", viewAllAvailableSuppliers);
+
+// Admin: list all suppliers including deactivated (management page)
+supplierRouter.get("/all", requireAdmin, viewAllSuppliers);
 
 // Admin supplier management
 supplierRouter.post("/", requireAdmin, createSupplier);

@@ -7,10 +7,23 @@ export const supplierApi = createApiClient(
     import.meta.env.VITE_SUPPLIER_API_BASE_URL,
 );
 
-export const viewAllSuppliers = async (): Promise<Supplier[]> => {
+export const viewAllAvailableSuppliers = async (): Promise<Supplier[]> => {
     try {
         const response = await supplierApi.get<ApiResponse<Supplier[]>>(
             ENDPOINTS.supplier.viewAllAvailableSuppliers
+        );
+
+        const data = response.data.data;
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const viewAllSuppliers = async (): Promise<Supplier[]> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<Supplier[]>>(
+            ENDPOINTS.supplier.viewAllSuppliers
         );
 
         const data = response.data.data;

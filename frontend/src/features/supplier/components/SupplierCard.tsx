@@ -1,4 +1,4 @@
-import { ClockIcon, MapPinIcon, PencilIcon } from "lucide-react";
+import { ClockIcon, LogOutIcon, MapPinIcon, PencilIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Supplier, SupplierDay } from "@/types/api.types";
@@ -49,11 +49,11 @@ const formatHoursSummary = (openingHours: Supplier["openingHours"]): string => {
 interface SupplierCardProps {
     supplier: Supplier;
     onEdit?: () => void;
+    onDeactivate?: () => void;
 }
 
-const SupplierCard = ({ supplier, onEdit }: SupplierCardProps) => {
+const SupplierCard = ({ supplier, onEdit, onDeactivate }: SupplierCardProps) => {
     const isDeactivated = supplier.status === "DEACTIVATED";
-    const showActions = Boolean(onEdit);
 
     return (
         <div
@@ -120,17 +120,30 @@ const SupplierCard = ({ supplier, onEdit }: SupplierCardProps) => {
                     </div>
                 )}
 
-                {showActions && (
+                {!isDeactivated && (
                     <div className="mt-2 flex items-center justify-end gap-2 border-t pt-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={onEdit}
-                        >
-                            <PencilIcon className="size-4" />
-                            Edit
-                        </Button>
+                        {onEdit && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={onEdit}
+                            >
+                                <PencilIcon className="size-4" />
+                                Edit
+                            </Button>
+                        )}
+                        {onDeactivate && (
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={onDeactivate}
+                            >
+                                <LogOutIcon className="size-4" />
+                                Deactivate
+                            </Button>
+                        )}
                     </div>
                 )}
             </div>

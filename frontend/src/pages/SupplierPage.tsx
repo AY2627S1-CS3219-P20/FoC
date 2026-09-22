@@ -9,6 +9,8 @@ import {
     createSupplier,
     updateSupplier,
 } from "@/api/supplierApi";
+import { deactivateSupplier } from "@/api/supplierDeactivateApi";
+import DeactivateModal from "@/features/supplier/components/DeactivateModal";
 import useAuthStore from "@/store/authStore";
 import type { Supplier, SupplierDay, CreateSupplierInput } from "@/types/api.types";
 import type { SupplierFormValues } from "@/features/supplier/schemas/supplier.schema";
@@ -52,6 +54,7 @@ const SupplierPage = () => {
     const isAdmin = useAuthStore(state => state.user?.role?.toLowerCase() === "admin");
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+    const [supplierToDeactivate, setSupplierToDeactivate] = useState<Supplier | null>(null);
 
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
         queryKey: ["suppliers"],
@@ -81,6 +84,18 @@ const SupplierPage = () => {
         onSuccess: () => {
             toast.success("Supplier updated");
             setEditingSupplier(null);
+            invalidate();
+        },
+        onError: (error: ParsedError) => {
+            toast.error(error.message);
+        },
+    });
+
+    const deactivateMutation = useMutation({
+        mutationFn: deactivateSupplier,
+        onSuccess: () => {
+            toast.success("Supplier deactivated");
+            setSupplierToDeactivate(null);
             invalidate();
         },
         onError: (error: ParsedError) => {
@@ -138,6 +153,7 @@ const SupplierPage = () => {
                                 key={supplier.id}
                                 supplier={supplier}
                                 onEdit={isAdmin ? () => setEditingSupplier(supplier) : undefined}
+                                onDeactivate={isAdmin ? () => setSupplierToDeactivate(supplier) : undefined}
                             />
                         ))}
                     </div>
@@ -171,6 +187,21 @@ const SupplierPage = () => {
                         isPending={updateMutation.isPending}
                         onSubmit={handleSubmitForm}
                         onCancel={() => setEditingSupplier(null)}
+                    />
+                </SupplierModal>
+            )}
+
+            {supplierToDeactivate && (
+                <SupplierModal
+                    open={true}
+                    onClose={() => setSupplierToDeactivate(null)}
+                    title="Deactivate Supplier"
+                >
+                    <DeactivateModal
+                        supplier={supplierToDeactivate}
+                        isPending={deactivateMutation.isPending}
+                        onConfirm={() => deactivateMutation.mutate(supplierToDeactivate.id)}
+                        onCancel={() => setSupplierToDeactivate(null)}
                     />
                 </SupplierModal>
             )}

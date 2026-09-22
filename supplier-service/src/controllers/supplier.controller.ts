@@ -25,6 +25,18 @@ export async function viewAllAvailableSuppliers(req: Request, res: Response) {
     });
 }
 
+export async function viewAllSuppliers(req: Request, res: Response) {
+    const suppliers = await prisma.supplier.findMany({
+        include: { openingHours: true },
+        orderBy: { name: "asc" },
+    });
+
+    return res.status(200).json({
+        success: true,
+        data: suppliers,
+    });
+}
+
 export async function createSupplier(req: Request, res: Response) {
     const input = parseInput(createSupplierSchema, req.body);
     const supplier = await createSupplierService(prisma, input);

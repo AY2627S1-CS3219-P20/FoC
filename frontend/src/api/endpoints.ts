@@ -13,6 +13,7 @@ export const ENDPOINTS = {
 
     supplier: {
         viewAllAvailableSuppliers: `${BASE_SUPPLIER}/`,
+        viewAllSuppliers: `${BASE_SUPPLIER}/all`,
         createSupplier: `${BASE_SUPPLIER}/`,
         updateSupplier: `${BASE_SUPPLIER}/:id`,
         deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
