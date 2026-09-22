@@ -7,9 +7,13 @@ import DesktopNav from "./DesktopNav";
 import MobileMenu from "./MobileMenu";
 import UserMenu from "./UserMenu";
 import CreditBalance from "./CreditBalance";
+import { ROLES } from "@/features/auth/types/auth.types";
+import { adminNavLinks, studentNavLinks } from "./navLinks";
 
 const Navbar = () => {
-    const { isAuthenticated } = useAuth();
+    const { user, isAuthenticated } = useAuth();
+    const isAdmin = user?.role === ROLES.ADMIN;
+    const navLinks = isAdmin ? adminNavLinks : studentNavLinks;
 
     return (
         <header className="sticky top-0 z-50 w-full bg-white shadow-2xs border-b border-slate-200">
@@ -26,14 +30,23 @@ const Navbar = () => {
 
                     {isAuthenticated && (
                         <>
-                            <DesktopNav />
+                            <DesktopNav links={navLinks} />
                             <div className="ml-auto hidden md:flex items-center space-x-2">
-                                <CreditBalance />
-                                <Separator orientation="vertical" className="bg-slate-300" />
+                                {/* Only show credit balance for non-admin users, as admin users do not have credits. */}
+                                {!isAdmin && (
+                                    <>
+                                        <CreditBalance />
+                                        <Separator
+                                            orientation="vertical"
+                                            className="bg-slate-300"
+                                        />
+                                    </>
+                                )}
+
                                 <UserMenu />
                             </div>
                             <div className="ml-auto flex md:hidden">
-                                <MobileMenu />
+                                <MobileMenu links={navLinks} showCreditBalance={!isAdmin} />
                             </div>
                         </>
                     )}
