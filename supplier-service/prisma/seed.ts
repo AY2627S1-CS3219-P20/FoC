@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { parse } from 'csv-parse/sync';
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, SupplierType } from "../src/generated/prisma/client.ts";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
 
 const adapter = new PrismaPg({
     connectionString: process.env.DATABASE_URL!,
@@ -23,8 +23,7 @@ async function main() {
     }) as Record<string, string>[]; // get content in the form of an array of rows
 
     // helper functions
-    type SupplierType = "FOOD" | "RETAIL" | "FACILITIES"
-    function enforceSupplierType(raw: string): SupplierType {
+    function enforceSupplierType(raw: string): string {
         if (raw.includes("Shopping")) {
             return "RETAIL";
         } else if (raw.includes("Food")) {
@@ -44,6 +43,19 @@ async function main() {
     type Days = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY"
     const days: Days[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
+    const types: string[] = ["FOOD", "RETAIL", "FACILITIES"]
+    const supplierTypes = types.map(async (t) => {
+        const supplierType = await prisma.supplierType.upsert({
+            where: {
+                type: t,
+            },
+            create: {
+                type: t,
+            },
+            update: {}
+        });
+    });
+
     for (const row of rows) {
         const supplier = await prisma.supplier.upsert({
             where: {
@@ -62,7 +74,7 @@ async function main() {
                 imageUrl: row.imageUrl || null, // field may be null
             },
             update: {}
-        }) 
+        }); 
 
         for (const day of days) {
             const openingHours = await prisma.openingHours.upsert({
@@ -76,7 +88,7 @@ async function main() {
                     closingTime: parse24hFormattedTime(row.ClosingTime),
                 },
                 update: {}
-            })
+            });
         }
     }
 };
