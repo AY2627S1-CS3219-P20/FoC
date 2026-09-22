@@ -13,6 +13,9 @@ export const ENDPOINTS = {
 
     supplier: {
         viewAllAvailableSuppliers: `${BASE_SUPPLIER}/`,
+        createSupplier: `${BASE_SUPPLIER}/`,
+        updateSupplier: `${BASE_SUPPLIER}/:id`,
+        deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
     },
 
 } as const;
