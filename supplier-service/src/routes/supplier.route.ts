@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
-import { viewAllAvailableSuppliers } from "../controllers/supplier.controller.js";
+import { viewSuppliersInPage } from "../controllers/supplier.controller.js";
 
 const supplierRouter = Router();
 
-// All supplier endpoints require authentication
+// All supplier endpoints require authentication (require users to have been logged in)
 supplierRouter.use(authenticate);
 
-// View all available suppliers
-supplierRouter.get("/", viewAllAvailableSuppliers);
+// View all the suppliers that can be listed in the current page
+supplierRouter.get("/", viewSuppliersInPage);
 
 export default supplierRouter;
