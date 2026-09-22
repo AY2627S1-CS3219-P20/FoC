@@ -5,7 +5,8 @@ import { toast } from "react-toastify";
 
 import type { ParsedError } from "@/utils/errorHandler";
 import {
-    viewAllSuppliers,
+    viewSuppliersForAdmin,
+    viewSuppliersInPage,
     createSupplier,
     updateSupplier,
 } from "@/api/supplierApi";
@@ -58,7 +59,7 @@ const SupplierPage = () => {
 
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
         queryKey: ["suppliers"],
-        queryFn: viewAllSuppliers,
+        queryFn: isAdmin ? () => viewSuppliersForAdmin(1) : () => viewSuppliersInPage(1),
         refetchOnMount: "always",
     });
 

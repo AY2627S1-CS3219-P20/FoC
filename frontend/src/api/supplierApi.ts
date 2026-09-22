@@ -9,27 +9,25 @@ export const supplierApi = createApiClient(
     import.meta.env.VITE_SUPPLIER_API_BASE_URL,
 );
 
-export const viewAllAvailableSuppliers = async (): Promise<Supplier[]> => {
+export const viewSuppliersInPage = async (page: number): Promise<Supplier[]> => {
     try {
-        const response = await supplierApi.get<ApiResponse<Supplier[]>>(
-            ENDPOINTS.supplier.viewAllAvailableSuppliers
+        const response = await supplierApi.get<ApiResponse<{ message: string; suppliers: Supplier[] }>>(
+            `${ENDPOINTS.supplier.viewSuppliersInPage}?page=${page}`,
         );
 
-        const data = response.data.data;
-        return Array.isArray(data) ? data : [];
+        return response.data.data?.suppliers ?? [];
     } catch (error) {
         throw parseError(error);
     }
 };
 
-export const viewAllSuppliers = async (): Promise<Supplier[]> => {
+export const viewSuppliersForAdmin = async (page: number = 1): Promise<Supplier[]> => {
     try {
-        const response = await supplierApi.get<ApiResponse<Supplier[]>>(
-            ENDPOINTS.supplier.viewAllSuppliers
+        const response = await supplierApi.get<ApiResponse<{ message: string; suppliers: Supplier[] }>>(
+            `${ENDPOINTS.supplier.viewSuppliersForAdmin}?page=${page}`,
         );
 
-        const data = response.data.data;
-        return Array.isArray(data) ? data : [];
+        return response.data.data?.suppliers ?? [];
     } catch (error) {
         throw parseError(error);
     }

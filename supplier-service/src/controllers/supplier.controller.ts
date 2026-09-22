@@ -11,36 +11,43 @@ import {
 } from "../schemas/supplier.schema.js";
 import { AppError } from "../errors/errors.js";
 import {
-    upload,
     buildAssetUrl,
     getContentType,
     resolveSafeUploadPath,
 } from "../libs/upload.js";
 import fs from "node:fs/promises";
+import { fetchAllSuppliers, fetchSuppliers } from "../services/supplier.service.js";
+import { supplierSchema } from "../schema/supplier.schema.js";
 
-export async function viewAllAvailableSuppliers(req: Request, res: Response) {
-    console.log("Fetching all suppliers...");
-    const suppliers = await prisma.supplier.findMany({
-        where: { status: "ACTIVATED" },
-        include: { openingHours: true },
-        orderBy: { name: "asc" },
-    });
+export async function viewSuppliersInPage(req: Request, res: Response) {
+    const request = supplierSchema.safeParse(req.query);
+    if (!request.success) {
+        throw new AppError("Parameters not input correctly", 400);
+    }
+    const suppliers = await fetchSuppliers(request.data.page);
 
     return res.status(200).json({
         success: true,
-        data: suppliers,
+        data: {
+            message: "All suppliers fetched successfully",
+            suppliers: suppliers,
+        },
     });
 }
 
-export async function viewAllSuppliers(req: Request, res: Response) {
-    const suppliers = await prisma.supplier.findMany({
-        include: { openingHours: true },
-        orderBy: { name: "asc" },
-    });
+export async function viewSuppliersForAdmin(req: Request, res: Response) {
+    const request = supplierSchema.safeParse(req.query);
+    if (!request.success) {
+        throw new AppError("Parameters not input correctly", 400);
+    }
+    const suppliers = await fetchAllSuppliers();
 
     return res.status(200).json({
         success: true,
-        data: suppliers,
+        data: {
+            message: "All suppliers fetched successfully",
+            suppliers: suppliers,
+        },
     });
 }
 

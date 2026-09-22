@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { Day } from "../generated/prisma/enums.js";
 import type { CreateSupplierInput, UpdateSupplierInput, OpeningHoursInput } from "../schemas/supplier.schema.js";
+import { prisma } from "../libs/prisma.js";
 import { AppError } from "../errors/errors.js";
 
 export const STATUS = {
@@ -159,4 +160,32 @@ export async function updateSupplier(
         data,
         include: { openingHours: true },
     });
+}
+
+const LIMIT: number = 15; // only a max of 15 suppliers per page is displayed per page
+
+// this function fetches the suppliers on the given page
+export async function fetchSuppliers(page: number) {
+    const suppliers = await prisma.supplier.findMany({
+        include: { openingHours: true }, // also get opening hours of suppliers
+        orderBy: { name: 'asc' }, // case-sensitive
+        take: LIMIT,
+        skip: LIMIT * (page - 1),
+    });
+
+    if (!suppliers || suppliers.length == 0) {
+        throw new AppError("No records found for this page", 400, "BAD_REQUEST");
+    }
+
+    return { suppliers: suppliers };
+}
+
+// this function fetches every supplier, unpaginated, for the admin management view
+export async function fetchAllSuppliers() {
+    const suppliers = await prisma.supplier.findMany({
+        include: { openingHours: true }, // also get opening hours of suppliers
+        orderBy: { name: 'asc' }, // case-sensitive
+    });
+
+    return { suppliers: suppliers };
 }
