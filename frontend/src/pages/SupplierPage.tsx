@@ -1,33 +1,6 @@
-// For testing purposes
-import { ENDPOINTS } from "@/api/endpoints";
-import supplierApi from "@/api/supplierApi";
-import type { ApiResponse, ApiSupplierResponse, SupplierRecord } from "@/types/api.types";
-import { parseError, type ParsedError } from "@/utils/errorHandler";
+import useSuppliers from "@/features/suppliers/hooks/useSuppliers";
 import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import SupplierRecordCard from "@/features/suppliers/components/SupplierRecordCard";
-import { useQuery } from "@tanstack/react-query";
-
-export const viewSuppliersInPage = async (page: number): Promise<ApiSupplierResponse> => {
-    const response = await supplierApi.get<ApiResponse<ApiSupplierResponse>>(
-        ENDPOINTS.supplier.viewSuppliersInPage(page)
-    );
-
-    return response.data.data!;
-};
-
-const useSuppliers = (page: number) => {
-    return useQuery<ApiSupplierResponse, ParsedError>({
-        queryKey: ["suppliers"],
-        queryFn: async () => {
-            try {
-                return await viewSuppliersInPage(page);
-            } catch (rawError) {
-                throw parseError(rawError);
-            }
-        },
-        refetchOnMount: "always",
-    });
-};
 
 const SupplierPage = () => {
     const DEFAULT_PAGE = 1;
