@@ -12,12 +12,12 @@ export const ENDPOINTS = {
     user: {},
 
     supplier: {
-        viewSuppliersInPage: `${BASE_SUPPLIER}/`,
         viewSuppliersForAdmin: `${BASE_SUPPLIER}/all`,
         createSupplier: `${BASE_SUPPLIER}/`,
         updateSupplier: `${BASE_SUPPLIER}/:id`,
         deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
         uploadSupplierImage: `${BASE_SUPPLIER}/upload-image`,
+        viewSuppliersInPage: (page: number) => `${BASE_SUPPLIER}/?page=${page}`,
     },
 
 } as const;

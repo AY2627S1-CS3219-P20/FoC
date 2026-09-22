@@ -1,36 +1,37 @@
 import type { Request, Response } from "express";
-import { prisma } from "../libs/prisma.js";
-import {
-    createSupplier as createSupplierService,
-    updateSupplier as updateSupplierService,
-} from "../services/supplier.service.js";
-import {
-    parseInput,
-    createSupplierSchema,
-    updateSupplierSchema,
-} from "../schemas/supplier.schema.js";
+import fs from "node:fs/promises";
 import { AppError } from "../errors/errors.js";
+import { prisma } from "../libs/prisma.js";
 import {
     buildAssetUrl,
     getContentType,
     resolveSafeUploadPath,
 } from "../libs/upload.js";
-import fs from "node:fs/promises";
-import { fetchAllSuppliers, fetchSuppliers } from "../services/supplier.service.js";
 import { supplierSchema } from "../schema/supplier.schema.js";
+import {
+    createSupplierSchema,
+    parseInput,
+    updateSupplierSchema,
+} from "../schemas/supplier.schema.js";
+import {
+    createSupplier as createSupplierService,
+    fetchActiveSuppliers,
+    fetchAllSuppliers,
+    updateSupplier as updateSupplierService,
+} from "../services/supplier.service.js";
 
 export async function viewSuppliersInPage(req: Request, res: Response) {
     const request = supplierSchema.safeParse(req.query);
     if (!request.success) {
         throw new AppError("Parameters not input correctly", 400);
     }
-    const suppliers = await fetchSuppliers(request.data.page);
+    const suppliers = await fetchActiveSuppliers(request.data.page);
 
     return res.status(200).json({
         success: true,
         data: {
             message: "All suppliers fetched successfully",
-            suppliers: suppliers,
+            data: suppliers,
         },
     });
 }
@@ -40,13 +41,13 @@ export async function viewSuppliersForAdmin(req: Request, res: Response) {
     if (!request.success) {
         throw new AppError("Parameters not input correctly", 400);
     }
-    const suppliers = await fetchAllSuppliers();
+    const suppliers = await fetchAllSuppliers(request.data.page);
 
     return res.status(200).json({
         success: true,
         data: {
             message: "All suppliers fetched successfully",
-            suppliers: suppliers,
+            data: suppliers,
         },
     });
 }

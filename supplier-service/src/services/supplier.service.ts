@@ -1,8 +1,8 @@
+import { AppError } from "../errors/errors.js";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { Day } from "../generated/prisma/enums.js";
-import type { CreateSupplierInput, UpdateSupplierInput, OpeningHoursInput } from "../schemas/supplier.schema.js";
 import { prisma } from "../libs/prisma.js";
-import { AppError } from "../errors/errors.js";
+import type { CreateSupplierInput, OpeningHoursInput, UpdateSupplierInput } from "../schemas/supplier.schema.js";
 
 export const STATUS = {
     ACTIVATED: "ACTIVATED",
@@ -164,28 +164,35 @@ export async function updateSupplier(
 
 const LIMIT: number = 15; // only a max of 15 suppliers per page is displayed per page
 
-// this function fetches the suppliers on the given page
-export async function fetchSuppliers(page: number) {
-    const suppliers = await prisma.supplier.findMany({
+// public fetch for the normal-user page: active suppliers only
+export async function fetchActiveSuppliers(page: number) {
+    return fetchSuppliers(page, { status: STATUS.ACTIVATED });
+}
+
+// public fetch for the admin page: every supplier, including deactivated
+export async function fetchAllSuppliers(page: number) {
+    return fetchSuppliers(page);
+}
+
+// shared paginated fetch; callers supply an optional where clause
+async function fetchSuppliers(
+    page: number,
+    where?: Prisma.SupplierWhereInput,
+) {
+    const args: Prisma.SupplierFindManyArgs = {
         include: { openingHours: true }, // also get opening hours of suppliers
         orderBy: { name: 'asc' }, // case-sensitive
         take: LIMIT,
         skip: LIMIT * (page - 1),
-    });
+    };
+
+    if (where) args.where = where;
+
+    const suppliers = await prisma.supplier.findMany(args);
 
     if (!suppliers || suppliers.length == 0) {
         throw new AppError("No records found for this page", 400, "BAD_REQUEST");
     }
 
-    return { suppliers: suppliers };
-}
-
-// this function fetches every supplier, unpaginated, for the admin management view
-export async function fetchAllSuppliers() {
-    const suppliers = await prisma.supplier.findMany({
-        include: { openingHours: true }, // also get opening hours of suppliers
-        orderBy: { name: 'asc' }, // case-sensitive
-    });
-
-    return { suppliers: suppliers };
+    return suppliers;
 }

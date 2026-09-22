@@ -11,11 +11,11 @@ export const supplierApi = createApiClient(
 
 export const viewSuppliersInPage = async (page: number): Promise<Supplier[]> => {
     try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; suppliers: Supplier[] }>>(
-            `${ENDPOINTS.supplier.viewSuppliersInPage}?page=${page}`,
+        const response = await supplierApi.get<ApiResponse<{ message: string; data: Supplier[] }>>(
+            `${ENDPOINTS.supplier.viewSuppliersInPage(page)}`,
         );
 
-        return response.data.data?.suppliers ?? [];
+        return response.data.data?.data ?? [];
     } catch (error) {
         throw parseError(error);
     }
@@ -23,11 +23,11 @@ export const viewSuppliersInPage = async (page: number): Promise<Supplier[]> => 
 
 export const viewSuppliersForAdmin = async (page: number = 1): Promise<Supplier[]> => {
     try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; suppliers: Supplier[] }>>(
+        const response = await supplierApi.get<ApiResponse<{ message: string; data: Supplier[] }>>(
             `${ENDPOINTS.supplier.viewSuppliersForAdmin}?page=${page}`,
         );
 
-        return response.data.data?.suppliers ?? [];
+        return response.data.data?.data ?? [];
     } catch (error) {
         throw parseError(error);
     }
