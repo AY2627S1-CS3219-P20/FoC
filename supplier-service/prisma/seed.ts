@@ -69,9 +69,9 @@ async function main() {
                 floor: Number(row.Floor),
                 description: row["Location Description"],
                 address: row.Address,
-                latitude: Number(row.latitude) || null, // field may be null
-                longitude: Number(row.longitude) || null, // field may be null
-                imageUrl: row.imageUrl || null, // field may be null
+                latitude: Number(row.Latitude) || null, // field may be null
+                longitude: Number(row.Longitude) || null, // field may be null
+                imageUrl: row.ImageURL || null, // field may be null
             },
             update: {}
         }); 
