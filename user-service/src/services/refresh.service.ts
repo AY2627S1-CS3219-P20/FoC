@@ -7,10 +7,13 @@ import { REFRESH_TOKEN_MAX_AGE } from "../constants/auth.constants.js";
 
 export async function refreshAccessToken(refreshToken: string) {
     console.log("Refresh service running >>>>>>>>>>>>>>");
-    // Verify the refresh token using jwt and the secret key
+
+    // 1. Verify the refresh token using jwt and the secret key
     const payload = verifyRefreshToken(refreshToken);
     console.log("Refresh token jti:", payload.jti);
+    console.log("Refresh token userId:", payload.userId);
 
+    // 2. Find the exact refresh token in the database using the jti (tokenId)
     const storedToken = await prisma.refreshToken.findUnique({
         where: {
             tokenId: payload.jti,
@@ -20,25 +23,24 @@ export async function refreshAccessToken(refreshToken: string) {
         },
     });
 
-    // Check if the refresh token exists and is valid
     if (!storedToken) {
         console.log("Refresh token not found in database");
         throw new AppError("Invalid token, please sign out and back in", 401);
     }
 
-    // Check if the refresh token has been revoked
+    // 3. Check if the refresh token has already been revoked
     if (storedToken.revokedAt) {
         console.log("The refresh token has been revoked. No more refresh token rotation.");
         throw new AppError("Invalid token, please sign out and back in", 401);
     }
 
-    // Check if the refresh token has expired
+    // 4. Check if the refresh token has expired
     if (storedToken.expiresAt < new Date()) {
         console.log("The refresh token has expired. No more refresh token rotation.");
         throw new AppError("Invalid token, please sign out and back in", 401);
     }
 
-    // Verify the refresh token against the stored hash
+    // 5. Verify the refresh token against the stored hash
     const refreshTokenValid = await argon2.verify(storedToken.tokenHash, refreshToken);
     if (!refreshTokenValid) {
         console.log("The refresh token does not match the stored hash. No more refresh token rotation.");
@@ -48,9 +50,10 @@ export async function refreshAccessToken(refreshToken: string) {
     // Refresh token is valid and exists in the database
     const user = storedToken.user;
 
+    // 6. Revoke ONLY the current refresh token that was used to request a new access token
     const revoked = await prisma.refreshToken.updateMany({
         where: {
-            userId: user.userId,
+            tokenId: payload.jti,
             revokedAt: null,
         },
         data: {
@@ -66,18 +69,18 @@ export async function refreshAccessToken(refreshToken: string) {
         throw new AppError("Invalid token, please sign out and back in", 401);
     }
 
-    // Generate a new access token
+    // 7. Generate a new access token
     const newAccessToken = generateAccessToken({
         userId: user.userId,
         email: user.email,
         role: user.role,
     });
 
-    // Generate a new refresh token
+    // 8. Generate a new refresh token
     const { refreshToken: newRefreshToken, tokenId: newTokenId } = generateRefreshToken(user.userId);
     const newTokenHash = await argon2.hash(newRefreshToken);
 
-    // Store the new refresh token in the database
+    // 9. Store the new refresh token in the database
     await prisma.refreshToken.create({
         data: {
             tokenId: newTokenId,

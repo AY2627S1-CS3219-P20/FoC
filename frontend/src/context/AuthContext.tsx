@@ -4,6 +4,7 @@ import {
     useState,
     useCallback,
     type ReactNode,
+    useRef,
 } from "react";
 import { setToken, removeToken } from "@/utils/token";
 import useAuthStore from "@/store/authStore";
@@ -22,24 +23,55 @@ export const AuthContext = createContext<AuthContextValue>({
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [isInitializing, setIsInitializing] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(true);
     const setUser = useAuthStore((state) => state.setUser);
     const clearAuth = useAuthStore((state) => state.clearAuth);
 
+    // Use a ref to store the promise of the restoreSession function,
+    // to ensure that multiple calls to restoreSession do not trigger multiple requests.
+    const restorePromiseRef = useRef<Promise<void> | null>(null);
+
     const restoreSession = useCallback(async () => {
-        setIsInitializing(true);
-        try {
-            const response = await authApi.post<ApiResponse<AuthData>>(ENDPOINTS.auth.refreshToken);
-            const { accessToken, user } = response.data.data!;
-            setToken(accessToken);
-            setUser(user);
-        } catch {
-            removeToken();
-            clearAuth();
-        } finally {
-            setIsInitializing(false);
+        if (restorePromiseRef.current) {
+            return restorePromiseRef.current;
         }
+
+        const promise = (async () => {
+            setIsInitializing(true);
+
+            try {
+                // console.log("REFRESH: starting");
+
+                const response = await authApi.post<ApiResponse<AuthData>>(ENDPOINTS.auth.refreshToken);
+                // console.log("REFRESH: success", response.data);
+
+                const { accessToken, user } = response.data.data!;
+                // console.log("REFRESH: user =", user);
+
+                setToken(accessToken);
+                setUser(user);
+                // console.log("REFRESH: setUser called");
+
+            } catch (error) {
+                // console.error("REFRESH: FAILED", error);
+                removeToken();
+                clearAuth();
+            } finally {
+                setIsInitializing(false);
+                restorePromiseRef.current = null;
+                // console.log("REFRESH: initialization finished");
+            }
+        })();
+
+        restorePromiseRef.current = promise;
+
+        return promise;
     }, [setUser, clearAuth]);
+
+    // Restore session when the app starts or when the user refreshes the page
+    useEffect(() => {
+        void restoreSession();
+    }, [restoreSession]);
 
     useEffect(() => {
         const forcedLogout = () => {
