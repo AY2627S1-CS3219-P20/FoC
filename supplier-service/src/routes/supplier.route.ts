@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
-import { viewSuppliersInPage } from "../controllers/supplier.controller.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
+import { createSupplierType, deleteSupplierType, viewSuppliersInPage } from "../controllers/supplier.controller.js";
 
 const supplierRouter = Router();
 
@@ -14,5 +14,9 @@ supplierRouter.use(authenticate);
 
 // View all the suppliers that can be listed in the current page
 supplierRouter.get("/", viewSuppliersInPage);
+
+// both routes below expect a json body
+supplierRouter.post("/new-supplier-type", createSupplierType) // create a new supplier type that does not currently exist
+supplierRouter.post("/delete-supplier-type", deleteSupplierType) // delete a new supplier type that does not currently exist
 
 export default supplierRouter;
