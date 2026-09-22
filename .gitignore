@@ -23,3 +23,6 @@ generated/
 
 # Prisma
 **/src/generated/
+
+# Local test seed scripts (contain hardcoded credentials)
+user-service/scripts/seed-test-user.mts
