@@ -5,7 +5,9 @@ import {
     viewAllAvailableSuppliers,
     createSupplier,
     updateSupplier,
+    deactivateSupplier,
 } from "../controllers/supplier.controller.js";
+import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
 
 const supplierRouter = Router();
 
@@ -18,5 +20,6 @@ supplierRouter.get("/", viewAllAvailableSuppliers);
 // Admin supplier management
 supplierRouter.post("/", requireAdmin, createSupplier);
 supplierRouter.patch("/:id", requireAdmin, updateSupplier);
+supplierRouter.patch("/:id/deactivate", requireAdmin, deactivateSupplierRoute);
 
 export default supplierRouter;
