@@ -10,6 +10,10 @@ out/
 *.pem
 *.key
 
+# Testing files
+postman/
+.postman/
+
 # OS
 .DS_Store
 Thumbs.db
