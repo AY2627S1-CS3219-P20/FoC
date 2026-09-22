@@ -12,12 +12,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum SupplierType {
-  FOOD
-  RETAIL
-  FACILITIES
-}
-
 enum SupplierStatus {
   ACTIVATED
   DEACTIVATED
@@ -33,10 +27,18 @@ enum Day {
   SUNDAY
 }
 
+model SupplierType { // initial data should include types "RETAIL", "FOOD", "FACILITIES"
+  id String @id @default(uuid())
+  type String @unique
+  suppliers Supplier[]
+
+  @@index([type])
+}
+
 model Supplier {
   id String @id @default(uuid())
   name String @unique
-  type SupplierType 
+  type String
   status SupplierStatus @default(ACTIVATED)
   building String
   floor Int
@@ -48,6 +50,8 @@ model Supplier {
   imageUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  supplierType SupplierType @relation(fields: [type], references: [type], onDelete: Cascade)
 }
 
 model OpeningHours {
