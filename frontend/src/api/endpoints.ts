@@ -12,7 +12,7 @@ export const ENDPOINTS = {
     user: {},
 
     supplier: {
-        viewAllAvailableSuppliers: `${BASE_SUPPLIER}/`,
+        viewSuppliersInPage: (page: number) => `${BASE_SUPPLIER}/?page=${page}`,
     },
 
 } as const;
