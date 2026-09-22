@@ -16,5 +16,5 @@ export async function fetchSuppliers(page: number) {
         throw new AppError("No records found for this page", 400, "BAD_REQUEST");
     }
 
-    return { suppliers: suppliers };
+    return suppliers;
 } 

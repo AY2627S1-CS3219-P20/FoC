@@ -18,7 +18,7 @@ export async function viewSuppliersInPage(req: Request, res: Response) {
         success: true,
         data: {
             message: "All suppliers fetched successfully",
-            suppliers: suppliers,
+            data: suppliers,
         },
     });
 }
