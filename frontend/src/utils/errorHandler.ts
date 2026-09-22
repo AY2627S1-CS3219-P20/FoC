@@ -8,10 +8,26 @@ export interface ParsedError {
 }
 
 const isAxiosError = (error: unknown): error is AxiosError => {
-    return (typeof error === 'object' && error !== null && 'isAxiosError' in error && (error as AxiosError).isAxiosError === true);
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'isAxiosError' in error
+        && (error as AxiosError).isAxiosError === true
+    );
 };
 
 export const parseError = (error: unknown): ParsedError => {
+    // Already parsed error
+    if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        "message" in error &&
+        "statusCode" in error
+    ) {
+        return error as ParsedError;
+    }
+
     // Axios error with response data
     if (isAxiosError(error) && error.response) {
         const data = error.response.data as ApiErrorResponse;
