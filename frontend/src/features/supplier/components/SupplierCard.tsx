@@ -35,15 +35,49 @@ const formatTimeLabel = (value: string | Date): string => {
     return `${displayHour}:${minutes} ${period}`;
 };
 
+interface HourGroup {
+    days: SupplierDay[];
+    openingTime: string;
+    closingTime: string;
+}
+
 const formatHoursSummary = (openingHours: Supplier["openingHours"]): string => {
     const sorted = [...(openingHours ?? [])].sort(
         (a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day),
     );
 
-    return sorted
-        .map(hour => `${DAY_ABBR[hour.day]} ${formatTimeLabel(hour.openingTime)}–${formatTimeLabel(hour.closingTime)}`)
-        .join(" · ")
-        .slice(0, 60);
+    const groups: HourGroup[] = [];
+    for (const hour of sorted) {
+        const last = groups[groups.length - 1];
+        const curIndex = DAY_ORDER.indexOf(hour.day);
+        if (
+            last &&
+            DAY_ORDER.indexOf(last.days[last.days.length - 1]) === curIndex - 1 &&
+            last.openingTime === hour.openingTime &&
+            last.closingTime === hour.closingTime
+        ) {
+            last.days.push(hour.day);
+        } else {
+            groups.push({
+                days: [hour.day],
+                openingTime: hour.openingTime,
+                closingTime: hour.closingTime,
+            });
+        }
+    }
+
+    const timeRange = (openingTime: string, closingTime: string) =>
+        `${formatTimeLabel(openingTime)}–${formatTimeLabel(closingTime)}`;
+
+    return groups
+        .map(group => {
+            const label = timeRange(group.openingTime, group.closingTime);
+            if (group.days.length === 1) {
+                return `${DAY_ABBR[group.days[0]]} ${label}`;
+            }
+            return `${DAY_ABBR[group.days[0]]}-${DAY_ABBR[group.days[group.days.length - 1]]} ${label}`;
+        })
+        .join(" · ");
 };
 
 interface SupplierCardProps {
