@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import LoginPage from '@/pages/LoginPage';
 import SupplierPage from '@/pages/SupplierPage';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
+import AppLayout from '@/components/layout/AppLayout';
 import HomePage from '@/pages/HomePage';
 
 const AppRouter = () => {
@@ -17,8 +18,10 @@ const AppRouter = () => {
 
                         {/* Protected routes - redirect to login page if not authenticated */}
                         <Route element={<ProtectedRoute />}>
-                            <Route path="/home" element={<HomePage />} />
-                            <Route path="/suppliers" element={<SupplierPage />} />
+                            <Route element={<AppLayout />}>
+                                <Route path="/home" element={<HomePage />} />
+                                <Route path="/suppliers" element={<SupplierPage />} />
+                            </Route>
                         </Route>
                     </Routes>
                 </AuthProvider>
