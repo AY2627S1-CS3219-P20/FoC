@@ -42,3 +42,7 @@ export const supplierDayLabels: Record<typeof supplierDayValues[number], string>
     SATURDAY: "Saturday",
     SUNDAY: "Sunday",
 };
+
+export const supplierTypeFormSchema = z.object({
+    type: z.string().toUpperCase(),
+})
