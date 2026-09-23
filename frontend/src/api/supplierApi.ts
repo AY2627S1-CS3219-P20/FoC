@@ -2,7 +2,7 @@ import createApiClient from "./axios";
 import axios from "axios";
 import { ENDPOINTS } from "@/api/endpoints";
 import { getToken } from "@/utils/token";
-import type { ApiResponse, CreateSupplierInput, UpdateSupplierInput, Supplier, SupplierType } from "@/types/api.types";
+import type { ApiResponse, CreateSupplierInput, UpdateSupplierInput, Supplier, SupplierType, SupplierTypeCount } from "@/types/api.types";
 import { parseError } from "@/utils/errorHandler";
 
 export const supplierApi = createApiClient(
@@ -55,6 +55,18 @@ export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
     }
 };
 
+export const countSupplierTypes = async (): Promise<SupplierTypeCount[]> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<{ message: string; data: SupplierType[] }>>(
+            `${ENDPOINTS.supplier.countSupplierType}`,
+        );
+
+        return response.data.data?.data ?? [];
+    } catch (error) {
+        throw parseError(error);
+    }
+}
+
 export const createSupplierType = async (type: string): Promise<SupplierType> => {
     const jsonBody = {
         type: type,
@@ -71,10 +83,11 @@ export const createSupplierType = async (type: string): Promise<SupplierType> =>
     }
 };
 
-export const deleteSupplierType = async (type: SupplierType): Promise<SupplierType> => {
+export const deleteSupplierType = async (type: SupplierTypeCount): Promise<SupplierType> => {
     const jsonBody = {
-        type: type,
-    }
+        id: type.id,
+        type: type.type, 
+    } // enforce the argument to be of SupplierType, which is expected by supplier-service
     try {
         const response = await supplierApi.post<ApiResponse<{ message: string; data: SupplierType }>>(
             `${ENDPOINTS.supplier.deleteSupplierType}`,

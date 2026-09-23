@@ -22,6 +22,7 @@ export const ENDPOINTS = {
         getAllSupplierTypes: `${BASE_SUPPLIER}/get-supplier-types`,
         createSupplierType: `${BASE_SUPPLIER}/new-supplier-type`,
         deleteSupplierType: `${BASE_SUPPLIER}/delete-supplier-type`,
+        countSupplierType: `${BASE_SUPPLIER}/count-supplier-type`,
     },
 
 } as const;
