@@ -63,6 +63,11 @@ export interface Supplier {
     openingHours: SupplierOpeningHours[];
 }
 
+export interface SupplierType {
+    id: string;
+    type: string;
+}
+
 export interface CreateSupplierInput {
     name: string;
     type: string;
