@@ -5,6 +5,7 @@ import { removeToken } from "@/utils/token";
 import useAuthStore from "@/store/authStore";
 import queryClient from "@/lib/queryClient";
 import type { ParsedError } from "@/utils/errorHandler";
+import { ROUTES } from "@/routes/routes";
 
 const useLogout = () => {
     const navigate = useNavigate();
@@ -18,13 +19,13 @@ const useLogout = () => {
             removeToken();
             clearAuth();
             queryClient.clear();
-            navigate("/");
+            navigate(ROUTES.LOGIN);
         },
         onError: () => {
             removeToken();
             clearAuth();
             queryClient.clear();
-            navigate("/");
+            navigate(ROUTES.LOGIN);
         },
     });
 

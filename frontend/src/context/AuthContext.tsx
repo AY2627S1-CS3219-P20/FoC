@@ -8,9 +8,10 @@ import {
 } from "react";
 import { setToken, removeToken } from "@/utils/token";
 import useAuthStore from "@/store/authStore";
-import type { ApiResponse, AuthData } from "@/types/api.types";
+import type { ApiResponse } from "@/types/api.types";
 import { ENDPOINTS } from "@/api/endpoints";
 import authApi from "@/api/authApi";
+import type { AuthResult } from "@/features/auth/types/auth.types";
 
 interface AuthContextValue {
     isInitializing: boolean;
@@ -42,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             try {
                 // console.log("REFRESH: starting");
 
-                const response = await authApi.post<ApiResponse<AuthData>>(ENDPOINTS.auth.refreshToken);
+                const response = await authApi.post<ApiResponse<AuthResult>>(ENDPOINTS.auth.refreshToken);
                 // console.log("REFRESH: success", response.data);
 
                 const { accessToken, user } = response.data.data!;

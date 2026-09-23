@@ -1,4 +1,4 @@
-import type { ApiUser } from "@/types/api.types";
+import type { ApiUser } from "@/features/auth/types/auth.types";
 import { create } from "zustand";
 
 interface AuthState {
