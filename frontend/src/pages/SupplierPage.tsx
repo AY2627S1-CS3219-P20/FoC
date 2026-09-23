@@ -1,11 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
+import { Navigate } from "react-router-dom";
 
 import type { ParsedError } from "@/utils/errorHandler";
 import { viewSuppliersInPage } from "@/api/supplierApi";
 import type { Supplier } from "@/types/api.types";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
+import useAuth from "@/hooks/useAuth";
+import { ROUTES } from "@/routes/routes";
 
 const SupplierPage = () => {
+    const { user } = useAuth();
+
+    if (user?.role === "ADMIN") {
+        return <Navigate to={ROUTES.ADMIN.MANAGE_SUPPLIERS} replace />;
+    }
+
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
         queryKey: ["suppliers"],
         queryFn: () => viewSuppliersInPage(1),
