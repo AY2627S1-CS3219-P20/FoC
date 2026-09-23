@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import { supplierTypeFormSchema } from "../schemas/supplier.schema";
 import { createSupplierType } from "@/api/supplierApi";
 import type { ParsedError } from "@/utils/errorHandler";
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -54,7 +54,8 @@ const CreateSupplierTypeForm = ({ submitLabel, onSuccess, onCancel }: CreateSupp
                             const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
                             return (
                             <Field data-invalid={isInvalid}>
-                                <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+                                <FieldLabel htmlFor={field.name}>Create New Type</FieldLabel>
+                                <FieldDescription>Input a new supplier type that does not exist yet.</FieldDescription>
                                 <FieldContent>
                                 <Input
                                     id={field.name}
