@@ -55,6 +55,38 @@ export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
     }
 };
 
+export const createSupplierType = async (type: string): Promise<SupplierType> => {
+    const jsonBody = {
+        type: type,
+    }
+    try {
+        const response = await supplierApi.post<ApiResponse<{ message: string; data: SupplierType }>>(
+            `${ENDPOINTS.supplier.createSupplierType}`,
+            jsonBody
+        );
+
+        return response.data.data?.data!; // will always return the newly created supplier type
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const deleteSupplierType = async (type: SupplierType): Promise<SupplierType> => {
+    const jsonBody = {
+        type: type,
+    }
+    try {
+        const response = await supplierApi.post<ApiResponse<{ message: string; data: SupplierType }>>(
+            `${ENDPOINTS.supplier.deleteSupplierType}`,
+            jsonBody
+        );
+
+        return response.data.data?.data!; // will always return the deleted supplier type
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
 export const viewSuppliersForAdmin = async (page: number = 1): Promise<Supplier[]> => {
     try {
         const response = await supplierApi.get<ApiResponse<{ message: string; data: Supplier[] }>>(
