@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import useAuth from "@/hooks/useAuth";
 
 import { Spinner } from "@/components/ui/spinner"
+import { ROUTES } from "@/routes/routes";
 
 const ProtectedRoute = () => {
     const { isAuthenticated, isInitializing } = useAuth();
@@ -16,7 +17,7 @@ const ProtectedRoute = () => {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/" replace state={{ from: location }} />;
+        return <Navigate to={ROUTES.LOGIN} replace state={{ from: location }} />;
     }
 
     return <Outlet />;

@@ -20,7 +20,7 @@ supplierRouter.get("/assets/:file", serveAsset);
 // All supplier endpoints require authentication
 supplierRouter.use(authenticate);
 
-// View the suppliers listed on the current page
+// View the suppliers listed on the current page (active suppliers only)
 supplierRouter.get("/", viewSuppliersInPage);
 
 // Admin: list all suppliers including deactivated (management page)

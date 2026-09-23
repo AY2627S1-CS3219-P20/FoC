@@ -6,8 +6,9 @@ import useAuthStore from "@/store/authStore";
 import { parseError } from "@/utils/errorHandler";
 
 import type { ParsedError } from "@/utils/errorHandler";
-import type { LoginPayload } from "../types/auth.types";
+import type { AuthResult, LoginPayload } from "../types/auth.types";
 import { toast } from "react-toastify";
+import { ROUTES } from "@/routes/routes";
 
 const useLogin = () => {
   const navigate = useNavigate();
@@ -15,23 +16,37 @@ const useLogin = () => {
   const setUser = useAuthStore((state) => state.setUser);
 
   const { mutate, isPending, isError, error } = useMutation<
-    void,
+    AuthResult,
     ParsedError,
     LoginPayload
   >({
     mutationFn: async (payload: LoginPayload) => {
       try {
         const result = await loginService(payload);
+
         setToken(result.accessToken);
         setUser(result.user);
+
+        return result;
       } catch (rawError) {
         throw parseError(rawError);
       }
     },
-    onSuccess: () => {
-      const from = location.state?.from?.pathname || "/home";
-      navigate(from, { replace: true });
-      
+    onSuccess: (result) => {
+      const from = location.state?.from?.pathname;
+
+      if (from) {
+        navigate(from, { replace: true });
+        toast.success("Login successful!");
+        return;
+      }
+
+      if (result.user.role === "ADMIN") {
+        navigate(ROUTES.ADMIN.MANAGE_USERS, { replace: true });
+      } else {
+        navigate(ROUTES.HOME, { replace: true });
+      }
+
       toast.success("Login successful!");
     },
     onError: (error) => {

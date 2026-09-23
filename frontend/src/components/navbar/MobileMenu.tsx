@@ -1,10 +1,7 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import {
-    BoxesIcon,
-    ClipboardListIcon,
-    CoinsIcon,
-    HouseIcon,
     LogOutIcon,
     MenuIcon,
     UserIcon,
@@ -29,9 +26,17 @@ import {
 } from "@/components/ui/navigation-menu";
 
 import CreditBalance from "./CreditBalance";
-import { useState } from "react";
+import type { NavLinkItem } from "./navLinks";
 
-const MobileMenu = () => {
+interface MobileMenuProps {
+    links: NavLinkItem[];
+    showCreditBalance?: boolean;
+}
+
+const MobileMenu = ({
+    links,
+    showCreditBalance = true,
+}: MobileMenuProps) => {
     const location = useLocation();
     const { user } = useAuth();
     const { logout } = useLogout();
@@ -61,73 +66,44 @@ const MobileMenu = () => {
                 </DrawerHeader>
 
                 <div className="flex flex-col gap-2 p-4">
-                    <CreditBalance />
-
-                    <Separator className="bg-slate-300" />
+                    {showCreditBalance && (
+                        <>
+                            <CreditBalance />
+                            <Separator className="bg-slate-300" />
+                        </>
+                    )}
 
                     <NavigationMenu className="max-w-full">
                         <NavigationMenuList>
                             <ul className="flex w-full flex-col gap-1">
-                                <li>
-                                    <NavigationMenuLink
-                                        active={location.pathname === "/home"}
-                                        render={
-                                            <Link
-                                                to="/home"
-                                                onClick={() => setOpen(false)}
-                                                className="flex flex-row items-center gap-2"
-                                            >
-                                                <HouseIcon className="size-5" />
-                                                Home
-                                            </Link>
-                                        }
-                                    />
-                                </li>
-                                <li>
-                                    <NavigationMenuLink
-                                        active={location.pathname === "/activity"}
-                                        render={
-                                            <Link
-                                                to="/activity"
-                                                onClick={() => setOpen(false)}
-                                                className="flex flex-row items-center gap-2"
-                                            >
-                                                <ClipboardListIcon className="size-5" />
-                                                Activity
-                                            </Link>
-                                        }
-                                    />
-                                </li>
-                                <li>
-                                    <NavigationMenuLink
-                                        active={location.pathname === "/suppliers"}
-                                        render={
-                                            <Link
-                                                to="/suppliers"
-                                                onClick={() => setOpen(false)}
-                                                className="flex flex-row items-center gap-2"
-                                            >
-                                                <BoxesIcon className="size-5" />
-                                                Suppliers
-                                            </Link>
-                                        }
-                                    />
-                                </li>
-                                <li>
-                                    <NavigationMenuLink
-                                        active={location.pathname === "/credits"}
-                                        render={
-                                            <Link
-                                                to="/credits"
-                                                onClick={() => setOpen(false)}
-                                                className="flex flex-row items-center gap-2"
-                                            >
-                                                <CoinsIcon className="size-5" />
-                                                Credits
-                                            </Link>
-                                        }
-                                    />
-                                </li>
+                                {links.map(
+                                    ({
+                                        label,
+                                        href,
+                                        icon: Icon,
+                                    }) => (
+                                        <li key={href}>
+                                            <NavigationMenuLink
+                                                active={
+                                                    location.pathname ===
+                                                    href
+                                                }
+                                                render={
+                                                    <Link
+                                                        to={href}
+                                                        onClick={() =>
+                                                            setOpen(false)
+                                                        }
+                                                        className="flex flex-row items-center gap-2"
+                                                    >
+                                                        <Icon className="size-5" />
+                                                        {label}
+                                                    </Link>
+                                                }
+                                            />
+                                        </li>
+                                    ),
+                                )}
                             </ul>
                         </NavigationMenuList>
                     </NavigationMenu>
@@ -139,11 +115,15 @@ const MobileMenu = () => {
                             <ul className="flex w-full flex-col gap-1">
                                 <li>
                                     <NavigationMenuLink
-                                        active={location.pathname === "/profile"}
+                                        active={
+                                            location.pathname === "/profile"
+                                        }
                                         render={
                                             <Link
                                                 to="/profile"
-                                                onClick={() => setOpen(false)}
+                                                onClick={() =>
+                                                    setOpen(false)
+                                                }
                                                 className="flex flex-row items-center gap-2"
                                             >
                                                 <UserIcon className="size-5" />
@@ -152,16 +132,19 @@ const MobileMenu = () => {
                                         }
                                     />
                                 </li>
+
                                 <li>
                                     <NavigationMenuLink
-                                        onClick={() => { logout(); setOpen(false); }}
+                                        onClick={() => {
+                                            logout();
+                                            setOpen(false);
+                                        }}
                                         className="flex cursor-pointer items-center gap-2 text-red-600"
                                     >
                                         <LogOutIcon className="size-5" />
                                         Logout
                                     </NavigationMenuLink>
                                 </li>
-
                             </ul>
                         </NavigationMenuList>
                     </NavigationMenu>

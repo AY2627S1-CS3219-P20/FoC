@@ -2,7 +2,8 @@ import axios from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from "axios";
 import { getToken, setToken, removeToken } from "@/utils/token";
 import { ENDPOINTS } from "@/api/endpoints";
-import type { ApiResponse, AuthData } from "@/types/api.types";
+import type { ApiResponse } from "@/types/api.types";
+import type { AuthResult } from "@/features/auth/types/auth.types";
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
     _retry?: boolean;
@@ -12,7 +13,7 @@ const BASE_AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL;
 if (!BASE_AUTH_API_URL) throw new Error("API_BASE_URL is not defined in env");
 
 const refreshAccessToken = async (): Promise<string> => {
-    const response = await axios.post<ApiResponse<AuthData>>(
+    const response = await axios.post<ApiResponse<AuthResult>>(
         `${BASE_AUTH_API_URL}${ENDPOINTS.auth.refreshToken}`,
         {},
         {
