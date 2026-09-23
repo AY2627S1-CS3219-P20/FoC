@@ -84,7 +84,7 @@ const SupplierPage = () => {
                     </MenubarMenu>
                     {supplierTypes.map(type => (
                         <MenubarMenu>
-                            <MenubarTrigger onClick={() => handleFilterInput(type.type)}>{type.type}</MenubarTrigger>
+                            <MenubarTrigger key={type.id} onClick={() => handleFilterInput(type.type)}>{type.type}</MenubarTrigger>
                         </MenubarMenu>
                     ))}
                 </Menubar>
