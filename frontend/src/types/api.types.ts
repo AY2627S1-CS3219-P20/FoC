@@ -68,6 +68,12 @@ export interface SupplierType {
     type: string;
 }
 
+export interface SupplierTypeCount {
+    id: string;
+    type: string;
+    count: number;
+}
+
 export interface CreateSupplierInput {
     name: string;
     type: string;

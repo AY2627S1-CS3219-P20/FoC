@@ -1,6 +1,4 @@
 import type { Request, Response } from "express";
-import { countActiveSuppliers, createType, deleteType, fetchSupplierTypes } from "../services/supplier.service.js";
-import { typeSchema, supplierSchema, filterSearchSupplierSchema } from "../schemas/supplier.schema.js";
 import fs from "node:fs/promises";
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
@@ -10,11 +8,19 @@ import {
     resolveSafeUploadPath,
 } from "../libs/upload.js";
 import {
+    typeSchema,
+    supplierSchema,
+    filterSearchSupplierSchema,
     createSupplierSchema,
     parseInput,
     updateSupplierSchema,
 } from "../schemas/supplier.schema.js";
 import {
+    countForEachType,
+    countActiveSuppliers,
+    createType,
+    deleteType,
+    fetchSupplierTypes,
     createSupplier as createSupplierService,
     fetchActiveSuppliers,
     fetchAllSuppliers,
@@ -122,6 +128,19 @@ export async function deleteSupplierType(req: Request, res: Response) {
         },
     });
 }
+
+export async function countSupplierType(req: Request, res: Response) {
+    const counts = await countForEachType();
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "Data fetched successfully",
+            data: counts,
+        },
+    });
+}
+
 export async function createSupplier(req: Request, res: Response) {
     const input = parseInput(createSupplierSchema, req.body);
     const supplier = await createSupplierService(prisma, input);

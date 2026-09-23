@@ -19,7 +19,10 @@ export const ENDPOINTS = {
         uploadSupplierImage: `${BASE_SUPPLIER}/upload-image`,
         viewSuppliersInPage: (page: number) => `${BASE_SUPPLIER}/?page=${page}`,
         countActiveSuppliers: `${BASE_SUPPLIER}/count-active-suppliers`,
-        getAllSupplierTypes: `${BASE_SUPPLIER}/get-supplier-types`
+        getAllSupplierTypes: `${BASE_SUPPLIER}/get-supplier-types`,
+        createSupplierType: `${BASE_SUPPLIER}/new-supplier-type`,
+        deleteSupplierType: `${BASE_SUPPLIER}/delete-supplier-type`,
+        countSupplierType: `${BASE_SUPPLIER}/count-supplier-type`,
     },
 
 } as const;
