@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createType, deleteType } from "../services/supplier.service.js";
+import { countActiveSuppliers, createType, deleteType } from "../services/supplier.service.js";
 import { typeSchema, supplierSchema } from "../schema/supplier.schema.js";
 import fs from "node:fs/promises";
 import { AppError } from "../errors/errors.js";
@@ -20,6 +20,18 @@ import {
     fetchAllSuppliers,
     updateSupplier as updateSupplierService,
 } from "../services/supplier.service.js";
+
+export async function countAllActiveSuppliers(req: Request, res: Response) {
+    const count = await countActiveSuppliers();
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "All active suppliers counted successfully",
+            data: count,
+        },
+    });
+}
 
 export async function viewSuppliersInPage(req: Request, res: Response) {
     const request = supplierSchema.safeParse(req.query);
