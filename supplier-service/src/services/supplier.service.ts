@@ -166,7 +166,31 @@ const LIMIT: number = 15; // only a max of 15 suppliers per page is displayed pe
 
 // public fetch for the normal-user page: active suppliers only
 export async function fetchActiveSuppliers(page: number) {
-    return fetchSuppliers(page, { status: STATUS.ACTIVATED });
+    const suppliers = await prisma.supplier.findMany({
+        where: { status: STATUS.ACTIVATED },
+        include: { openingHours: true }, // also get opening hours of suppliers
+        orderBy: { name: 'asc' }, // case-sensitive
+        take: LIMIT, 
+        skip: LIMIT * (page - 1),
+    });
+
+    if (!suppliers || suppliers.length == 0) {
+        throw new AppError("No records found for this page", 400, "BAD_REQUEST");
+    }
+
+    return suppliers;
+}
+
+export async function countActiveSuppliers() {
+    const count = await prisma.supplier.count({
+        where: { 
+            status: {
+                equals: "ACTIVATED"
+            }
+        }
+    });
+
+    return count;
 }
 
 // public fetch for the admin page: every supplier, including deactivated

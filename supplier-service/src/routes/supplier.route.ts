@@ -11,6 +11,7 @@ import {
     updateSupplier,
     uploadSupplierImage,
     serveAsset,
+    countAllActiveSuppliers,
 } from "../controllers/supplier.controller.js";
 import { upload } from "../libs/upload.js";
 import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
@@ -25,6 +26,9 @@ supplierRouter.use(authenticate);
 
 // View the suppliers listed on the current page (active suppliers only)
 supplierRouter.get("/", viewSuppliersInPage);
+
+// count the total number of active suppliers
+supplierRouter.get("/count-active-suppliers", countAllActiveSuppliers);
 
 // both routes below expect a json body and require admin persmissions to access
 supplierRouter.post("/new-supplier-type", authorize(Role.ADMIN), createSupplierType) // create a new supplier type that does not currently exist

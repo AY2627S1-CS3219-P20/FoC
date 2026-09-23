@@ -18,6 +18,7 @@ export const ENDPOINTS = {
         deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
         uploadSupplierImage: `${BASE_SUPPLIER}/upload-image`,
         viewSuppliersInPage: (page: number) => `${BASE_SUPPLIER}/?page=${page}`,
+        countActiveSuppliers: `${BASE_SUPPLIER}/count-active-suppliers`
     },
 
 } as const;

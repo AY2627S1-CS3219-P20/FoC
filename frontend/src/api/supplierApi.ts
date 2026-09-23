@@ -15,7 +15,24 @@ export const viewSuppliersInPage = async (page: number): Promise<Supplier[]> => 
             `${ENDPOINTS.supplier.viewSuppliersInPage(page)}`,
         );
 
+        console.log(page)
+        console.log(response.data.data?.data.length)
+
         return response.data.data?.data ?? [];
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const countActiveSuppliers = async (): Promise<number> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<{ message: string; data: number }>>(
+            `${ENDPOINTS.supplier.countActiveSuppliers}`,
+        );
+
+        console.log(response);
+
+        return response.data.data?.data ?? 0;
     } catch (error) {
         throw parseError(error);
     }
