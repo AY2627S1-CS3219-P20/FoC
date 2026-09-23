@@ -9,9 +9,9 @@ export const STATUS = {
     DEACTIVATED: "DEACTIVATED",
 } as const;
 
-function toPrismaTime(time: string): string {
+function toPrismaTime(time: string): Date {
     const padded = /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time;
-    return `2020-01-01T${padded}.000Z`;
+    return new Date(`2020-01-01T${padded}`);
 }
 
 function assertNoDuplicateDays(openingHours: OpeningHoursInput[] | undefined): void {
