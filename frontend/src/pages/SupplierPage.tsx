@@ -1,37 +1,42 @@
-import useSuppliers from "@/features/suppliers/hooks/useSuppliers";
-import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
-import SupplierRecordCard from "@/features/suppliers/components/SupplierRecordCard";
+import { useQuery } from "@tanstack/react-query";
+
+import type { ParsedError } from "@/utils/errorHandler";
+import { viewSuppliersInPage } from "@/api/supplierApi";
+import type { Supplier } from "@/types/api.types";
+import SupplierCard from "@/features/supplier/components/SupplierCard";
 
 const SupplierPage = () => {
-    const DEFAULT_PAGE = 1;
-    const { data: suppliers, isLoading, isError, error } = useSuppliers(DEFAULT_PAGE);
-    // console.log(suppliers)
-    // console.log("type:", typeof suppliers?.data, "isArray:", Array.isArray(suppliers?.data), suppliers?.data);
+    const suppliersQuery = useQuery<Supplier[], ParsedError>({
+        queryKey: ["suppliers"],
+        queryFn: () => viewSuppliersInPage(1),
+        refetchOnMount: "always",
+    });
+
+    const isLoading = suppliersQuery.isLoading;
+    const isError = suppliersQuery.isError;
+    const suppliers = suppliersQuery.data ?? [];
 
     return (
         <>
-            <div className="flex flex-col items-start justify-center gap-5 px-5 md:px-10 py-5">
+            <div className="flex flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
                 <h1 className="text-xl md:text-2xl font-bold">Suppliers</h1>
-                {/* TODO: fetch all the supplier types and do a loop, such that each element is in the menubar*/}
-                <Menubar className="w-fit">
-                    <MenubarMenu>
-                        <MenubarTrigger>All</MenubarTrigger>
-                    </MenubarMenu>
-                    <MenubarMenu>
-                        <MenubarTrigger>Food</MenubarTrigger>
-                    </MenubarMenu>
-                    <MenubarMenu>
-                        <MenubarTrigger>Retail</MenubarTrigger>
-                    </MenubarMenu>
-                    <MenubarMenu>
-                        <MenubarTrigger>Facilities</MenubarTrigger>
-                    </MenubarMenu>
-                </Menubar>
+            </div>
+
+            <div className="px-5 md:px-10 pb-10">
                 {isLoading && <p>Loading suppliers...</p>}
-                {isError && <p>Failed to load suppliers: {error.message}</p>}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {suppliers?.data?.map(supplier => <SupplierRecordCard supplier={supplier} key={supplier.id} /> )}
-                </div>
+                {isError && <p>Failed to load suppliers: {suppliersQuery.error.message}</p>}
+
+                {!isLoading && !isError && suppliers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No suppliers yet.</p>
+                )}
+
+                {suppliers.length > 0 && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {suppliers.map(supplier => (
+                            <SupplierCard key={supplier.id} supplier={supplier} />
+                        ))}
+                    </div>
+                )}
             </div>
         </>
     );

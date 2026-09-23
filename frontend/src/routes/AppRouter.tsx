@@ -24,7 +24,7 @@ const AppRouter = () => {
                         {/* Protected routes - redirect to login page if not authenticated */}
                         <Route element={<ProtectedRoute />}>
                             <Route element={<AppLayout />}>
-                                <Route element={<RoleRoute allowedRoles={[ROLES.STUDENT]} />}>
+                                <Route element={<RoleRoute allowedRoles={[ROLES.STUDENT, ROLES.ADMIN]} />}>
                                     <Route path={ROUTES.HOME} element={<HomePage />} />
                                     <Route path={ROUTES.SUPPLIERS} element={<SupplierPage />} />
                                 </Route>

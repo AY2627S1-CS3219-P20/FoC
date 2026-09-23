@@ -1,18 +1,37 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
-import { viewSuppliersInPage } from "../controllers/supplier.controller.js";
-import { authorize } from "../middleware/authorize.middleware.js";
-import { Role } from "../types/auth.types.js";
+import { requireAdmin } from "../middleware/admin.middleware.js";
+import {
+    viewSuppliersInPage,
+    viewSuppliersForAdmin,
+    createSupplier,
+    updateSupplier,
+    uploadSupplierImage,
+    serveAsset,
+} from "../controllers/supplier.controller.js";
+import { upload } from "../libs/upload.js";
+import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
 
 const supplierRouter = Router();
 
-// All supplier endpoints require authentication (require users to have been logged in)
+// Public: serve an uploaded image by filename
+supplierRouter.get("/assets/:file", serveAsset);
+
+// All supplier endpoints require authentication
 supplierRouter.use(authenticate);
 
-// For admin endpoints, use the authorize middleware to check if the user has the required role
-// supplierRouter.get("/all", authorize(Role.ADMIN), viewSuppliersInPage);
-
-// View all the suppliers that can be listed in the current page
+// View the suppliers listed on the current page (active suppliers only)
 supplierRouter.get("/", viewSuppliersInPage);
+
+// Admin: list all suppliers including deactivated (management page)
+supplierRouter.get("/all", requireAdmin, viewSuppliersForAdmin);
+
+// Admin: upload a supplier location image
+supplierRouter.post("/upload-image", requireAdmin, upload.single("image"), uploadSupplierImage);
+
+// Admin supplier management
+supplierRouter.post("/", requireAdmin, createSupplier);
+supplierRouter.patch("/:id", requireAdmin, updateSupplier);
+supplierRouter.patch("/:id/deactivate", requireAdmin, deactivateSupplierRoute);
 
 export default supplierRouter;
