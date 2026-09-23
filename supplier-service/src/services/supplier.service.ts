@@ -316,3 +316,15 @@ export async function deleteType(type: string) {
 
     return deletedType;
 }
+
+export async function countForEachType() {
+    const counts = await prisma.supplierType.findMany({
+        select: { id: true, type: true, _count: { select: { suppliers: true } } },
+    });
+
+    const results = counts.map((record) => {
+        return { id: record.id, type: record.type, count: record._count.suppliers }
+    })
+    
+    return results;
+}

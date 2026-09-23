@@ -3,6 +3,7 @@ import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
 import {
+    countSupplierType,
     createSupplierType,
     deleteSupplierType,
     viewSuppliersInPage,
@@ -37,6 +38,7 @@ supplierRouter.get("/get-supplier-types", getAllSupplierTypes);
 // both routes below expect a json body and require admin persmissions to access
 supplierRouter.post("/new-supplier-type", authorize(Role.ADMIN), createSupplierType) // create a new supplier type that does not currently exist
 supplierRouter.post("/delete-supplier-type", authorize(Role.ADMIN), deleteSupplierType) // delete a new supplier type that does not currently exist
+supplierRouter.get("/count-supplier-type", authorize(Role.ADMIN), countSupplierType) // count the number of suppliers for each type
 
 // Admin: list all suppliers including deactivated (management page)
 supplierRouter.get("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
