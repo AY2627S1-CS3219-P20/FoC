@@ -33,20 +33,9 @@ const useLogin = () => {
       }
     },
     onSuccess: (result) => {
-      const from = location.state?.from?.pathname;
-
-      if (from) {
-        navigate(from, { replace: true });
-        toast.success("Login successful!");
-        return;
-      }
-
-      if (result.user.role === "ADMIN") {
-        navigate(ROUTES.ADMIN.MANAGE_USERS, { replace: true });
-      } else {
-        navigate(ROUTES.HOME, { replace: true });
-      }
-
+      const from = location.state?.from?.pathname || ROUTES.HOME;
+      navigate(from, { replace: true });
+      
       toast.success("Login successful!");
     },
     onError: (error) => {
