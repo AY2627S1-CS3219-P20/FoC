@@ -56,6 +56,8 @@ async function main() {
         });
     });
 
+    await Promise.all(supplierTypes);
+
     for (const row of rows) {
         const supplier = await prisma.supplier.upsert({
             where: {

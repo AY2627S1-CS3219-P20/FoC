@@ -25,6 +25,7 @@ const config = {
     port: getEnvNumber("PORT"),
     databaseUrl: getEnv("DATABASE_URL"),
     jwtPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH"),
+    assetsPublicUrl: process.env.ASSETS_PUBLIC_URL ?? undefined,
 };
 
 export default config;
