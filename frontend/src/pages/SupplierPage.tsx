@@ -45,8 +45,6 @@ const SupplierPage = () => {
                     <p className="text-sm text-muted-foreground">No suppliers yet.</p>
                 )}
 
-                <p>{activeSupplierCount}</p>
-
                 <Card className="w-fit p-5">
                     {suppliers.length > 0 && (
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
