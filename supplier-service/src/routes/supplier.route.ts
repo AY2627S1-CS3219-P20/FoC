@@ -15,8 +15,8 @@ supplierRouter.use(authenticate);
 // View all the suppliers that can be listed in the current page
 supplierRouter.get("/", viewSuppliersInPage);
 
-// both routes below expect a json body
-supplierRouter.post("/new-supplier-type", createSupplierType) // create a new supplier type that does not currently exist
-supplierRouter.post("/delete-supplier-type", deleteSupplierType) // delete a new supplier type that does not currently exist
+// both routes below expect a json body and require admin persmissions to access
+supplierRouter.post("/new-supplier-type", authorize(Role.ADMIN), createSupplierType) // create a new supplier type that does not currently exist
+supplierRouter.post("/delete-supplier-type", authorize(Role.ADMIN), deleteSupplierType) // delete a new supplier type that does not currently exist
 
 export default supplierRouter;
