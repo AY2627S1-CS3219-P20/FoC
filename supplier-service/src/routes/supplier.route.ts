@@ -28,8 +28,8 @@ supplierRouter.use(authenticate);
 // View the suppliers listed on the current page (active suppliers only)
 supplierRouter.post("/", viewSuppliersInPage);
 
-// count the total number of active suppliers
-supplierRouter.get("/count-active-suppliers", countAllActiveSuppliers);
+// count the total number of active suppliers that match the search key and type filter
+supplierRouter.post("/count-active-suppliers", countAllActiveSuppliers);
 
 // get all supplier types, don't require admin access 
 supplierRouter.get("/get-supplier-types", getAllSupplierTypes);

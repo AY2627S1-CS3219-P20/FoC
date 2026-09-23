@@ -197,15 +197,29 @@ export async function fetchActiveSuppliers(page: number, searchString?: string |
     return suppliers;
 }
 
-export async function countActiveSuppliers() {
+// count the number of active suppliers that match the search string and type filter
+export async function countActiveSuppliers(searchString?: string | null, typeFilter?: string | null) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
     const count = await prisma.supplier.count({
         where: { 
             status: {
                 equals: "ACTIVATED"
+            },
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            }, 
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
             }
         }
     });
-
+    console.log(count)
     return count;
 }
 

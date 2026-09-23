@@ -22,7 +22,11 @@ import {
 } from "../services/supplier.service.js";
 
 export async function countAllActiveSuppliers(req: Request, res: Response) {
-    const count = await countActiveSuppliers();
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const count = await countActiveSuppliers(requestBody.data.searchString, requestBody.data.typeFilter);
 
     return res.status(200).json({
         success: true,
