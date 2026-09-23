@@ -14,30 +14,37 @@ import { Menubar, MenubarMenu, MenubarTrigger } from '@/components/ui/menubar';
 
 const SupplierPage = () => {
     const LIMIT: number = 15;
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = Number(searchParams.get("page")) || 1;
 
-    const [searchString, setSearchString] = useState("");
-    const [typeFilter, setTypeFilter] = useState("all"); // default to viewing all types of suppliers
+    // ensure the search string and type filters are saved to session storage
+    // so that filters are still present when navigating between pages
+    const [searchString, setSearchString] = useState(() => sessionStorage.getItem("searchString") ?? "");
+    const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem("typeFilter") ?? "all"); // default to viewing all types of suppliers
+    useEffect(() => {
+        sessionStorage.setItem("searchKey", searchString);
+        sessionStorage.setItem("typeFilter", typeFilter);
+    }, [searchString, typeFilter]);
 
     const handleSearchKeyInput = (event: React.ChangeEvent<HTMLInputElement>) => {
         console.log(searchString)
+        setSearchParams({ page: '1' }) // reset the page to be 1 upon any change in search input
         setSearchString(event.target.value); 
     }
     const handleFilterInput = (filter: string) => {
+        setSearchParams({ page: '1' }) // reset the page to be 1 upon any change in type filter used
         setTypeFilter(filter.toUpperCase()); 
-        console.log(typeFilter)
     }
 
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["suppliers", searchString, typeFilter],
+        queryKey: ["suppliers", currentPage, searchString, typeFilter],
         queryFn: () => viewSuppliersInPage(currentPage, searchString, typeFilter),
         refetchOnMount: "always",
     });
 
     const countActiveSuppliersQuery = useQuery<number, ParsedError>({
-        queryKey: ["count-active-suppliers"],
-        queryFn: () => countActiveSuppliers(),
+        queryKey: ["count-active-suppliers", searchString, typeFilter],
+        queryFn: () => countActiveSuppliers(searchString, typeFilter),
         refetchOnMount: "always",
     });
 
@@ -80,11 +87,23 @@ const SupplierPage = () => {
 
                 <Menubar className="w-fit">
                     <MenubarMenu>
-                        <MenubarTrigger onClick={() => handleFilterInput("ALL")}>ALL</MenubarTrigger>
+                        <MenubarTrigger 
+                            key="all"
+                            className={typeFilter === "ALL" ? "bg-accent text-accent-foreground" : ""} // ensure that the filter is shown as selected on frontend
+                            onClick={() => handleFilterInput("ALL")}
+                        >
+                            ALL
+                        </MenubarTrigger>
                     </MenubarMenu>
                     {supplierTypes.map(type => (
                         <MenubarMenu>
-                            <MenubarTrigger key={type.id} onClick={() => handleFilterInput(type.type)}>{type.type}</MenubarTrigger>
+                            <MenubarTrigger 
+                                key={type.id} 
+                                className={typeFilter === type.type ? "bg-accent text-accent-foreground" : ""} // ensure that the filter is shown as selected on frontend
+                                onClick={() => handleFilterInput(type.type)}
+                            >
+                                {type.type}
+                            </MenubarTrigger>
                         </MenubarMenu>
                     ))}
                 </Menubar>
@@ -98,7 +117,7 @@ const SupplierPage = () => {
                     <p className="text-sm text-muted-foreground">No suppliers yet.</p>
                 )}
 
-                <Card className="w-fit p-5">
+                <Card className="w-full p-5">
                     {suppliers.length > 0 && (
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {suppliers.map(supplier => (
@@ -108,11 +127,13 @@ const SupplierPage = () => {
                     )}
                     <Pagination className="p-4 border-1 rounded-xl w-fit">
                         <PaginationContent>
-                            <PaginationItem>
-                                <PaginationPrevious 
-                                    href={`?page=${Math.max(currentPage-1, 1)}`} 
-                                />
-                            </PaginationItem>
+                            {currentPage > 1 && (
+                                <PaginationItem>
+                                    <PaginationPrevious 
+                                        href={`?page=${Math.max(currentPage-1, 1)}`} 
+                                    />
+                                </PaginationItem>
+                            )}
                             {Array.from({ length: totalNumberOfPages }, (_, i) => (
                                 <PaginationItem key={i}>
                                     <PaginationLink 
@@ -122,11 +143,13 @@ const SupplierPage = () => {
                                     </PaginationLink>
                                 </PaginationItem>
                             ))}
-                            <PaginationItem>
-                                <PaginationNext 
-                                    href={`?page=${Math.min(currentPage+1, totalNumberOfPages)}`} 
-                                />
-                            </PaginationItem>
+                            {currentPage < totalNumberOfPages && (
+                                <PaginationItem>
+                                    <PaginationNext 
+                                        href={`?page=${Math.min(currentPage+1, totalNumberOfPages)}`} 
+                                    />
+                                </PaginationItem>
+                            )}
                         </PaginationContent>
                     </Pagination>
                 </Card>
