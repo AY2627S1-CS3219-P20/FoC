@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createType, deleteType, fetchSuppliers } from "../services/supplier.service.js";
+import { createType, deleteType } from "../services/supplier.service.js";
 import { typeSchema, supplierSchema } from "../schema/supplier.schema.js";
 import fs from "node:fs/promises";
 import { AppError } from "../errors/errors.js";
@@ -9,7 +9,6 @@ import {
     getContentType,
     resolveSafeUploadPath,
 } from "../libs/upload.js";
-import { supplierSchema } from "../schema/supplier.schema.js";
 import {
     createSupplierSchema,
     parseInput,

@@ -2,9 +2,10 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { createSupplierType, deleteSupplierType, viewSuppliersInPage } from "../controllers/supplier.controller.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import {
+    createSupplierType,
+    deleteSupplierType,
     viewSuppliersInPage,
     viewSuppliersForAdmin,
     createSupplier,
@@ -30,7 +31,6 @@ supplierRouter.get("/", viewSuppliersInPage);
 supplierRouter.post("/new-supplier-type", authorize(Role.ADMIN), createSupplierType) // create a new supplier type that does not currently exist
 supplierRouter.post("/delete-supplier-type", authorize(Role.ADMIN), deleteSupplierType) // delete a new supplier type that does not currently exist
 
-export default supplierRouter;
 // Admin: list all suppliers including deactivated (management page)
 supplierRouter.get("/all", requireAdmin, viewSuppliersForAdmin);
 
