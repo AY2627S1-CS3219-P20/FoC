@@ -19,8 +19,8 @@ export const openingHoursSchema = z.object({
 export const createSupplierSchema = z.object({
     name: z.string().trim().min(1, { error: "Name is required" }),
     type: z.string().trim().min(1, { error: "Type is required" }),
-    building: z.string().trim().optional(),
-    floor: z.number().int().nonnegative().optional(),
+    building: z.string().trim().nullable().optional(),
+    floor: z.number().int().nonnegative().nullable().optional(),
     description: z.string().min(1, { error: "Description is required" }),
     address: z.string().min(1, { error: "Address is required" }),
     latitude: z.number().nullable().optional(),
