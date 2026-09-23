@@ -2,7 +2,6 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { requireAdmin } from "../middleware/admin.middleware.js";
 import {
     createSupplierType,
     deleteSupplierType,
@@ -32,14 +31,14 @@ supplierRouter.post("/new-supplier-type", authorize(Role.ADMIN), createSupplierT
 supplierRouter.post("/delete-supplier-type", authorize(Role.ADMIN), deleteSupplierType) // delete a new supplier type that does not currently exist
 
 // Admin: list all suppliers including deactivated (management page)
-supplierRouter.get("/all", requireAdmin, viewSuppliersForAdmin);
+supplierRouter.get("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
 
 // Admin: upload a supplier location image
-supplierRouter.post("/upload-image", requireAdmin, upload.single("image"), uploadSupplierImage);
+supplierRouter.post("/upload-image", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);
 
 // Admin supplier management
-supplierRouter.post("/", requireAdmin, createSupplier);
-supplierRouter.patch("/:id", requireAdmin, updateSupplier);
-supplierRouter.patch("/:id/deactivate", requireAdmin, deactivateSupplierRoute);
+supplierRouter.post("/", authorize(Role.ADMIN), createSupplier);
+supplierRouter.patch("/:id", authorize(Role.ADMIN), updateSupplier);
+supplierRouter.patch("/:id/deactivate", authorize(Role.ADMIN), deactivateSupplierRoute);
 
 export default supplierRouter;
