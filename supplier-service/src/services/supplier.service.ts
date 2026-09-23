@@ -165,9 +165,25 @@ export async function updateSupplier(
 const LIMIT: number = 15; // only a max of 15 suppliers per page is displayed per page
 
 // public fetch for the normal-user page: active suppliers only
-export async function fetchActiveSuppliers(page: number) {
+// searchString and typeFilter are optional fields, which may or may not be supplied
+export async function fetchActiveSuppliers(page: number, searchString?: string | null, typeFilter?: string | null) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
     const suppliers = await prisma.supplier.findMany({
-        where: { status: STATUS.ACTIVATED },
+        where: { 
+            status: STATUS.ACTIVATED, 
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            }, 
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        },
         include: { openingHours: true }, // also get opening hours of suppliers
         orderBy: { name: 'asc' }, // case-sensitive
         take: LIMIT, 
@@ -191,6 +207,15 @@ export async function countActiveSuppliers() {
     });
 
     return count;
+}
+
+// this function returns all supplier types available
+export async function fetchSupplierTypes() {
+    const types = await prisma.supplierType.findMany({
+        orderBy: { type: 'asc' }
+    });
+
+    return types;
 }
 
 // public fetch for the admin page: every supplier, including deactivated

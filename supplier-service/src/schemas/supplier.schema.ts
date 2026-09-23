@@ -31,9 +31,25 @@ export const createSupplierSchema = z.object({
 
 export const updateSupplierSchema = createSupplierSchema.partial();
 
+export const supplierSchema = z.object({
+    page: z.coerce.number().int().positive(),
+});
+
+export const filterSearchSupplierSchema = z.object({
+    searchString: z.string().nullable().optional(),
+    filterType: z.string().nullable().optional(),
+})
+
+export const typeSchema = z.object({
+    type: z.string().toUpperCase() // ensure all types are saved in upper case
+});
+
 export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>;
 export type OpeningHoursInput = z.infer<typeof openingHoursSchema>;
+export type ViewSupplierInput = z.infer<typeof supplierSchema>;
+export type FilterAndSortSupplierInput = z.infer<typeof filterSearchSupplierSchema>;
+export type TypeInput = z.infer<typeof typeSchema>;
 
 export function parseInput<T>(schema: z.ZodSchema<T>, body: unknown): T {
     try {
