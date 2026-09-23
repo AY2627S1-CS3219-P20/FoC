@@ -4,14 +4,14 @@ import queryClient from '@/lib/queryClient';
 import { AuthProvider } from "@/context/AuthContext";
 import LoginPage from '@/pages/LoginPage';
 import SupplierPage from '@/pages/SupplierPage';
-import ProtectedRoute from '@/components/layout/ProtectedRoute';
+import ProtectedRoute from '@/routes/ProtectedRoute';
 import AppLayout from '@/components/layout/AppLayout';
 import HomePage from '@/pages/HomePage';
-import RoleRoute from '@/components/layout/RoleRoute';
 import { ROLES } from '@/features/auth/types/auth.types';
 import { ROUTES } from './routes';
 import ManageSuppliersPage from '@/pages/ManageSuppliersPage';
 import ManageUsersPage from '@/pages/ManageUsersPage';
+import RoleRoute from '@/routes/RoleRoute';
 
 const AppRouter = () => {
     return (
