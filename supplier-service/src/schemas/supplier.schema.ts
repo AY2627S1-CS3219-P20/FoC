@@ -37,7 +37,7 @@ export const supplierSchema = z.object({
 
 export const filterSearchSupplierSchema = z.object({
     searchString: z.string().nullable().optional(),
-    filterType: z.string().nullable().optional(),
+    typeFilter: z.string().nullable().optional(),
 })
 
 export const typeSchema = z.object({

@@ -43,7 +43,7 @@ export async function viewSuppliersInPage(req: Request, res: Response) {
     if (!requestBody.success) {
         throw new AppError("JSON body not input correctly", 400);
     }
-    const suppliers = await fetchActiveSuppliers(requestParams.data.page, requestBody.data.searchString, requestBody.data.filterType);
+    const suppliers = await fetchActiveSuppliers(requestParams.data.page, requestBody.data.searchString, requestBody.data.typeFilter);
 
     return res.status(200).json({
         success: true,
