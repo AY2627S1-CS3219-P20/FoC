@@ -1,4 +1,6 @@
 import type { Request, Response } from "express";
+import { createType, deleteType, fetchSuppliers } from "../services/supplier.service.js";
+import { typeSchema, supplierSchema } from "../schema/supplier.schema.js";
 import fs from "node:fs/promises";
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
@@ -52,6 +54,42 @@ export async function viewSuppliersForAdmin(req: Request, res: Response) {
     });
 }
 
+export async function createSupplierType(req: Request, res: Response) {
+    const request = typeSchema.safeParse(req.body);
+    if (!request.success) {
+        // we need to make sure this block is not reached, i.e. the request body has a "type" field
+        request.error; // ZodError instance
+        throw new AppError("Parameters not input correctly", 400);
+    }
+    const newType = await createType(request.data.type);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "New supplier type created successfully",
+            data: newType,
+        },
+    });
+}
+
+export async function deleteSupplierType(req: Request, res: Response) {
+    const request = typeSchema.safeParse(req.body);
+    if (!request.success) {
+        // we need to make sure this block is not reached, i.e. the request body has a "type" field
+        request.error; // ZodError instance
+        console.log(request.error)
+        throw new AppError("Parameters not input correctly", 400);
+    }
+    const deletedType = await deleteType(request.data.type);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "Existing supplier type deleted successfully",
+            data: deletedType,
+        },
+    });
+}
 export async function createSupplier(req: Request, res: Response) {
     const input = parseInput(createSupplierSchema, req.body);
     const supplier = await createSupplierService(prisma, input);
