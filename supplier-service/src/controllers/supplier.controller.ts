@@ -39,7 +39,7 @@ export async function viewSuppliersInPage(req: Request, res: Response) {
         throw new AppError("Parameters not input correctly", 400);
     }
 
-    const requestBody = filterSearchSupplierSchema.safeParse(req.body);
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body.data);
     if (!requestBody.success) {
         throw new AppError("JSON body not input correctly", 400);
     }
