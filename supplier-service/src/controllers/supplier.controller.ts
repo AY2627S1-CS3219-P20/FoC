@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { countActiveSuppliers, createType, deleteType } from "../services/supplier.service.js";
-import { typeSchema, supplierSchema } from "../schema/supplier.schema.js";
+import { countActiveSuppliers, createType, deleteType, fetchSupplierTypes } from "../services/supplier.service.js";
+import { typeSchema, supplierSchema, filterSearchSupplierSchema } from "../schemas/supplier.schema.js";
 import fs from "node:fs/promises";
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
@@ -22,7 +22,11 @@ import {
 } from "../services/supplier.service.js";
 
 export async function countAllActiveSuppliers(req: Request, res: Response) {
-    const count = await countActiveSuppliers();
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const count = await countActiveSuppliers(requestBody.data.searchString, requestBody.data.typeFilter);
 
     return res.status(200).json({
         success: true,
@@ -34,17 +38,34 @@ export async function countAllActiveSuppliers(req: Request, res: Response) {
 }
 
 export async function viewSuppliersInPage(req: Request, res: Response) {
-    const request = supplierSchema.safeParse(req.query);
-    if (!request.success) {
+    const requestParams = supplierSchema.safeParse(req.query);
+    if (!requestParams.success) {
         throw new AppError("Parameters not input correctly", 400);
     }
-    const suppliers = await fetchActiveSuppliers(request.data.page);
+
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body.data);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const suppliers = await fetchActiveSuppliers(requestParams.data.page, requestBody.data.searchString, requestBody.data.typeFilter);
 
     return res.status(200).json({
         success: true,
         data: {
             message: "All suppliers fetched successfully",
             data: suppliers,
+        },
+    });
+}
+
+export async function getAllSupplierTypes(req: Request, res: Response) {
+    const types = await fetchSupplierTypes();
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "All active suppliers counted successfully",
+            data: types,
         },
     });
 }

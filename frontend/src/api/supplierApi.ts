@@ -2,21 +2,23 @@ import createApiClient from "./axios";
 import axios from "axios";
 import { ENDPOINTS } from "@/api/endpoints";
 import { getToken } from "@/utils/token";
-import type { ApiResponse, CreateSupplierInput, UpdateSupplierInput, Supplier } from "@/types/api.types";
+import type { ApiResponse, CreateSupplierInput, UpdateSupplierInput, Supplier, SupplierType } from "@/types/api.types";
 import { parseError } from "@/utils/errorHandler";
 
 export const supplierApi = createApiClient(
     import.meta.env.VITE_SUPPLIER_API_BASE_URL,
 );
 
-export const viewSuppliersInPage = async (page: number): Promise<Supplier[]> => {
+export const viewSuppliersInPage = async (page: number, searchString: string | null, typeFilter: string | null): Promise<Supplier[]> => {
+    const requestBody = {
+        searchString: searchString,
+        typeFilter: typeFilter
+    }
     try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; data: Supplier[] }>>(
+        const response = await supplierApi.post<ApiResponse<{ message: string; data: Supplier[] }>>(
             `${ENDPOINTS.supplier.viewSuppliersInPage(page)}`,
+            { data: requestBody }
         );
-
-        console.log(page)
-        console.log(response.data.data?.data.length)
 
         return response.data.data?.data ?? [];
     } catch (error) {
@@ -24,15 +26,30 @@ export const viewSuppliersInPage = async (page: number): Promise<Supplier[]> => 
     }
 };
 
-export const countActiveSuppliers = async (): Promise<number> => {
+export const countActiveSuppliers = async (searchString: string, typeFilter: string): Promise<number> => {
+    const jsonBody = {
+        searchString: searchString,
+        typeFilter: typeFilter
+    }
     try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; data: number }>>(
+        const response = await supplierApi.post<ApiResponse<{ message: string; data: number }>>(
             `${ENDPOINTS.supplier.countActiveSuppliers}`,
+            jsonBody
         );
 
-        console.log(response);
-
         return response.data.data?.data ?? 0;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<{ message: string; data: SupplierType[] }>>(
+            `${ENDPOINTS.supplier.getAllSupplierTypes}`,
+        );
+
+        return response.data.data?.data ?? [];
     } catch (error) {
         throw parseError(error);
     }
