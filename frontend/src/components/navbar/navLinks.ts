@@ -1,6 +1,7 @@
 import { ROUTES } from "@/routes/routes";
 import type { LucideIcon } from "lucide-react";
 import {
+    BlocksIcon,
     BoxesIcon,
     ClipboardListIcon,
     CoinsIcon,
@@ -40,6 +41,16 @@ export const studentNavLinks: NavLinkItem[] = [
 
 export const adminNavLinks: NavLinkItem[] = [
     {
+        label: "Home",
+        href: ROUTES.HOME,
+        icon: HouseIcon,
+    },
+    {
+        label: "Suppliers",
+        href: ROUTES.SUPPLIERS,
+        icon: BoxesIcon,
+    },
+    {
         label: "Manage Users",
         href: ROUTES.ADMIN.MANAGE_USERS,
         icon: UserIcon,
@@ -47,7 +58,7 @@ export const adminNavLinks: NavLinkItem[] = [
     {
         label: "Manage Suppliers",
         href: ROUTES.ADMIN.MANAGE_SUPPLIERS,
-        icon: BoxesIcon,
+        icon: BlocksIcon,
     },
     {
         label: "Manage Supplier Types",

@@ -4,9 +4,7 @@ export const ROUTES = {
     REGISTER: "/register",
 
     // Protected routes for student roles
-    HOME: "/home",
     ACTIVITY: "/activity",
-    SUPPLIERS: "/suppliers",
     CREDITS: "/credits",
 
     // Protected routes for admin roles
@@ -18,6 +16,8 @@ export const ROUTES = {
     },
 
     // Protected routes for both student and admin roles
+    HOME: "/home",
+    SUPPLIERS: "/suppliers",
     PROFILE: "/profile",
 
 } as const;

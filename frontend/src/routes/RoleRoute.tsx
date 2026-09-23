@@ -3,7 +3,7 @@ import useAuth from "@/hooks/useAuth";
 import type { Role } from "@/features/auth/types/auth.types";
 
 import { Spinner } from "@/components/ui/spinner";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/routes/routes";
 
 interface RoleRouteProps {
