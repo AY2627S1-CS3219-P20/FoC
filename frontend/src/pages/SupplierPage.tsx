@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from "@tanstack/react-query";
 import type { ParsedError } from "@/utils/errorHandler";
@@ -6,16 +7,25 @@ import type { Supplier } from "@/types/api.types";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
 import { Card } from "@/components/ui/card";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from "@/components/ui/pagination";
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 
 const SupplierPage = () => {
     const LIMIT: number = 15;
     const [searchParams] = useSearchParams();
     const currentPage = Number(searchParams.get("page")) || 1;
 
+    const [searchString, setSearchString] = useState("");
+    const [typeFilter, setTypeFilter] = useState("all"); // default to viewing all types of suppliers
+
+    const handleSearchKeyInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+        console.log(searchString)
+        setSearchString(event.target.value); 
+    }
 
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["suppliers"],
-        queryFn: () => viewSuppliersInPage(currentPage),
+        queryKey: ["suppliers", searchString],
+        queryFn: () => viewSuppliersInPage(currentPage, searchString, typeFilter),
         refetchOnMount: "always",
     });
 
@@ -33,8 +43,16 @@ const SupplierPage = () => {
 
     return (
         <>
-            <div className="flex flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
+            <div className="flex md:flex-row lg: flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
                 <h1 className="text-xl md:text-2xl font-bold">Suppliers</h1>
+                <Field className="md:w-full lg:w-[500px]">
+                    <Input
+                        id="input-search-key"
+                        type="text"
+                        placeholder="Search for a supplier"
+                        onChange={handleSearchKeyInput}
+                    />
+                </Field>
             </div>
 
             <div className="px-5 md:px-10 pb-10">
