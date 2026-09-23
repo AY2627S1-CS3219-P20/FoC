@@ -78,11 +78,11 @@ const SupplierPage = () => {
                         />
                     </Field>
                 </div>
-                {supplierTypesIsLoading && <p>Loading suppliers...</p>}
-                {supplierTypesIsError && <p>Failed to load suppliers: {supplierTypesQuery.error.message}</p>}
+                {supplierTypesIsLoading && <p>Loading supplier types...</p>}
+                {supplierTypesIsError && <p>Failed to load supplier types: {supplierTypesQuery.error.message}</p>}
 
-                {!supplierTypesIsLoading && !supplierTypesIsError && suppliers.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No suppliers yet.</p>
+                {!supplierTypesIsLoading && !supplierTypesIsError && supplierTypes.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No supplier types yet.</p>
                 )}
 
                 <Menubar className="w-fit">
