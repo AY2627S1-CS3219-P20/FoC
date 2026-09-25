@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form";
 import useLogin from "../hooks/useLogin";
-import { loginSchema, type LoginFormValues } from "../schemas/login.schema";
+import { loginSchema } from "../schemas/login.schema";
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
@@ -21,7 +21,7 @@ const LoginForm = () => {
             onSubmit: loginSchema,
         },
         onSubmit: async ({ value }) => {
-            login(value as LoginFormValues);
+            login(loginSchema.parse(value));
         }
     });
 

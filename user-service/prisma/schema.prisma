@@ -17,6 +17,7 @@ enum Role {
   ADMIN
 }
 
+// Canonical email/phone CHECK constraints are maintained in SQL migrations.
 model User {
   userId      String   @id @default(uuid())
   email       String   @unique
@@ -44,6 +45,7 @@ model RefreshToken {
   @@index([userId])
 }
 
+// Canonical email/phone CHECK constraints are maintained in SQL migrations.
 model PendingRegistration {
   challengeId    String    @id @default(uuid())
   email          String    @unique
@@ -62,6 +64,7 @@ model PendingRegistration {
   @@index([expiresAt])
 }
 
+// A canonical email CHECK constraint is maintained in SQL migrations.
 model RegistrationOtpRequest {
   id          String   @id @default(uuid())
   // Independent of the challenge so replacing it cannot reset the request quota.
