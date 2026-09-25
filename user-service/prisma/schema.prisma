@@ -43,3 +43,31 @@ model RefreshToken {
 
   @@index([userId])
 }
+
+model PendingRegistration {
+  challengeId    String    @id @default(uuid())
+  email          String    @unique
+  username       String
+  phoneNumber    String
+  // Nullable so secrets can be cleared after consumption or expiry.
+  passwordHash   String?
+  otpHash        String?
+  expiresAt      DateTime
+  failedAttempts Int       @default(0)
+  emailSentAt    DateTime?
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([expiresAt])
+}
+
+model RegistrationOtpRequest {
+  id          String   @id @default(uuid())
+  // Independent of the challenge so replacing it cannot reset the request quota.
+  email       String
+  requestedAt DateTime @default(now())
+
+  @@index([email, requestedAt])
+  @@index([requestedAt])
+}
