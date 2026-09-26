@@ -17,6 +17,9 @@ interface ProfileDetailsFormProps {
     pendingEmailChange: PendingEmailChange | null;
 }
 
+const toLocalPhoneNumber = (phoneNumber: string) =>
+    phoneNumber.replace(/^\+65/, '');
+
 const ProfileDetailsForm = ({
     user,
     pendingEmailChange,
@@ -38,7 +41,7 @@ const ProfileDetailsForm = ({
         defaultValues: {
             email: pendingEmailChange?.email ?? user.email,
             username: user.username,
-            phoneNumber: user.phoneNumber,
+            phoneNumber: toLocalPhoneNumber(user.phoneNumber),
         },
         validators: {
             onBlur: profileDetailsSchema,
@@ -70,7 +73,10 @@ const ProfileDetailsForm = ({
                     setOtpError(undefined);
                 }
 
-                form.reset(details);
+                form.reset({
+                    ...details,
+                    phoneNumber: toLocalPhoneNumber(details.phoneNumber),
+                });
             } catch {
                 // Mutation hooks display the API error message.
             }
