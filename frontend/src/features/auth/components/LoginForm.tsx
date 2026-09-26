@@ -7,6 +7,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { EyeOffIcon, EyeIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const LoginForm = () => {
     const [eyeOff, setEyeOff] = useState(true);
@@ -97,11 +98,9 @@ const LoginForm = () => {
                     </Button>
                     <p className="text-sm text-slate-600">
                         Not an existing user? Sign up{" "}
-                        <a
-                            href="/register"
-                            className="hover:text-indigo-500 underline">
-                            here
-                        </a>
+                        <Link to="/register" className="hover:text-indigo-500 underline">
+                            here!
+                        </Link>
                     </p>
                 </div>
             </form>

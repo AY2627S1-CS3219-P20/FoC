@@ -6,6 +6,7 @@ import useAuthStore from "@/store/authStore";
 import queryClient from "@/lib/queryClient";
 import type { ParsedError } from "@/utils/errorHandler";
 import { ROUTES } from "@/routes/routes";
+import { toast } from "react-toastify";
 
 const useLogout = () => {
     const navigate = useNavigate();
@@ -19,6 +20,7 @@ const useLogout = () => {
             removeToken();
             clearAuth();
             queryClient.clear();
+            toast.success("Logged out successfully.");
             navigate(ROUTES.LOGIN);
         },
         onError: () => {

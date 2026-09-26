@@ -8,7 +8,7 @@ import { AppError } from "../errors/errors.js";
 import type { AuthenticatedUser } from "../types/auth.types.js";
 
 const privateKey = fs.readFileSync(config.jwtPrivateKeyPath, "utf8");
-const publicKey = createPublicKey(privateKey);
+const publicKey = fs.readFileSync(config.jwtPublicKeyPath, "utf8");
 
 export interface AccessTokenPayload {
     userId: string;
