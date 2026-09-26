@@ -1,8 +1,7 @@
-import { type FormEvent, useState } from 'react';
-import { SearchIcon, XIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import SearchBar from '@/components/ui/search-bar';
 import { Spinner } from '@/components/ui/spinner';
 import { ROLES, type ApiUser, type Role } from '@/features/auth/types/auth.types';
 import PromoteUserDialog from '@/features/user/components/PromoteUserDialog';
@@ -31,16 +30,18 @@ const ManageUsersPage = () => {
     const total = usersQuery.data?.total ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-    const handleSearch = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    const handleSearch = () => {
         setSearch(searchInput.trim());
         setPage(1);
     };
 
-    const clearSearch = () => {
-        setSearchInput('');
-        setSearch('');
-        setPage(1);
+    const handleSearchInputChange = (value: string) => {
+        setSearchInput(value);
+
+        if (!value) {
+            setSearch('');
+            setPage(1);
+        }
     };
 
     return (
@@ -53,36 +54,17 @@ const ManageUsersPage = () => {
             </div>
 
             <section className="rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10 md:p-6">
-                <form
+                <div
                     className="mb-5 flex flex-col gap-4 md:flex-row md:items-end"
-                    onSubmit={handleSearch}
                 >
-                    <div className="flex flex-1 flex-col gap-2">
-                        <Label htmlFor="user-search">Search users</Label>
-                        <div className="flex gap-2">
-                            <Input
-                                id="user-search"
-                                type="search"
-                                placeholder="Search by username or email"
-                                value={searchInput}
-                                onChange={event => setSearchInput(event.target.value)}
-                            />
-                            <Button type="submit" variant="indigo">
-                                <SearchIcon />
-                                Search
-                            </Button>
-                            {(searchInput || search) && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={clearSearch}
-                                    aria-label="Clear search"
-                                >
-                                    <XIcon />
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <SearchBar
+                        id="user-search"
+                        label="Search users"
+                        placeholder="Search by username or email"
+                        value={searchInput}
+                        onValueChange={handleSearchInputChange}
+                        onSearch={handleSearch}
+                    />
 
                     <div className="flex flex-col gap-2 md:w-48">
                         <Label htmlFor="role-filter">Role</Label>
@@ -100,7 +82,7 @@ const ManageUsersPage = () => {
                             <option value={ROLES.ADMIN}>Admin</option>
                         </select>
                     </div>
-                </form>
+                </div>
 
                 {usersQuery.isLoading && (
                     <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
