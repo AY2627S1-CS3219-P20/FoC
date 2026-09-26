@@ -2,7 +2,7 @@ import fs from "node:fs";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import type { Response, NextFunction } from "express";
 import { AppError } from "../errors/errors.js";
-import type { AuthRequest } from "../types/auth.types.js";
+import type { AuthRequest, Role } from "../types/auth.types.js";
 import config from "../config/config.js";
 
 const publicKey = fs.readFileSync(config.jwtPublicKeyPath, "utf8");
@@ -46,7 +46,7 @@ export function authenticate(
         req.user = {
             userId: payload.userId,
             email: payload.email,
-            role: payload.role,
+            role: payload.role as Role,
         };
 
         console.log(`Authenticated user: ${req.user.email} with role: ${req.user.role}`);
