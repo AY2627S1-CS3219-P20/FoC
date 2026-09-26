@@ -74,6 +74,64 @@ export async function listUsers(
   };
 }
 
+export async function promoteUserToAdmin(
+  actorId: string,
+  targetUserId: string,
+) {
+  const target = await prisma.user.findUnique({
+    where: { userId: targetUserId },
+    select: publicUserSelect,
+  });
+
+  if (!target) {
+    throw new AppError("User account not found", 404, "USER_NOT_FOUND");
+  }
+
+  if (target.role === "ADMIN") {
+    throw new AppError(
+      "The user is already an admin",
+      409,
+      "USER_ALREADY_ADMIN",
+    );
+  }
+
+  // TODO(F6.3.2): Check requester history once Order Service is implemented.
+  const updateResult = await prisma.user.updateMany({
+    where: {
+      userId: targetUserId,
+      role: "STUDENT",
+    },
+    data: { role: "ADMIN" },
+  });
+
+  if (updateResult.count !== 1) {
+    throw new AppError(
+      "The user's role could not be updated",
+      409,
+      "ROLE_UPDATE_CONFLICT",
+    );
+  }
+
+  const updatedUser = await prisma.user.findUnique({
+    where: { userId: targetUserId },
+    select: publicUserSelect,
+  });
+
+  if (!updatedUser) {
+    throw new AppError("User account not found", 404, "USER_NOT_FOUND");
+  }
+
+  console.info("Administrative user role changed", {
+    actorId,
+    targetUserId,
+    previousRole: "STUDENT",
+    newRole: "ADMIN",
+    changedAt: new Date().toISOString(),
+  });
+
+  return toPublicUser(updatedUser);
+}
+
 async function ensureProfileValuesAreAvailable(
   userId: string,
   input: UpdateMyProfileInput,

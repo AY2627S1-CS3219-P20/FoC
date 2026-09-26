@@ -6,10 +6,12 @@ import {
   resendEmailChangeOtp,
   startEmailChange,
   updateMyProfile,
+  updateUserRole,
   verifyEmailChange,
 } from "../controllers/user.controller.js";
+import { Role } from "../generated/prisma/client.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
-import { authorizeAdmin } from "../middlewares/authorize.middleware.js";
+import { authorize } from "../middlewares/authorize.middleware.js";
 
 const userRouter = Router();
 
@@ -21,7 +23,7 @@ userRouter.post("/me/email-change/resend", resendEmailChangeOtp);
 userRouter.post("/me/email-change/verify", verifyEmailChange);
 userRouter.post("/me/password-change", changePassword);
 
-userRouter.use(authorizeAdmin);
-userRouter.get("/", listUsers);
+userRouter.get("/", authorize(Role.ADMIN), listUsers);
+userRouter.patch("/:userId/role", authorize(Role.ADMIN), updateUserRole);
 
 export default userRouter;

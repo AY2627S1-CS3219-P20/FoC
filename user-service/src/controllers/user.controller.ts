@@ -6,6 +6,8 @@ import {
   resendEmailChangeOtpSchema,
   startEmailChangeSchema,
   updateMyProfileSchema,
+  updateUserRoleParamsSchema,
+  updateUserRoleSchema,
   verifyEmailChangeSchema,
 } from "../schemas/user.schema.js";
 import {
@@ -18,6 +20,7 @@ import {
   changePassword as changePasswordService,
   getMyProfile as getMyProfileService,
   listUsers as listUsersService,
+  promoteUserToAdmin,
   updateMyProfile as updateMyProfileService,
 } from "../services/user.service.js";
 import type { AuthenticatedRequest } from "../types/auth.types.js";
@@ -46,6 +49,38 @@ export async function listUsers(req: AuthenticatedRequest, res: Response) {
   return res.status(200).json({
     success: true,
     data,
+  });
+}
+
+export async function updateUserRole(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const paramsResult = updateUserRoleParamsSchema.safeParse(req.params);
+  const bodyResult = updateUserRoleSchema.safeParse(req.body);
+
+  if (!paramsResult.success) {
+    throw new AppError(
+      paramsResult.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  if (!bodyResult.success) {
+    throw new AppError(
+      bodyResult.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  const user = await promoteUserToAdmin(
+    getAuthenticatedUserId(req),
+    paramsResult.data.userId,
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: { user },
   });
 }
 

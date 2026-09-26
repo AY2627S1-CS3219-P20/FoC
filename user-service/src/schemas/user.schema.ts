@@ -29,6 +29,14 @@ export const listUsersQuerySchema = z.strictObject({
 
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 
+export const updateUserRoleParamsSchema = z.strictObject({
+  userId: z.uuid({ error: "Invalid user ID" }),
+});
+
+export const updateUserRoleSchema = z.strictObject({
+  role: z.literal("ADMIN", { error: "Role must be ADMIN" }),
+});
+
 export const updateMyProfileSchema = z
   .strictObject({
     username: usernameSchema.optional(),

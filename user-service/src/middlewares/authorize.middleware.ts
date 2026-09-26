@@ -1,38 +1,21 @@
-import type { NextFunction, Response } from "express";
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Response, NextFunction } from "express";
 import { AppError } from "../errors/errors.js";
-import { prisma } from "../libs/prisma.js";
 import type { AuthenticatedRequest } from "../types/auth.types.js";
+import type { Role } from "../generated/prisma/client.js";
 
-export function createAuthorizeAdmin(db: PrismaClient = prisma) {
-  return async (
-    req: AuthenticatedRequest,
-    _res: Response,
-    next: NextFunction,
-  ) => {
+export function authorize(...allowedRoles: Role[]) {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
-      throw new AppError(
-        "Authentication required",
-        401,
-        "AUTHENTICATION_REQUIRED",
-      );
+      throw new AppError("Authentication required", 401);
     }
 
-    const actor = await db.user.findUnique({
-      where: { userId: req.user.userId },
-      select: { role: true },
-    });
-
-    if (actor?.role !== "ADMIN") {
+    if (!allowedRoles.includes(req.user.role)) {
       throw new AppError(
         "You do not have permission to access this resource",
         403,
-        "ADMIN_REQUIRED",
       );
     }
 
     next();
   };
 }
-
-export const authorizeAdmin = createAuthorizeAdmin();
