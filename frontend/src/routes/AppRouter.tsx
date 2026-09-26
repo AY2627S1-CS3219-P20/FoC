@@ -14,6 +14,7 @@ import ManageSuppliersPage from '@/pages/ManageSuppliersPage';
 import ManageUsersPage from '@/pages/ManageUsersPage';
 import RoleRoute from '@/routes/RoleRoute';
 import ManageSupplierTypesPage from '@/pages/ManageSupplierTypesPage';
+import ProfilePage from '@/pages/ProfilePage';
 
 const AppRouter = () => {
     return (
@@ -30,6 +31,7 @@ const AppRouter = () => {
                                 <Route element={<RoleRoute allowedRoles={[ROLES.STUDENT, ROLES.ADMIN]} />}>
                                     <Route path={ROUTES.HOME} element={<HomePage />} />
                                     <Route path={ROUTES.SUPPLIERS} element={<SupplierPage />} />
+                                    <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
                                 </Route>
 
                                 <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>

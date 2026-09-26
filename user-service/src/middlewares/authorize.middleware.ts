@@ -1,10 +1,11 @@
 import type { Response, NextFunction } from "express";
 import { AppError } from "../errors/errors.js";
-import type { AuthRequest, Role } from "../types/auth.types.js";
+import type { AuthenticatedRequest } from "../types/auth.types.js";
+import type { Role } from "../generated/prisma/client.js";
 
 export function authorize(...allowedRoles: Role[]) {
     return (
-        req: AuthRequest,
+        req: AuthenticatedRequest,
         _res: Response,
         next: NextFunction,
     ) => {

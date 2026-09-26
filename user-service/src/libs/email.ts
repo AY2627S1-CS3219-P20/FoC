@@ -69,3 +69,32 @@ export async function sendRegistrationOtpEmail(
     );
   }
 }
+
+export async function sendEmailChangeOtpEmail(
+  recipientEmail: string,
+  otp: string,
+): Promise<void> {
+  const from = getEmailSetting("EMAIL_FROM");
+  const mailer = getTransporter();
+
+  try {
+    await mailer.sendMail({
+      from,
+      to: recipientEmail,
+      subject: "Verify your new Aaron email address",
+      text: [
+        `Your Aaron email change verification code is: ${otp}`,
+        "",
+        `This code expires in ${REGISTRATION_OTP_EXPIRES_IN_MINUTES} minutes.`,
+        "If you did not request this change, you can ignore this email.",
+      ].join("\n"),
+    });
+  } catch (error) {
+    console.error("Email Service Error:", error);
+    throw new AppError(
+      "Unable to send verification email. Please try again later.",
+      502,
+      "EMAIL_DELIVERY_FAILED",
+    );
+  }
+}
