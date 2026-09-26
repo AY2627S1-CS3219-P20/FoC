@@ -12,7 +12,7 @@ import ProfileDetailsForm from '@/features/user/components/ProfileDetailsForm';
 import useProfile from '@/features/user/hooks/useProfile';
 
 const ProfilePage = () => {
-    const { data: user, isPending, isError, error, refetch } = useProfile();
+    const { data: profile, isPending, isError, error, refetch } = useProfile();
 
     return (
         <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-8 md:px-10 md:py-10">
@@ -32,7 +32,7 @@ const ProfilePage = () => {
                 <CardHeader className="border-b border-slate-200 pb-4">
                     <CardTitle className="text-lg text-slate-900">Personal information</CardTitle>
                     <CardDescription>
-                        Your username and phone number are visible only where needed in Aaron.
+                        Manage your username, phone number, and verified email address.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -43,7 +43,7 @@ const ProfilePage = () => {
                         </div>
                     )}
 
-                    {isError && !user && (
+                    {isError && !profile && (
                         <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
                             <p className="font-medium text-slate-900">Unable to load your profile</p>
                             <p className="max-w-md text-sm text-slate-600">{error.message}</p>
@@ -53,7 +53,12 @@ const ProfilePage = () => {
                         </div>
                     )}
 
-                    {user && <ProfileDetailsForm user={user} />}
+                    {profile && (
+                        <ProfileDetailsForm
+                            user={profile.user}
+                            pendingEmailChange={profile.pendingEmailChange}
+                        />
+                    )}
                 </CardContent>
             </Card>
         </main>

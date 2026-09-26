@@ -11,10 +11,12 @@ export const phoneNumberSchema = z.string()
     .pipe(z.string().regex(/^(?:\+65)?[89]\d{7}$/, 'Enter an 8-digit Singapore mobile number starting with 8 or 9'))
     .transform(value => value.startsWith('+65') ? value : `+65${value}`);
 
+export const emailSchema = z.string().trim().toLowerCase()
+    .pipe(z.email({ error: 'Enter a valid email address' }));
+
 export const registerSchema = z.strictObject({
     username: usernameSchema,
-    email: z.string().trim().toLowerCase()
-        .pipe(z.email({ error: 'Enter a valid email address' })),
+    email: emailSchema,
     phoneNumber: phoneNumberSchema,
     password: z.string()
         .min(8, 'Password must have at least 8 characters')

@@ -15,6 +15,9 @@ export const ENDPOINTS = {
 
     user: {
         profile: `${BASE_USER}/me`,
+        emailChange: `${BASE_USER}/me/email-change`,
+        resendEmailChangeOtp: `${BASE_USER}/me/email-change/resend`,
+        verifyEmailChange: `${BASE_USER}/me/email-change/verify`,
     },
 
     supplier: {

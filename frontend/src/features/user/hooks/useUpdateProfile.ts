@@ -6,6 +6,7 @@ import { parseError, type ParsedError } from '@/utils/errorHandler';
 import type { UpdateProfilePayload } from '../schemas/profile.schema';
 import { updateMyProfileService } from '../services/user.service';
 import { PROFILE_QUERY_KEY } from './useProfile';
+import type { ProfileResult } from '../types/user.types';
 
 const useUpdateProfile = () => {
     const queryClient = useQueryClient();
@@ -21,7 +22,10 @@ const useUpdateProfile = () => {
             }
         },
         onSuccess: user => {
-            queryClient.setQueryData(PROFILE_QUERY_KEY, user);
+            queryClient.setQueryData<ProfileResult>(
+                PROFILE_QUERY_KEY,
+                current => current ? { ...current, user } : current,
+            );
             setUser(user);
             toast.success('Profile updated successfully.');
         },
@@ -32,6 +36,7 @@ const useUpdateProfile = () => {
 
     return {
         updateProfile: mutation.mutate,
+        updateProfileAsync: mutation.mutateAsync,
         isPending: mutation.isPending,
     };
 };
