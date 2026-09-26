@@ -16,14 +16,14 @@ export function authenticate(
 
     if (!authHeader?.startsWith("Bearer ")) {
         console.log("Authorization header does not start with Bearer");
-        throw new AppError("Unauthorized access", 401);
+        throw new AppError("Authentication required", 401, "AUTHENTICATION_REQUIRED");
     }
 
     const accessToken = authHeader.replace("Bearer ", "").trim();
 
     if (!accessToken) {
         console.log("Access token is missing after Bearer");
-        throw new AppError("Unauthorized access", 401);
+        throw new AppError("Authentication required", 401, "AUTHENTICATION_REQUIRED");
     }
 
     try {
