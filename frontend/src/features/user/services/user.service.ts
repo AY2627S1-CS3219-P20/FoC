@@ -9,6 +9,7 @@ import type {
     VerifyEmailChangePayload,
 } from '../schemas/email-change.schema';
 import type { ChangePasswordPayload } from '../schemas/password-change.schema';
+import type { CreateAdminInvitationPayload } from '../schemas/admin-invitation.schema';
 import type {
     AdminUserListParams,
     AdminUserListResult,
@@ -27,6 +28,12 @@ export const listUsersService = async (
     );
 
     return response.data.data!;
+};
+
+export const createAdminInvitationService = async (
+    payload: CreateAdminInvitationPayload,
+): Promise<void> => {
+    await authApi.post(ENDPOINTS.user.adminInvitations, payload);
 };
 
 export const promoteUserService = async (

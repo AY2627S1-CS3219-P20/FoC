@@ -15,6 +15,7 @@ export const ENDPOINTS = {
 
     user: {
         users: BASE_USER,
+        adminInvitations: `${BASE_USER}/admin-invitations`,
         userRole: (userId: string) => `${BASE_USER}/${userId}/role`,
         profile: `${BASE_USER}/me`,
         emailChange: `${BASE_USER}/me/email-change`,

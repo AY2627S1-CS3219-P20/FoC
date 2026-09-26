@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { MailPlusIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import SearchBar from '@/components/ui/search-bar';
 import { Spinner } from '@/components/ui/spinner';
 import { ROLES, type ApiUser, type Role } from '@/features/auth/types/auth.types';
 import PromoteUserDialog from '@/features/user/components/PromoteUserDialog';
+import CreateAdminInvitationDialog from '@/features/user/components/CreateAdminInvitationDialog';
 import useAdminUsers from '@/features/user/hooks/useAdminUsers';
+import useCreateAdminInvitation from '@/features/user/hooks/useCreateAdminInvitation';
 import usePromoteUser from '@/features/user/hooks/usePromoteUser';
 
 const PAGE_SIZE = 20;
@@ -16,8 +19,13 @@ const ManageUsersPage = () => {
     const [role, setRole] = useState<Role | ''>('');
     const [page, setPage] = useState(1);
     const [userToPromote, setUserToPromote] = useState<ApiUser | null>(null);
+    const [isCreateAdminOpen, setIsCreateAdminOpen] = useState(false);
 
     const { promoteUser, isPending: isPromoting } = usePromoteUser();
+    const {
+        createAdminInvitation,
+        isPending: isCreatingAdmin,
+    } = useCreateAdminInvitation();
 
     const usersQuery = useAdminUsers({
         search: search || undefined,
@@ -46,11 +54,21 @@ const ManageUsersPage = () => {
 
     return (
         <main className="px-5 py-5 md:px-10 md:py-8">
-            <div className="mb-6 flex flex-col gap-1">
-                <h1 className="text-xl md:text-2xl font-bold">Manage Users</h1>
-                <p className="text-sm text-muted-foreground">
-                    Search and review registered user accounts.
-                </p>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-xl md:text-2xl font-bold">Manage Users</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Search and review registered user accounts.
+                    </p>
+                </div>
+                <Button
+                    type="button"
+                    variant="indigo"
+                    onClick={() => setIsCreateAdminOpen(true)}
+                >
+                    <MailPlusIcon />
+                    Create admin
+                </Button>
             </div>
 
             <section className="rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10 md:p-6">
@@ -207,6 +225,18 @@ const ManageUsersPage = () => {
                                 setUserToPromote(null);
                                 setPage(1);
                             },
+                        });
+                    }}
+                />
+            )}
+
+            {isCreateAdminOpen && (
+                <CreateAdminInvitationDialog
+                    isPending={isCreatingAdmin}
+                    onClose={() => setIsCreateAdminOpen(false)}
+                    onSubmit={payload => {
+                        createAdminInvitation(payload, {
+                            onSuccess: () => setIsCreateAdminOpen(false),
                         });
                     }}
                 />
