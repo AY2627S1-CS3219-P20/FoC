@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import cors from "cors";
 import "dotenv/config";
 import authRouter from "./routes/auth.route.js";
+import userRouter from "./routes/user.route.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import cookieParser from "cookie-parser";
 import config from "./config/config.js";
@@ -20,6 +21,7 @@ app.get("/user", (_req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/users", userRouter);
 
 // Catch all * not found routes
 app.use((_req: Request, _res: Response) => {
