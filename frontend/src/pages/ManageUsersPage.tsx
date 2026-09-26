@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { ROLES, type Role } from '@/features/auth/types/auth.types';
+import { ROLES, type ApiUser, type Role } from '@/features/auth/types/auth.types';
+import PromoteUserDialog from '@/features/user/components/PromoteUserDialog';
 import useAdminUsers from '@/features/user/hooks/useAdminUsers';
+import usePromoteUser from '@/features/user/hooks/usePromoteUser';
 
 const PAGE_SIZE = 20;
 
@@ -14,6 +16,9 @@ const ManageUsersPage = () => {
     const [search, setSearch] = useState('');
     const [role, setRole] = useState<Role | ''>('');
     const [page, setPage] = useState(1);
+    const [userToPromote, setUserToPromote] = useState<ApiUser | null>(null);
+
+    const { promoteUser, isPending: isPromoting } = usePromoteUser();
 
     const usersQuery = useAdminUsers({
         search: search || undefined,
@@ -137,6 +142,7 @@ const ManageUsersPage = () => {
                                         <th className="px-4 py-3 font-medium">Email</th>
                                         <th className="px-4 py-3 font-medium">Phone number</th>
                                         <th className="px-4 py-3 font-medium">Role</th>
+                                        <th className="px-4 py-3 text-right font-medium">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -155,6 +161,22 @@ const ManageUsersPage = () => {
                                                 >
                                                     {user.role === ROLES.ADMIN ? 'Admin' : 'Student'}
                                                 </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                {user.role === ROLES.STUDENT ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setUserToPromote(user)}
+                                                    >
+                                                        Make admin
+                                                    </Button>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Already admin
+                                                    </span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -191,6 +213,22 @@ const ManageUsersPage = () => {
                     </>
                 )}
             </section>
+
+            {userToPromote && (
+                <PromoteUserDialog
+                    user={userToPromote}
+                    isPending={isPromoting}
+                    onClose={() => setUserToPromote(null)}
+                    onConfirm={() => {
+                        promoteUser(userToPromote.id, {
+                            onSuccess: () => {
+                                setUserToPromote(null);
+                                setPage(1);
+                            },
+                        });
+                    }}
+                />
+            )}
         </main>
     );
 };

@@ -1,5 +1,6 @@
 import authApi from '@/api/authApi';
 import { ENDPOINTS } from '@/api/endpoints';
+import { ROLES } from '@/features/auth/types/auth.types';
 import type { ApiResponse } from '@/types/api.types';
 import type { UpdateProfilePayload } from '../schemas/profile.schema';
 import type {
@@ -14,6 +15,7 @@ import type {
     EmailChangeChallenge,
     EmailChangeVerificationResult,
     ProfileResult,
+    UpdateUserRoleResult,
 } from '../types/user.types';
 
 export const listUsersService = async (
@@ -22,6 +24,17 @@ export const listUsersService = async (
     const response = await authApi.get<ApiResponse<AdminUserListResult>>(
         ENDPOINTS.user.users,
         { params },
+    );
+
+    return response.data.data!;
+};
+
+export const promoteUserService = async (
+    userId: string,
+): Promise<UpdateUserRoleResult> => {
+    const response = await authApi.patch<ApiResponse<UpdateUserRoleResult>>(
+        ENDPOINTS.user.userRole(userId),
+        { role: ROLES.ADMIN },
     );
 
     return response.data.data!;

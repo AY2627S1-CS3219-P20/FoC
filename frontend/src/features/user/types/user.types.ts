@@ -14,6 +14,10 @@ export interface AdminUserListResult {
     total: number;
 }
 
+export interface UpdateUserRoleResult {
+    user: ApiUser;
+}
+
 export interface EmailChangeChallenge {
     challengeId: string;
     expiresAt: string;
