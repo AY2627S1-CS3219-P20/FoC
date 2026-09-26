@@ -1,5 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { AppError } from "../errors/errors.js";
+import { REGISTRATION_OTP_EXPIRES_IN_MINUTES } from "../constants/auth.constants.js";
 
 const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
 const BREVO_SMTP_PORT = 587;
@@ -55,7 +56,7 @@ export async function sendRegistrationOtpEmail(
       text: [
         `Your Aaron verification code is: ${otp}`,
         "",
-        "This code expires in 10 minutes.",
+        `This code expires in ${REGISTRATION_OTP_EXPIRES_IN_MINUTES} minutes.`,
         "If you did not request this code, you can ignore this email.",
       ].join("\n"),
     });

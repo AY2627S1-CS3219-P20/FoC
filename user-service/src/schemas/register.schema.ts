@@ -33,4 +33,11 @@ export const registerSchema = z.strictObject({
     .regex(/[\p{P}\p{S}]/u, "Include a special character"),
 });
 
+export const resendRegistrationOtpSchema = z.strictObject({
+  challengeId: z.uuid({ error: "Invalid registration challenge" }),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type ResendRegistrationOtpInput = z.infer<
+  typeof resendRegistrationOtpSchema
+>;

@@ -12,6 +12,10 @@ export const REFRESH_TOKEN_EXPIRES_IN =
 
 export const ACCESS_TOKEN_EXPIRES_IN = "15m";
 
+export const REGISTRATION_OTP_EXPIRES_IN_MINUTES = 10;
+
+export const REGISTRATION_OTP_MAX_REQUESTS_PER_HOUR = 3;
+
 // Testing values for refresh token expiration and max age
 // export const REFRESH_TOKEN_EXPIRES_IN_MINUTES = 3;
 
