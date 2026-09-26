@@ -78,6 +78,18 @@ model RegistrationOtpRequest {
 }
 
 // A canonical email CHECK constraint is maintained in SQL migrations.
+model AdminInvitation {
+  invitationId String   @id @default(uuid())
+  email        String   @unique
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
+// A canonical email CHECK constraint is maintained in SQL migrations.
 model PendingEmailChange {
   challengeId    String    @id @default(uuid())
   userId         String    @unique
