@@ -9,10 +9,23 @@ import type {
 } from '../schemas/email-change.schema';
 import type { ChangePasswordPayload } from '../schemas/password-change.schema';
 import type {
+    AdminUserListParams,
+    AdminUserListResult,
     EmailChangeChallenge,
     EmailChangeVerificationResult,
     ProfileResult,
 } from '../types/user.types';
+
+export const listUsersService = async (
+    params: AdminUserListParams,
+): Promise<AdminUserListResult> => {
+    const response = await authApi.get<ApiResponse<AdminUserListResult>>(
+        ENDPOINTS.user.users,
+        { params },
+    );
+
+    return response.data.data!;
+};
 
 export const getMyProfileService = async (): Promise<ProfileResult> => {
     const response = await authApi.get<ApiResponse<ProfileResult>>(
