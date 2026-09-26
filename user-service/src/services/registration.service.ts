@@ -3,10 +3,12 @@ import argon2 from "argon2";
 import {
   REGISTRATION_OTP_EXPIRES_IN_MINUTES,
   REGISTRATION_OTP_MAX_REQUESTS_PER_HOUR,
+  REGISTRATION_OTP_MAX_VERIFY_ATTEMPTS,
 } from "../constants/auth.constants.js";
 import { AppError } from "../errors/errors.js";
 import {
   Prisma,
+  Role,
   type PendingRegistration,
 } from "../generated/prisma/client.js";
 import { sendRegistrationOtpEmail } from "../libs/email.js";
@@ -14,6 +16,7 @@ import { prisma } from "../libs/prisma.js";
 import type {
   RegisterInput,
   ResendRegistrationOtpInput,
+  VerifyRegistrationInput,
 } from "../schemas/register.schema.js";
 
 const ONE_HOUR_IN_MS = 60 * 60 * 1000;
@@ -208,4 +211,126 @@ export async function resendRegistrationOtp(
   await ensureIdentityIsAvailable(pending);
 
   return issueOtp({ kind: "resend", pending });
+}
+
+export async function verifyRegistration(input: VerifyRegistrationInput) {
+  const pending = await prisma.pendingRegistration.findUnique({
+    where: { challengeId: input.challengeId },
+  });
+
+  if (!pending
+    || pending.consumedAt
+    || !pending.passwordHash
+    || !pending.otpHash
+    || !pending.emailSentAt) {
+    throw new AppError(
+      "Registration request is no longer active",
+      409,
+      "REGISTRATION_NOT_ACTIVE",
+    );
+  }
+
+  if (pending.expiresAt <= new Date()) {
+    throw new AppError(
+      "Verification code has expired",
+      410,
+      "OTP_EXPIRED",
+    );
+  }
+
+  if (pending.failedAttempts >= REGISTRATION_OTP_MAX_VERIFY_ATTEMPTS) {
+    throw new AppError(
+      "Too many incorrect verification attempts. Request a new code.",
+      429,
+      "OTP_ATTEMPTS_EXCEEDED",
+    );
+  }
+
+  const passwordHash = pending.passwordHash;
+  const otpHash = pending.otpHash;
+  const otpValid = await argon2.verify(otpHash, input.otp);
+
+  if (!otpValid) {
+    await prisma.pendingRegistration.updateMany({
+      where: {
+        challengeId: pending.challengeId,
+        otpHash,
+        consumedAt: null,
+        failedAttempts: { lt: REGISTRATION_OTP_MAX_VERIFY_ATTEMPTS },
+      },
+      data: {
+        failedAttempts: { increment: 1 },
+      },
+    });
+
+    throw new AppError("Invalid verification code", 400, "INVALID_OTP");
+  }
+
+  const verifiedAt = new Date();
+
+  try {
+    const user = await prisma.$transaction(async (tx) => {
+      const consumed = await tx.pendingRegistration.updateMany({
+        where: {
+          challengeId: pending.challengeId,
+          otpHash,
+          consumedAt: null,
+          expiresAt: { gt: verifiedAt },
+          failedAttempts: { lt: REGISTRATION_OTP_MAX_VERIFY_ATTEMPTS },
+        },
+        data: {
+          consumedAt: verifiedAt,
+          passwordHash: null,
+          otpHash: null,
+        },
+      });
+
+      if (consumed.count !== 1) {
+        throw new AppError(
+          "Verification code is no longer valid",
+          409,
+          "OTP_NO_LONGER_VALID",
+        );
+      }
+
+      return tx.user.create({
+        data: {
+          email: pending.email,
+          username: pending.username,
+          phoneNumber: pending.phoneNumber,
+          password: passwordHash,
+          role: Role.STUDENT,
+        },
+        select: {
+          userId: true,
+          email: true,
+          username: true,
+          phoneNumber: true,
+          role: true,
+        },
+      });
+    });
+
+    // Credit Service has no allocation API yet; the required 50-credit grant. TODO: Implement credit allocation once the API is available.
+    return {
+      id: user.userId,
+      email: user.email,
+      username: user.username,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError
+      && error.code === "P2002") {
+      await ensureIdentityIsAvailable(pending);
+
+      throw new AppError(
+        "Registration details are already in use",
+        409,
+        "REGISTRATION_CONFLICT",
+      );
+    }
+
+    throw error;
+  }
 }

@@ -7,10 +7,12 @@ import { refreshTokenCookieOptions } from "../libs/cookies.js";
 import {
     registerSchema,
     resendRegistrationOtpSchema,
+    verifyRegistrationSchema,
 } from "../schemas/register.schema.js";
 import {
     resendRegistrationOtp as resendRegistrationOtpService,
     startRegistration,
+    verifyRegistration as verifyRegistrationService,
 } from "../services/registration.service.js";
 
 export async function register(req: Request, res: Response) {
@@ -40,6 +42,21 @@ export async function resendRegistrationOtp(req: Request, res: Response) {
     return res.status(202).json({
         success: true,
         data,
+    });
+}
+
+export async function verifyRegistration(req: Request, res: Response) {
+    const result = verifyRegistrationSchema.safeParse(req.body);
+
+    if (!result.success) {
+        throw new AppError(result.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const user = await verifyRegistrationService(result.data);
+
+    return res.status(201).json({
+        success: true,
+        data: { user },
     });
 }
 

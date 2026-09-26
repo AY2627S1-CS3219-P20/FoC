@@ -37,7 +37,13 @@ export const resendRegistrationOtpSchema = z.strictObject({
   challengeId: z.uuid({ error: "Invalid registration challenge" }),
 });
 
+export const verifyRegistrationSchema = z.strictObject({
+  challengeId: z.uuid({ error: "Invalid registration challenge" }),
+  otp: z.string().regex(/^\d{6}$/, "Enter the 6-digit verification code"),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ResendRegistrationOtpInput = z.infer<
   typeof resendRegistrationOtpSchema
 >;
+export type VerifyRegistrationInput = z.infer<typeof verifyRegistrationSchema>;
