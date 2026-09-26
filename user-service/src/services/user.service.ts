@@ -1,11 +1,16 @@
 import argon2 from "argon2";
-import { Prisma, type Role } from "../generated/prisma/client.js";
+import {
+  Prisma,
+  type PrismaClient,
+  type Role,
+} from "../generated/prisma/client.js";
 import { REFRESH_TOKEN_MAX_AGE } from "../constants/auth.constants.js";
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
 import { generateRefreshToken } from "../libs/refreshToken.js";
 import type {
   ChangePasswordInput,
+  ListUsersQuery,
   UpdateMyProfileInput,
 } from "../schemas/user.schema.js";
 
@@ -30,6 +35,42 @@ function toPublicUser(user: {
     username: user.username,
     phoneNumber: user.phoneNumber,
     role: user.role,
+  };
+}
+
+export async function listUsers(
+  input: ListUsersQuery,
+  db: PrismaClient = prisma,
+) {
+  const where: Prisma.UserWhereInput = {};
+
+  if (input.search) {
+    where.OR = [
+      { username: { contains: input.search, mode: "insensitive" } },
+      { email: { contains: input.search, mode: "insensitive" } },
+    ];
+  }
+
+  if (input.role) {
+    where.role = input.role;
+  }
+
+  const [users, total] = await Promise.all([
+    db.user.findMany({
+      where,
+      select: publicUserSelect,
+      orderBy: [{ createdAt: "asc" }, { userId: "asc" }],
+      skip: (input.page - 1) * input.pageSize,
+      take: input.pageSize,
+    }),
+    db.user.count({ where }),
+  ]);
+
+  return {
+    users: users.map(toPublicUser),
+    page: input.page,
+    pageSize: input.pageSize,
+    total,
   };
 }
 

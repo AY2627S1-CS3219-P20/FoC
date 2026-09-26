@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { AppError } from "../errors/errors.js";
 import {
   changePasswordSchema,
+  listUsersQuerySchema,
   resendEmailChangeOtpSchema,
   startEmailChangeSchema,
   updateMyProfileSchema,
@@ -16,6 +17,7 @@ import {
 import {
   changePassword as changePasswordService,
   getMyProfile as getMyProfileService,
+  listUsers as listUsersService,
   updateMyProfile as updateMyProfileService,
 } from "../services/user.service.js";
 import type { AuthenticatedRequest } from "../types/auth.types.js";
@@ -27,6 +29,24 @@ function getAuthenticatedUserId(req: AuthenticatedRequest): string {
   }
 
   return req.user.userId;
+}
+
+export async function listUsers(req: AuthenticatedRequest, res: Response) {
+  const result = listUsersQuerySchema.safeParse(req.query);
+
+  if (!result.success) {
+    throw new AppError(
+      result.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  const data = await listUsersService(result.data);
+
+  return res.status(200).json({
+    success: true,
+    data,
+  });
 }
 
 export async function getMyProfile(req: AuthenticatedRequest, res: Response) {

@@ -6,6 +6,29 @@ import {
   usernameSchema,
 } from "./register.schema.js";
 
+const positiveIntegerQuerySchema = (fieldName: string) =>
+  z
+    .string()
+    .regex(/^\d+$/, `${fieldName} must be a positive integer`)
+    .transform(Number)
+    .refine((value) => value >= 1, `${fieldName} must be a positive integer`);
+
+export const listUsersQuerySchema = z.strictObject({
+  search: z
+    .string()
+    .trim()
+    .max(100, "Search must be at most 100 characters")
+    .optional()
+    .transform((value) => value || undefined),
+  role: z.enum(["STUDENT", "ADMIN"]).optional(),
+  page: positiveIntegerQuerySchema("Page").default(1),
+  pageSize: positiveIntegerQuerySchema("Page size")
+    .refine((value) => value <= 100, "Page size must be at most 100")
+    .default(20),
+});
+
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+
 export const updateMyProfileSchema = z
   .strictObject({
     username: usernameSchema.optional(),
