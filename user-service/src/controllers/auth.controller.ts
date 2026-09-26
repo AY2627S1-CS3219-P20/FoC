@@ -1,5 +1,9 @@
 import type { Request, Response } from "express";
-import { loginSchema } from "../schemas/auth.schema.js";
+import {
+    adminActivationSchema,
+    loginSchema,
+} from "../schemas/auth.schema.js";
+import { activateAdmin as activateAdminService } from "../services/admin-activation.service.js";
 import { loginUser, logoutUser } from "../services/auth.service.js";
 import { AppError } from "../errors/errors.js";
 import { refreshAccessToken } from "../services/refresh.service.js";
@@ -14,6 +18,25 @@ import {
     startRegistration,
     verifyRegistration as verifyRegistrationService,
 } from "../services/registration.service.js";
+
+export async function activateAdmin(req: Request, res: Response) {
+    const result = adminActivationSchema.safeParse(req.body);
+
+    if (!result.success) {
+        throw new AppError(
+            result.error.issues.at(0)?.message || "Invalid request",
+            400,
+        );
+    }
+
+    const user = await activateAdminService(result.data);
+
+    return res.status(201).json({
+        success: true,
+        message: "Administrator account activated successfully.",
+        data: { user },
+    });
+}
 
 export async function register(req: Request, res: Response) {
     const result = registerSchema.safeParse(req.body);
