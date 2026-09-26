@@ -12,6 +12,7 @@ import type { ApiResponse } from "@/types/api.types";
 import { ENDPOINTS } from "@/api/endpoints";
 import authApi from "@/api/authApi";
 import type { AuthResult } from "@/features/auth/types/auth.types";
+import { toast } from "react-toastify";
 
 interface AuthContextValue {
     isInitializing: boolean;
@@ -78,6 +79,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const forcedLogout = () => {
             removeToken();
             clearAuth();
+            toast.error("Your session has expired. Please log in again.", {
+                toastId: "session-expired",
+            });
         };
         // Listen for the "auth:logout" event from axios interceptor to handle forced logout across tabs
         window.addEventListener("auth:logout", forcedLogout);
