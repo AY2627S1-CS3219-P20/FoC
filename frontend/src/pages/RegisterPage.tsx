@@ -17,7 +17,10 @@ const RegisterPage = () => {
             </div>
             <Card className="w-full max-w-sm rounded-2xl p-6!">
                 {pendingRegistration ? (
-                    <RegistrationOtpForm email={pendingRegistration.email} />
+                    <RegistrationOtpForm
+                        challengeId={pendingRegistration.challengeId}
+                        email={pendingRegistration.email}
+                    />
                 ) : (
                     <RegisterForm onRegistrationStarted={setPendingRegistration} />
                 )}

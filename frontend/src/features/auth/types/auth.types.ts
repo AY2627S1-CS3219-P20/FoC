@@ -12,6 +12,10 @@ export interface PendingRegistrationChallenge extends RegistrationChallenge {
     email: string;
 }
 
+export interface VerifyRegistrationResult {
+    user: ApiUser;
+}
+
 export interface ApiUser {
     id: string;
     email: string;

@@ -25,3 +25,6 @@ export const registrationOtpSchema = z.strictObject({
 });
 
 export type RegisterPayload = z.infer<typeof registerSchema>;
+export type VerifyRegistrationPayload = z.infer<typeof registrationOtpSchema> & {
+    challengeId: string;
+};

@@ -4,8 +4,12 @@ import type {
     LoginPayload,
     AuthResult,
     RegistrationChallenge,
+    VerifyRegistrationResult,
 } from "@/features/auth/types/auth.types";
-import type { RegisterPayload } from "@/features/auth/schemas/register.schema";
+import type {
+    RegisterPayload,
+    VerifyRegistrationPayload,
+} from "@/features/auth/schemas/register.schema";
 import authApi from "@/api/authApi";
 
 export const loginService = async (
@@ -28,6 +32,17 @@ export const registerService = async (
 ): Promise<RegistrationChallenge> => {
     const response = await authApi.post<ApiResponse<RegistrationChallenge>>(
         ENDPOINTS.auth.register,
+        payload,
+    );
+
+    return response.data.data!;
+};
+
+export const verifyRegistrationService = async (
+    payload: VerifyRegistrationPayload,
+): Promise<VerifyRegistrationResult> => {
+    const response = await authApi.post<ApiResponse<VerifyRegistrationResult>>(
+        ENDPOINTS.auth.verifyRegistration,
         payload,
     );
 

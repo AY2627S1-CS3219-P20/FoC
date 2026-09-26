@@ -5,16 +5,24 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ROUTES } from '@/routes/routes';
 import { registrationOtpSchema } from '../schemas/register.schema';
+import useVerifyRegistration from '../hooks/useVerifyRegistration';
 
 interface RegistrationOtpFormProps {
+    challengeId: string;
     email: string;
 }
 
-const RegistrationOtpForm = ({ email }: RegistrationOtpFormProps) => {
+const RegistrationOtpForm = ({ challengeId, email }: RegistrationOtpFormProps) => {
+    const { verifyRegistration, isPending } = useVerifyRegistration();
     const form = useForm({
         defaultValues: { otp: '' },
         validators: {
             onBlur: registrationOtpSchema,
+            onSubmit: registrationOtpSchema,
+        },
+        onSubmit: async ({ value }) => {
+            const { otp } = registrationOtpSchema.parse(value);
+            verifyRegistration({ challengeId, otp });
         },
     });
 
@@ -23,7 +31,10 @@ const RegistrationOtpForm = ({ email }: RegistrationOtpFormProps) => {
             aria-label="Verify your email"
             noValidate
             className="flex flex-col gap-4"
-            onSubmit={event => event.preventDefault()}
+            onSubmit={event => {
+                event.preventDefault();
+                form.handleSubmit();
+            }}
         >
             <div className="space-y-2 text-center">
                 <h2 className="text-lg font-semibold text-indigo-900">Verify your email</h2>
@@ -61,9 +72,13 @@ const RegistrationOtpForm = ({ email }: RegistrationOtpFormProps) => {
             <p id="otp-expiry" className="text-center text-sm text-slate-600">
                 Codes expire after 10 minutes.
             </p>
-            {/* Enable these actions when the verification API is connected. */}
             <div className="flex flex-col items-center gap-3">
-                <Button type="submit" variant="indigo" size="lg" disabled>
+                <Button
+                    type="submit"
+                    variant="indigo"
+                    size="lg"
+                    isLoading={isPending}
+                >
                     Verify Email
                 </Button>
                 <Button type="button" variant="linkIndigo" disabled>
