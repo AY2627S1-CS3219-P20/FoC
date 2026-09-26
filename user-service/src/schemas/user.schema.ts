@@ -29,6 +29,14 @@ export const listUsersQuerySchema = z.strictObject({
 
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 
+export const createAdminInvitationSchema = z.strictObject({
+  email: emailSchema,
+});
+
+export type CreateAdminInvitationInput = z.infer<
+  typeof createAdminInvitationSchema
+>;
+
 export const updateUserRoleParamsSchema = z.strictObject({
   userId: z.uuid({ error: "Invalid user ID" }),
 });

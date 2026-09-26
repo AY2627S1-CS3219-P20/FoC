@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   changePassword,
+  createAdminInvitation,
   getMyProfile,
   listUsers,
   resendEmailChangeOtp,
@@ -23,6 +24,11 @@ userRouter.post("/me/email-change/resend", resendEmailChangeOtp);
 userRouter.post("/me/email-change/verify", verifyEmailChange);
 userRouter.post("/me/password-change", changePassword);
 
+userRouter.post(
+  "/admin-invitations",
+  authorize(Role.ADMIN),
+  createAdminInvitation,
+);
 userRouter.get("/", authorize(Role.ADMIN), listUsers);
 userRouter.patch("/:userId/role", authorize(Role.ADMIN), updateUserRole);
 
