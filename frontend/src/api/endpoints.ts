@@ -9,6 +9,7 @@ export const ENDPOINTS = {
         logout: `${BASE_AUTH}/logout`,
         refreshToken: `${BASE_AUTH}/refresh`,
         register: `${BASE_AUTH}/register`,
+        adminActivation: `${BASE_AUTH}/admin-activation`,
         resendRegistrationOtp: `${BASE_AUTH}/register/resend`,
         verifyRegistration: `${BASE_AUTH}/register/verify`,
     },

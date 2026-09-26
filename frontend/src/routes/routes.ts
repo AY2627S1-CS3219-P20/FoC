@@ -2,6 +2,7 @@ export const ROUTES = {
     // Public routes
     LOGIN: "/",
     REGISTER: "/register",
+    ACTIVATE_ADMIN: "/activate-admin",
 
     // Protected routes for student roles
     ACTIVITY: "/activity",
