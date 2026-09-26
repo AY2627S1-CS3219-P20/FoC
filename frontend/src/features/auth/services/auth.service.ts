@@ -4,6 +4,7 @@ import type {
     LoginPayload,
     AuthResult,
     RegistrationChallenge,
+    ResendRegistrationOtpPayload,
     VerifyRegistrationResult,
 } from "@/features/auth/types/auth.types";
 import type {
@@ -43,6 +44,17 @@ export const verifyRegistrationService = async (
 ): Promise<VerifyRegistrationResult> => {
     const response = await authApi.post<ApiResponse<VerifyRegistrationResult>>(
         ENDPOINTS.auth.verifyRegistration,
+        payload,
+    );
+
+    return response.data.data!;
+};
+
+export const resendRegistrationOtpService = async (
+    payload: ResendRegistrationOtpPayload,
+): Promise<RegistrationChallenge> => {
+    const response = await authApi.post<ApiResponse<RegistrationChallenge>>(
+        ENDPOINTS.auth.resendRegistrationOtp,
         payload,
     );
 

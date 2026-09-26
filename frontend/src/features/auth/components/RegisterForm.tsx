@@ -7,7 +7,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
 import { ROUTES } from '@/routes/routes';
-import { registerSchema } from '../schemas/register.schema';
+import { registerSchema, type RegistrationDetails } from '../schemas/register.schema';
 import useRegister from '../hooks/useRegister';
 import type { PendingRegistrationChallenge } from '../types/auth.types';
 
@@ -18,17 +18,21 @@ const registrationFields = [
 ] as const;
 
 interface RegisterFormProps {
-    onRegistrationStarted: (challenge: PendingRegistrationChallenge) => void;
+    initialValues?: RegistrationDetails;
+    onRegistrationStarted: (
+        challenge: PendingRegistrationChallenge,
+        details: RegistrationDetails,
+    ) => void;
 }
 
-const RegisterForm = ({ onRegistrationStarted }: RegisterFormProps) => {
+const RegisterForm = ({ initialValues, onRegistrationStarted }: RegisterFormProps) => {
     const [showPassword, setShowPassword] = useState(false);
     const { register, isPending } = useRegister();
     const form = useForm({
         defaultValues: {
-            username: '',
-            email: '',
-            phoneNumber: '',
+            username: initialValues?.username ?? '',
+            email: initialValues?.email ?? '',
+            phoneNumber: initialValues?.phoneNumber ?? '',
             password: '',
         },
         validators: {
@@ -41,10 +45,17 @@ const RegisterForm = ({ onRegistrationStarted }: RegisterFormProps) => {
             register(payload, {
                 onSuccess: challenge => {
                     form.reset();
-                    onRegistrationStarted({
-                        ...challenge,
-                        email: payload.email,
-                    });
+                    onRegistrationStarted(
+                        {
+                            ...challenge,
+                            email: payload.email,
+                        },
+                        {
+                            username: payload.username,
+                            email: payload.email,
+                            phoneNumber: payload.phoneNumber,
+                        },
+                    );
                 },
             });
         },

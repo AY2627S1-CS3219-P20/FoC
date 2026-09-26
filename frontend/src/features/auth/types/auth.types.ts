@@ -8,6 +8,8 @@ export interface RegistrationChallenge {
     expiresAt: string;
 }
 
+export type ResendRegistrationOtpPayload = Pick<RegistrationChallenge, "challengeId">;
+
 export interface PendingRegistrationChallenge extends RegistrationChallenge {
     email: string;
 }

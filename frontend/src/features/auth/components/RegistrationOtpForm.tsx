@@ -6,14 +6,25 @@ import { Input } from '@/components/ui/input';
 import { ROUTES } from '@/routes/routes';
 import { registrationOtpSchema } from '../schemas/register.schema';
 import useVerifyRegistration from '../hooks/useVerifyRegistration';
+import useResendRegistrationOtp from '../hooks/useResendRegistrationOtp';
+import type { RegistrationChallenge } from '../types/auth.types';
 
 interface RegistrationOtpFormProps {
     challengeId: string;
     email: string;
+    onChallengeUpdated: (challenge: RegistrationChallenge) => void;
+    onChangeDetails: () => void;
 }
 
-const RegistrationOtpForm = ({ challengeId, email }: RegistrationOtpFormProps) => {
-    const { verifyRegistration, isPending } = useVerifyRegistration();
+const RegistrationOtpForm = ({
+    challengeId,
+    email,
+    onChallengeUpdated,
+    onChangeDetails,
+}: RegistrationOtpFormProps) => {
+    const { verifyRegistration, isPending: isVerifying } = useVerifyRegistration();
+    const { resendRegistrationOtp, isPending: isResending } = useResendRegistrationOtp();
+    const isSubmitting = isVerifying || isResending;
     const form = useForm({
         defaultValues: { otp: '' },
         validators: {
@@ -25,6 +36,15 @@ const RegistrationOtpForm = ({ challengeId, email }: RegistrationOtpFormProps) =
             verifyRegistration({ challengeId, otp });
         },
     });
+
+    const handleResend = () => {
+        resendRegistrationOtp({ challengeId }, {
+            onSuccess: challenge => {
+                form.reset();
+                onChallengeUpdated(challenge);
+            },
+        });
+    };
 
     return (
         <form
@@ -56,6 +76,7 @@ const RegistrationOtpForm = ({ challengeId, email }: RegistrationOtpFormProps) =
                                 autoComplete="one-time-code"
                                 maxLength={6}
                                 required
+                                disabled={isSubmitting}
                                 value={field.state.value}
                                 onBlur={field.handleBlur}
                                 onChange={event => field.handleChange(event.target.value)}
@@ -77,12 +98,27 @@ const RegistrationOtpForm = ({ challengeId, email }: RegistrationOtpFormProps) =
                     type="submit"
                     variant="indigo"
                     size="lg"
-                    isLoading={isPending}
+                    isLoading={isVerifying}
+                    disabled={isSubmitting}
                 >
                     Verify Email
                 </Button>
-                <Button type="button" variant="linkIndigo" disabled>
+                <Button
+                    type="button"
+                    variant="linkIndigo"
+                    isLoading={isResending}
+                    disabled={isSubmitting}
+                    onClick={handleResend}
+                >
                     Resend code
+                </Button>
+                <Button
+                    type="button"
+                    variant="linkIndigo"
+                    disabled={isSubmitting}
+                    onClick={onChangeDetails}
+                >
+                    Change registration details
                 </Button>
             </div>
             <Link to={ROUTES.LOGIN} className="text-center text-sm text-slate-600 underline hover:text-indigo-500">

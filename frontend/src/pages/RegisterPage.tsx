@@ -3,10 +3,29 @@ import Logo from '@/assets/logo.png';
 import { Card } from '@/components/ui/card';
 import RegisterForm from '@/features/auth/components/RegisterForm';
 import RegistrationOtpForm from '@/features/auth/components/RegistrationOtpForm';
-import type { PendingRegistrationChallenge } from '@/features/auth/types/auth.types';
+import type {
+    PendingRegistrationChallenge,
+    RegistrationChallenge,
+} from '@/features/auth/types/auth.types';
+import type { RegistrationDetails } from '@/features/auth/schemas/register.schema';
 
 const RegisterPage = () => {
     const [pendingRegistration, setPendingRegistration] = useState<PendingRegistrationChallenge | null>(null);
+    const [registrationDetails, setRegistrationDetails] = useState<RegistrationDetails>();
+
+    const handleRegistrationStarted = (
+        challenge: PendingRegistrationChallenge,
+        details: RegistrationDetails,
+    ) => {
+        setPendingRegistration(challenge);
+        setRegistrationDetails(details);
+    };
+
+    const handleChallengeUpdated = (challenge: RegistrationChallenge) => {
+        setPendingRegistration(previous => previous
+            ? { ...previous, ...challenge }
+            : previous);
+    };
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-5 px-4 py-10">
@@ -20,9 +39,14 @@ const RegisterPage = () => {
                     <RegistrationOtpForm
                         challengeId={pendingRegistration.challengeId}
                         email={pendingRegistration.email}
+                        onChallengeUpdated={handleChallengeUpdated}
+                        onChangeDetails={() => setPendingRegistration(null)}
                     />
                 ) : (
-                    <RegisterForm onRegistrationStarted={setPendingRegistration} />
+                    <RegisterForm
+                        initialValues={registrationDetails}
+                        onRegistrationStarted={handleRegistrationStarted}
+                    />
                 )}
             </Card>
         </main>
