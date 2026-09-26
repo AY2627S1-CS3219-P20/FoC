@@ -15,6 +15,7 @@ import ManageUsersPage from '@/pages/ManageUsersPage';
 import RoleRoute from '@/routes/RoleRoute';
 import ManageSupplierTypesPage from '@/pages/ManageSupplierTypesPage';
 import ProfilePage from '@/pages/ProfilePage';
+import AdminActivationPage from '@/pages/AdminActivationPage';
 
 const AppRouter = () => {
     return (
@@ -24,6 +25,7 @@ const AppRouter = () => {
                     <Routes>
                         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
                         <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+                        <Route path={ROUTES.ACTIVATE_ADMIN} element={<AdminActivationPage />} />
 
                         {/* Protected routes - redirect to login page if not authenticated */}
                         <Route element={<ProtectedRoute />}>

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+    activateAdmin,
     login,
     logout,
     refresh,
@@ -10,6 +11,7 @@ import {
 
 const authRouter = Router();
 
+authRouter.post("/admin-activation", activateAdmin);
 authRouter.post("/login", login);
 authRouter.post("/logout", logout);
 authRouter.post("/refresh", refresh);

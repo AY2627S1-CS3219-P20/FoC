@@ -1,4 +1,22 @@
-import type { ApiUser } from '@/features/auth/types/auth.types';
+import type { ApiUser, Role } from '@/features/auth/types/auth.types';
+
+export interface AdminUserListParams {
+    search?: string;
+    role?: Role;
+    page: number;
+    pageSize: number;
+}
+
+export interface AdminUserListResult {
+    users: ApiUser[];
+    page: number;
+    pageSize: number;
+    total: number;
+}
+
+export interface UpdateUserRoleResult {
+    user: ApiUser;
+}
 
 export interface EmailChangeChallenge {
     challengeId: string;

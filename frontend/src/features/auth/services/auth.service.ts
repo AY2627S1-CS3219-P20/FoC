@@ -2,16 +2,31 @@ import { ENDPOINTS } from "@/api/endpoints";
 import type { ApiResponse } from "@/types/api.types";
 import type {
     LoginPayload,
+    AdminActivationResult,
     AuthResult,
     RegistrationChallenge,
     ResendRegistrationOtpPayload,
     VerifyRegistrationResult,
 } from "@/features/auth/types/auth.types";
 import type {
+    AdminActivationPayload,
+} from "@/features/auth/schemas/admin-activation.schema";
+import type {
     RegisterPayload,
     VerifyRegistrationPayload,
 } from "@/features/auth/schemas/register.schema";
 import authApi from "@/api/authApi";
+
+export const activateAdminService = async (
+    payload: AdminActivationPayload,
+): Promise<AdminActivationResult> => {
+    const response = await authApi.post<ApiResponse<AdminActivationResult>>(
+        ENDPOINTS.auth.adminActivation,
+        payload,
+    );
+
+    return response.data.data!;
+};
 
 export const loginService = async (
     payload: LoginPayload

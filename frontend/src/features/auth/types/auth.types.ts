@@ -18,6 +18,10 @@ export interface VerifyRegistrationResult {
     user: ApiUser;
 }
 
+export interface AdminActivationResult {
+    user: ApiUser;
+}
+
 export interface ApiUser {
     id: string;
     email: string;

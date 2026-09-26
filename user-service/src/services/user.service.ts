@@ -1,11 +1,16 @@
 import argon2 from "argon2";
-import { Prisma, type Role } from "../generated/prisma/client.js";
+import {
+  Prisma,
+  type PrismaClient,
+  type Role,
+} from "../generated/prisma/client.js";
 import { REFRESH_TOKEN_MAX_AGE } from "../constants/auth.constants.js";
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
 import { generateRefreshToken } from "../libs/refreshToken.js";
 import type {
   ChangePasswordInput,
+  ListUsersQuery,
   UpdateMyProfileInput,
 } from "../schemas/user.schema.js";
 
@@ -31,6 +36,100 @@ function toPublicUser(user: {
     phoneNumber: user.phoneNumber,
     role: user.role,
   };
+}
+
+export async function listUsers(
+  input: ListUsersQuery,
+  db: PrismaClient = prisma,
+) {
+  const where: Prisma.UserWhereInput = {};
+
+  if (input.search) {
+    where.OR = [
+      { username: { contains: input.search, mode: "insensitive" } },
+      { email: { contains: input.search, mode: "insensitive" } },
+    ];
+  }
+
+  if (input.role) {
+    where.role = input.role;
+  }
+
+  const [users, total] = await Promise.all([
+    db.user.findMany({
+      where,
+      select: publicUserSelect,
+      orderBy: [{ createdAt: "asc" }, { userId: "asc" }],
+      skip: (input.page - 1) * input.pageSize,
+      take: input.pageSize,
+    }),
+    db.user.count({ where }),
+  ]);
+
+  return {
+    users: users.map(toPublicUser),
+    page: input.page,
+    pageSize: input.pageSize,
+    total,
+  };
+}
+
+export async function promoteUserToAdmin(
+  actorId: string,
+  targetUserId: string,
+) {
+  const target = await prisma.user.findUnique({
+    where: { userId: targetUserId },
+    select: publicUserSelect,
+  });
+
+  if (!target) {
+    throw new AppError("User account not found", 404, "USER_NOT_FOUND");
+  }
+
+  if (target.role === "ADMIN") {
+    throw new AppError(
+      "The user is already an admin",
+      409,
+      "USER_ALREADY_ADMIN",
+    );
+  }
+
+  // TODO(F6.3.2): Check requester history once Order Service is implemented.
+  const updateResult = await prisma.user.updateMany({
+    where: {
+      userId: targetUserId,
+      role: "STUDENT",
+    },
+    data: { role: "ADMIN" },
+  });
+
+  if (updateResult.count !== 1) {
+    throw new AppError(
+      "The user's role could not be updated",
+      409,
+      "ROLE_UPDATE_CONFLICT",
+    );
+  }
+
+  const updatedUser = await prisma.user.findUnique({
+    where: { userId: targetUserId },
+    select: publicUserSelect,
+  });
+
+  if (!updatedUser) {
+    throw new AppError("User account not found", 404, "USER_NOT_FOUND");
+  }
+
+  console.info("Administrative user role changed", {
+    actorId,
+    targetUserId,
+    previousRole: "STUDENT",
+    newRole: "ADMIN",
+    changedAt: new Date().toISOString(),
+  });
+
+  return toPublicUser(updatedUser);
 }
 
 async function ensureProfileValuesAreAvailable(

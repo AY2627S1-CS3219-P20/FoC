@@ -9,11 +9,15 @@ export const ENDPOINTS = {
         logout: `${BASE_AUTH}/logout`,
         refreshToken: `${BASE_AUTH}/refresh`,
         register: `${BASE_AUTH}/register`,
+        adminActivation: `${BASE_AUTH}/admin-activation`,
         resendRegistrationOtp: `${BASE_AUTH}/register/resend`,
         verifyRegistration: `${BASE_AUTH}/register/verify`,
     },
 
     user: {
+        users: BASE_USER,
+        adminInvitations: `${BASE_USER}/admin-invitations`,
+        userRole: (userId: string) => `${BASE_USER}/${userId}/role`,
         profile: `${BASE_USER}/me`,
         emailChange: `${BASE_USER}/me/email-change`,
         resendEmailChangeOtp: `${BASE_USER}/me/email-change/resend`,

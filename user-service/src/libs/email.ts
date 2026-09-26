@@ -1,6 +1,9 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { AppError } from "../errors/errors.js";
-import { REGISTRATION_OTP_EXPIRES_IN_MINUTES } from "../constants/auth.constants.js";
+import {
+  ADMIN_INVITATION_EXPIRES_IN_HOURS,
+  REGISTRATION_OTP_EXPIRES_IN_MINUTES,
+} from "../constants/auth.constants.js";
 
 const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
 const BREVO_SMTP_PORT = 587;
@@ -93,6 +96,37 @@ export async function sendEmailChangeOtpEmail(
     console.error("Email Service Error:", error);
     throw new AppError(
       "Unable to send verification email. Please try again later.",
+      502,
+      "EMAIL_DELIVERY_FAILED",
+    );
+  }
+}
+
+export async function sendAdminInvitationEmail(
+  recipientEmail: string,
+  activationUrl: string,
+): Promise<void> {
+  const from = getEmailSetting("EMAIL_FROM");
+  const mailer = getTransporter();
+
+  try {
+    await mailer.sendMail({
+      from,
+      to: recipientEmail,
+      subject: "Activate your Aaron administrator account",
+      text: [
+        "You have been invited to become an Aaron administrator.",
+        "",
+        `Activate your account: ${activationUrl}`,
+        "",
+        `This link expires in ${ADMIN_INVITATION_EXPIRES_IN_HOURS} hours.`,
+        "If you were not expecting this invitation, you can ignore this email.",
+      ].join("\n"),
+    });
+  } catch {
+    console.error("Administrator invitation email delivery failed");
+    throw new AppError(
+      "Unable to send administrator invitation. Please try again later.",
       502,
       "EMAIL_DELIVERY_FAILED",
     );

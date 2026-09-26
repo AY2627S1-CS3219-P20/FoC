@@ -1,5 +1,6 @@
 import authApi from '@/api/authApi';
 import { ENDPOINTS } from '@/api/endpoints';
+import { ROLES } from '@/features/auth/types/auth.types';
 import type { ApiResponse } from '@/types/api.types';
 import type { UpdateProfilePayload } from '../schemas/profile.schema';
 import type {
@@ -8,11 +9,43 @@ import type {
     VerifyEmailChangePayload,
 } from '../schemas/email-change.schema';
 import type { ChangePasswordPayload } from '../schemas/password-change.schema';
+import type { CreateAdminInvitationPayload } from '../schemas/admin-invitation.schema';
 import type {
+    AdminUserListParams,
+    AdminUserListResult,
     EmailChangeChallenge,
     EmailChangeVerificationResult,
     ProfileResult,
+    UpdateUserRoleResult,
 } from '../types/user.types';
+
+export const listUsersService = async (
+    params: AdminUserListParams,
+): Promise<AdminUserListResult> => {
+    const response = await authApi.get<ApiResponse<AdminUserListResult>>(
+        ENDPOINTS.user.users,
+        { params },
+    );
+
+    return response.data.data!;
+};
+
+export const createAdminInvitationService = async (
+    payload: CreateAdminInvitationPayload,
+): Promise<void> => {
+    await authApi.post(ENDPOINTS.user.adminInvitations, payload);
+};
+
+export const promoteUserService = async (
+    userId: string,
+): Promise<UpdateUserRoleResult> => {
+    const response = await authApi.patch<ApiResponse<UpdateUserRoleResult>>(
+        ENDPOINTS.user.userRole(userId),
+        { role: ROLES.ADMIN },
+    );
+
+    return response.data.data!;
+};
 
 export const getMyProfileService = async (): Promise<ProfileResult> => {
     const response = await authApi.get<ApiResponse<ProfileResult>>(

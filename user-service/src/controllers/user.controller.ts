@@ -2,9 +2,13 @@ import type { Response } from "express";
 import { AppError } from "../errors/errors.js";
 import {
   changePasswordSchema,
+  createAdminInvitationSchema,
+  listUsersQuerySchema,
   resendEmailChangeOtpSchema,
   startEmailChangeSchema,
   updateMyProfileSchema,
+  updateUserRoleParamsSchema,
+  updateUserRoleSchema,
   verifyEmailChangeSchema,
 } from "../schemas/user.schema.js";
 import {
@@ -14,8 +18,13 @@ import {
   verifyEmailChange as verifyEmailChangeService,
 } from "../services/email-change.service.js";
 import {
+  createAdminInvitation as createAdminInvitationService,
+} from "../services/admin-invitation.service.js";
+import {
   changePassword as changePasswordService,
   getMyProfile as getMyProfileService,
+  listUsers as listUsersService,
+  promoteUserToAdmin,
   updateMyProfile as updateMyProfileService,
 } from "../services/user.service.js";
 import type { AuthenticatedRequest } from "../types/auth.types.js";
@@ -27,6 +36,77 @@ function getAuthenticatedUserId(req: AuthenticatedRequest): string {
   }
 
   return req.user.userId;
+}
+
+export async function createAdminInvitation(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const result = createAdminInvitationSchema.safeParse(req.body);
+
+  if (!result.success) {
+    throw new AppError(
+      result.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  await createAdminInvitationService(result.data);
+
+  return res.status(202).json({
+    success: true,
+    message: "Administrator invitation sent.",
+  });
+}
+
+export async function listUsers(req: AuthenticatedRequest, res: Response) {
+  const result = listUsersQuerySchema.safeParse(req.query);
+
+  if (!result.success) {
+    throw new AppError(
+      result.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  const data = await listUsersService(result.data);
+
+  return res.status(200).json({
+    success: true,
+    data,
+  });
+}
+
+export async function updateUserRole(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const paramsResult = updateUserRoleParamsSchema.safeParse(req.params);
+  const bodyResult = updateUserRoleSchema.safeParse(req.body);
+
+  if (!paramsResult.success) {
+    throw new AppError(
+      paramsResult.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  if (!bodyResult.success) {
+    throw new AppError(
+      bodyResult.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  const user = await promoteUserToAdmin(
+    getAuthenticatedUserId(req),
+    paramsResult.data.userId,
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: { user },
+  });
 }
 
 export async function getMyProfile(req: AuthenticatedRequest, res: Response) {
