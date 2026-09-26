@@ -14,7 +14,7 @@ await ensureUploadsDir();
 
 app.use(
     cors({
-        origin: "http://localhost:5173",
+        origin: config.frontendUrl,
         credentials: true,
     }),
 );

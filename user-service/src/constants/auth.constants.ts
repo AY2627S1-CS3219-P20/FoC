@@ -10,7 +10,7 @@ export const REFRESH_TOKEN_MAX_AGE =
 export const REFRESH_TOKEN_EXPIRES_IN =
     `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d`;
 
-export const ACCESS_TOKEN_EXPIRES_IN = "15m";
+export const ACCESS_TOKEN_EXPIRES_IN = "60m";
 
 export const REGISTRATION_OTP_EXPIRES_IN_MINUTES = 10;
 
