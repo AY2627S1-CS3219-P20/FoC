@@ -1,0 +1,71 @@
+import nodemailer, { type Transporter } from "nodemailer";
+import { AppError } from "../errors/errors.js";
+import { REGISTRATION_OTP_EXPIRES_IN_MINUTES } from "../constants/auth.constants.js";
+
+const BREVO_SMTP_HOST = "smtp-relay.brevo.com";
+const BREVO_SMTP_PORT = 587;
+
+let transporter: Transporter | undefined;
+
+function getEmailSetting(name: string): string {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new AppError(
+      "Email delivery is not configured",
+      503,
+      "EMAIL_NOT_CONFIGURED",
+    );
+  }
+
+  return value;
+}
+
+function getTransporter(): Transporter {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: BREVO_SMTP_HOST,
+      port: BREVO_SMTP_PORT,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: getEmailSetting("BREVO_SMTP_USER"),
+        pass: getEmailSetting("BREVO_SMTP_KEY"),
+      },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
+    });
+  }
+
+  return transporter;
+}
+
+export async function sendRegistrationOtpEmail(
+  recipientEmail: string,
+  otp: string,
+): Promise<void> {
+  const from = getEmailSetting("EMAIL_FROM");
+  const mailer = getTransporter();
+
+  try {
+    await mailer.sendMail({
+      from,
+      to: recipientEmail,
+      subject: "Verify your Aaron account",
+      text: [
+        `Your Aaron verification code is: ${otp}`,
+        "",
+        `This code expires in ${REGISTRATION_OTP_EXPIRES_IN_MINUTES} minutes.`,
+        "If you did not request this code, you can ignore this email.",
+      ].join("\n"),
+    });
+  } catch (error) {
+    console.error("Email Service Error:", error);
+    throw new AppError(
+      "Unable to send verification email. Please try again later.",
+      502,
+      "EMAIL_DELIVERY_FAILED",
+    );
+  }
+}

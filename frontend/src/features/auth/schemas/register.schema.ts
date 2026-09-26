@@ -23,3 +23,9 @@ export const registerSchema = z.strictObject({
 export const registrationOtpSchema = z.strictObject({
     otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code from your email'),
 });
+
+export type RegisterPayload = z.infer<typeof registerSchema>;
+export type RegistrationDetails = Omit<RegisterPayload, 'password'>;
+export type VerifyRegistrationPayload = z.infer<typeof registrationOtpSchema> & {
+    challengeId: string;
+};

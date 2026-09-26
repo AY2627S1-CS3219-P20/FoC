@@ -4,6 +4,61 @@ import { loginUser, logoutUser } from "../services/auth.service.js";
 import { AppError } from "../errors/errors.js";
 import { refreshAccessToken } from "../services/refresh.service.js";
 import { refreshTokenCookieOptions } from "../libs/cookies.js";
+import {
+    registerSchema,
+    resendRegistrationOtpSchema,
+    verifyRegistrationSchema,
+} from "../schemas/register.schema.js";
+import {
+    resendRegistrationOtp as resendRegistrationOtpService,
+    startRegistration,
+    verifyRegistration as verifyRegistrationService,
+} from "../services/registration.service.js";
+
+export async function register(req: Request, res: Response) {
+    const result = registerSchema.safeParse(req.body);
+
+    if (!result.success) {
+        throw new AppError(result.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const data = await startRegistration(result.data);
+
+    return res.status(202).json({
+        success: true,
+        data,
+    });
+}
+
+export async function resendRegistrationOtp(req: Request, res: Response) {
+    const result = resendRegistrationOtpSchema.safeParse(req.body);
+
+    if (!result.success) {
+        throw new AppError(result.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const data = await resendRegistrationOtpService(result.data);
+
+    return res.status(202).json({
+        success: true,
+        data,
+    });
+}
+
+export async function verifyRegistration(req: Request, res: Response) {
+    const result = verifyRegistrationSchema.safeParse(req.body);
+
+    if (!result.success) {
+        throw new AppError(result.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const user = await verifyRegistrationService(result.data);
+
+    return res.status(201).json({
+        success: true,
+        data: { user },
+    });
+}
 
 export async function login(req: Request, res: Response) {
     const result = loginSchema.safeParse(req.body);
