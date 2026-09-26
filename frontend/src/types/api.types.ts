@@ -12,20 +12,6 @@ export interface ApiErrorResponse {
     message: string;
 }
 
-export interface ApiUser {
-    id: string;
-    email: string;
-    username: string;
-    phoneNumber: string;
-    role: "student" | "admin";
-}
-
-// Authentication
-export interface AuthData {
-    user: ApiUser;
-    accessToken: string;
-}
-
 // Supplier
 export type SupplierDay =
     | "MONDAY"
