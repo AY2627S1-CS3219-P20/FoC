@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
 import { ROUTES } from '@/routes/routes';
 import { registerSchema } from '../schemas/register.schema';
+import useRegister from '../hooks/useRegister';
+import type { PendingRegistrationChallenge } from '../types/auth.types';
 
 const registrationFields = [
     { name: 'username', label: 'Username', placeholder: 'student123', type: 'text', autoComplete: 'username' },
@@ -15,8 +17,13 @@ const registrationFields = [
     { name: 'phoneNumber', label: 'Phone Number', placeholder: '81234567', type: 'tel', autoComplete: 'tel' },
 ] as const;
 
-const RegisterForm = () => {
+interface RegisterFormProps {
+    onRegistrationStarted: (challenge: PendingRegistrationChallenge) => void;
+}
+
+const RegisterForm = ({ onRegistrationStarted }: RegisterFormProps) => {
     const [showPassword, setShowPassword] = useState(false);
+    const { register, isPending } = useRegister();
     const form = useForm({
         defaultValues: {
             username: '',
@@ -26,6 +33,20 @@ const RegisterForm = () => {
         },
         validators: {
             onBlur: registerSchema,
+            onSubmit: registerSchema,
+        },
+        onSubmit: async ({ value }) => {
+            const payload = registerSchema.parse(value);
+
+            register(payload, {
+                onSuccess: challenge => {
+                    form.reset();
+                    onRegistrationStarted({
+                        ...challenge,
+                        email: payload.email,
+                    });
+                },
+            });
         },
     });
 
@@ -34,7 +55,10 @@ const RegisterForm = () => {
             aria-label="Create an account"
             noValidate
             className="flex flex-col gap-4"
-            onSubmit={event => event.preventDefault()}
+            onSubmit={event => {
+                event.preventDefault();
+                form.handleSubmit();
+            }}
         >
             <FieldGroup className="gap-2.5">
                 {registrationFields.map(({ name, label, placeholder, type, autoComplete }) => (
@@ -109,8 +133,13 @@ const RegisterForm = () => {
                 </form.Field>
             </FieldGroup>
             <div className="flex flex-col items-center gap-4">
-                {/* Enable submission when the registration API is connected. */}
-                <Button type="submit" variant="indigo" size="lg" className="px-4" disabled>
+                <Button
+                    type="submit"
+                    variant="indigo"
+                    size="lg"
+                    className="px-4"
+                    isLoading={isPending}
+                >
                     Sign Up
                 </Button>
                 <p className="text-center text-sm text-slate-600">

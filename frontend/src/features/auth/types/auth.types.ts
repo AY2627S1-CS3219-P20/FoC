@@ -3,6 +3,15 @@ export interface LoginPayload {
     password: string;
 }
 
+export interface RegistrationChallenge {
+    challengeId: string;
+    expiresAt: string;
+}
+
+export interface PendingRegistrationChallenge extends RegistrationChallenge {
+    email: string;
+}
+
 export interface ApiUser {
     id: string;
     email: string;

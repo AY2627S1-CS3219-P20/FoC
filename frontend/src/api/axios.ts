@@ -101,7 +101,8 @@ const createApiClient = (baseURL: string): AxiosInstance => {
             const isAuthEndpoint =
                 requestUrl.includes(ENDPOINTS.auth.login) ||
                 requestUrl.includes(ENDPOINTS.auth.refreshToken) ||
-                requestUrl.includes(ENDPOINTS.auth.logout);
+                requestUrl.includes(ENDPOINTS.auth.logout) ||
+                requestUrl.includes(ENDPOINTS.auth.register);
 
             if (isAuthEndpoint) {
                 return Promise.reject(error);

@@ -6,7 +6,11 @@ import { Input } from '@/components/ui/input';
 import { ROUTES } from '@/routes/routes';
 import { registrationOtpSchema } from '../schemas/register.schema';
 
-const RegistrationOtpForm = () => {
+interface RegistrationOtpFormProps {
+    email: string;
+}
+
+const RegistrationOtpForm = ({ email }: RegistrationOtpFormProps) => {
     const form = useForm({
         defaultValues: { otp: '' },
         validators: {
@@ -23,7 +27,9 @@ const RegistrationOtpForm = () => {
         >
             <div className="space-y-2 text-center">
                 <h2 className="text-lg font-semibold text-indigo-900">Verify your email</h2>
-                <p className="text-sm text-slate-600">Enter the 6-digit code sent to your registration email.</p>
+                <p className="text-sm text-slate-600">
+                    Enter the 6-digit code sent to <span className="font-medium">{email}</span>.
+                </p>
             </div>
             <form.Field name="otp">
                 {field => {
