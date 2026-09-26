@@ -1,4 +1,5 @@
 const BASE_AUTH = "/auth";
+const BASE_USER = "/users";
 const BASE_SUPPLIER = "/supplier";
 
 export const ENDPOINTS = {
@@ -12,7 +13,9 @@ export const ENDPOINTS = {
         verifyRegistration: `${BASE_AUTH}/register/verify`,
     },
 
-    user: {},
+    user: {
+        profile: `${BASE_USER}/me`,
+    },
 
     supplier: {
         viewSuppliersForAdmin: `${BASE_SUPPLIER}/all`,
