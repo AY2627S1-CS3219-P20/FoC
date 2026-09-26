@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  changePassword,
   getMyProfile,
   resendEmailChangeOtp,
   startEmailChange,
@@ -16,5 +17,6 @@ userRouter.patch("/me", updateMyProfile);
 userRouter.post("/me/email-change", startEmailChange);
 userRouter.post("/me/email-change/resend", resendEmailChangeOtp);
 userRouter.post("/me/email-change/verify", verifyEmailChange);
+userRouter.post("/me/password-change", changePassword);
 
 export default userRouter;

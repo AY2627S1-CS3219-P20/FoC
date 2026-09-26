@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   emailSchema,
+  passwordSchema,
   phoneNumberSchema,
   usernameSchema,
 } from "./register.schema.js";
@@ -33,3 +34,10 @@ export const verifyEmailChangeSchema = z.strictObject({
 export type StartEmailChangeInput = z.infer<typeof startEmailChangeSchema>;
 export type ResendEmailChangeOtpInput = z.infer<typeof resendEmailChangeOtpSchema>;
 export type VerifyEmailChangeInput = z.infer<typeof verifyEmailChangeSchema>;
+
+export const changePasswordSchema = z.strictObject({
+  currentPassword: z.string().min(1, "Enter your current password"),
+  newPassword: passwordSchema,
+});
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

@@ -7,6 +7,7 @@ import type {
     ResendEmailChangeOtpPayload,
     VerifyEmailChangePayload,
 } from '../schemas/email-change.schema';
+import type { ChangePasswordPayload } from '../schemas/password-change.schema';
 import type {
     EmailChangeChallenge,
     EmailChangeVerificationResult,
@@ -63,4 +64,10 @@ export const verifyEmailChangeService = async (
     );
 
     return response.data.data!;
+};
+
+export const changePasswordService = async (
+    payload: ChangePasswordPayload,
+): Promise<void> => {
+    await authApi.post(ENDPOINTS.user.passwordChange, payload);
 };

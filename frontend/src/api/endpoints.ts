@@ -18,6 +18,7 @@ export const ENDPOINTS = {
         emailChange: `${BASE_USER}/me/email-change`,
         resendEmailChangeOtp: `${BASE_USER}/me/email-change/resend`,
         verifyEmailChange: `${BASE_USER}/me/email-change/verify`,
+        passwordChange: `${BASE_USER}/me/password-change`,
     },
 
     supplier: {

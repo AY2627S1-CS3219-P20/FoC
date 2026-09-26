@@ -1,7 +1,13 @@
+import argon2 from "argon2";
 import { Prisma, type Role } from "../generated/prisma/client.js";
+import { REFRESH_TOKEN_MAX_AGE } from "../constants/auth.constants.js";
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
-import type { UpdateMyProfileInput } from "../schemas/user.schema.js";
+import { generateRefreshToken } from "../libs/refreshToken.js";
+import type {
+  ChangePasswordInput,
+  UpdateMyProfileInput,
+} from "../schemas/user.schema.js";
 
 const publicUserSelect = {
   userId: true,
@@ -113,4 +119,68 @@ export async function updateMyProfile(
 
     throw error;
   }
+}
+
+export async function changePassword(
+  userId: string,
+  input: ChangePasswordInput,
+) {
+  const user = await prisma.user.findUnique({
+    where: { userId },
+    select: { password: true },
+  });
+
+  if (!user) {
+    throw new AppError("User account not found", 404, "USER_NOT_FOUND");
+  }
+
+  const currentPasswordValid = await argon2.verify(
+    user.password,
+    input.currentPassword,
+  );
+
+  if (!currentPasswordValid) {
+    throw new AppError(
+      "Current password is incorrect",
+      401,
+      "INVALID_CURRENT_PASSWORD",
+    );
+  }
+
+  if (input.currentPassword === input.newPassword) {
+    throw new AppError(
+      "New password must be different from your current password",
+      400,
+      "PASSWORD_UNCHANGED",
+    );
+  }
+
+  const passwordHash = await argon2.hash(input.newPassword);
+  const { refreshToken, tokenId } = generateRefreshToken(userId);
+  const tokenHash = await argon2.hash(refreshToken);
+  const changedAt = new Date();
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { userId },
+      data: { password: passwordHash },
+    }),
+    prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: { revokedAt: changedAt },
+    }),
+    prisma.refreshToken.create({
+      data: {
+        tokenId,
+        tokenHash,
+        userId,
+        expiresAt: new Date(changedAt.getTime() + REFRESH_TOKEN_MAX_AGE),
+      },
+    }),
+  ]);
+
+  return { refreshToken };
 }

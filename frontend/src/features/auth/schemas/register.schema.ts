@@ -14,16 +14,18 @@ export const phoneNumberSchema = z.string()
 export const emailSchema = z.string().trim().toLowerCase()
     .pipe(z.email({ error: 'Enter a valid email address' }));
 
+export const passwordSchema = z.string()
+    .min(8, 'Password must have at least 8 characters')
+    .regex(/[A-Z]/, 'Include an uppercase letter')
+    .regex(/[a-z]/, 'Include a lowercase letter')
+    .regex(/[0-9]/, 'Include a number')
+    .regex(/[\p{P}\p{S}]/u, 'Include a special character');
+
 export const registerSchema = z.strictObject({
     username: usernameSchema,
     email: emailSchema,
     phoneNumber: phoneNumberSchema,
-    password: z.string()
-        .min(8, 'Password must have at least 8 characters')
-        .regex(/[A-Z]/, 'Include an uppercase letter')
-        .regex(/[a-z]/, 'Include a lowercase letter')
-        .regex(/[0-9]/, 'Include a number')
-        .regex(/[\p{P}\p{S}]/u, 'Include a special character'),
+    password: passwordSchema,
 });
 
 export const registrationOtpSchema = z.strictObject({

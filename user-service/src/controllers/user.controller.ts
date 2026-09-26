@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { AppError } from "../errors/errors.js";
 import {
+  changePasswordSchema,
   resendEmailChangeOtpSchema,
   startEmailChangeSchema,
   updateMyProfileSchema,
@@ -13,10 +14,12 @@ import {
   verifyEmailChange as verifyEmailChangeService,
 } from "../services/email-change.service.js";
 import {
+  changePassword as changePasswordService,
   getMyProfile as getMyProfileService,
   updateMyProfile as updateMyProfileService,
 } from "../services/user.service.js";
 import type { AuthenticatedRequest } from "../types/auth.types.js";
+import { refreshTokenCookieOptions } from "../libs/cookies.js";
 
 function getAuthenticatedUserId(req: AuthenticatedRequest): string {
   if (!req.user) {
@@ -129,5 +132,30 @@ export async function verifyEmailChange(
   return res.status(200).json({
     success: true,
     data: { user },
+  });
+}
+
+export async function changePassword(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const result = changePasswordSchema.safeParse(req.body);
+
+  if (!result.success) {
+    throw new AppError(
+      result.error.issues.at(0)?.message || "Invalid request",
+      400,
+    );
+  }
+
+  const { refreshToken } = await changePasswordService(
+    getAuthenticatedUserId(req),
+    result.data,
+  );
+  res.cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
+
+  return res.status(200).json({
+    success: true,
+    message: "Password changed successfully.",
   });
 }

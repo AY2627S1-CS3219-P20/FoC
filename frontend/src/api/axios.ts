@@ -104,7 +104,10 @@ const createApiClient = (baseURL: string): AxiosInstance => {
                 requestUrl.includes(ENDPOINTS.auth.logout) ||
                 requestUrl.includes(ENDPOINTS.auth.register);
 
-            if (isAuthEndpoint) {
+            const isPasswordChangeEndpoint =
+                requestUrl.includes(ENDPOINTS.user.passwordChange);
+
+            if (isAuthEndpoint || isPasswordChangeEndpoint) {
                 return Promise.reject(error);
             }
 
