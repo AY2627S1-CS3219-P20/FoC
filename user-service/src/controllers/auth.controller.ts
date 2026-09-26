@@ -73,6 +73,7 @@ export async function login(req: Request, res: Response) {
 
     return res.status(200).json({
         success: true,
+        message: "Login successfully",
         data: {
             accessToken: data.accessToken,
             user: data.user,
@@ -108,19 +109,30 @@ export async function refresh(req: Request, res: Response) {
 
     // Check if the refresh token is present in the cookies
     if (!refreshToken) {
+        res.clearCookie("refreshToken", refreshTokenCookieOptions);
         console.log("No refresh token found in cookies");
         throw new AppError("Invalid, please sign out and back in", 401);
     }
 
-    const result = await refreshAccessToken(refreshToken);
-    res.cookie("refreshToken", result.refreshToken, refreshTokenCookieOptions);
-    console.log("Refresh token rotation successful");
+    try {
+        const result = await refreshAccessToken(refreshToken);
+        res.cookie("refreshToken", result.refreshToken, refreshTokenCookieOptions);
+        console.log("Refresh token rotation successful");
 
-    return res.status(200).json({
-        success: true,
-        data: {
-            accessToken: result.accessToken,
-            user: result.user,
-        },
-    });
+        return res.status(200).json({
+            success: true,
+            message: "Token refreshed successfully",
+            data: {
+                accessToken: result.accessToken,
+                user: result.user,
+            },
+        });
+    } catch (error) {
+        if (error instanceof AppError && error.statusCode === 401) {
+            console.log("Refresh token is invalid or expired, clearing cookie");
+            res.clearCookie("refreshToken", refreshTokenCookieOptions);
+        }
+
+        throw error;
+    }
 }
