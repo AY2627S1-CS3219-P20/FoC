@@ -28,7 +28,9 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  refreshTokens RefreshToken[]
+  refreshTokens          RefreshToken[]
+  pendingEmailChange     PendingEmailChange?
+  emailChangeOtpRequests EmailChangeOtpRequest[]
 }
 
 model RefreshToken {
@@ -71,6 +73,40 @@ model RegistrationOtpRequest {
   email       String
   requestedAt DateTime @default(now())
 
+  @@index([email, requestedAt])
+  @@index([requestedAt])
+}
+
+// A canonical email CHECK constraint is maintained in SQL migrations.
+model PendingEmailChange {
+  challengeId    String    @id @default(uuid())
+  userId         String    @unique
+  newEmail       String
+  otpHash        String?
+  expiresAt      DateTime
+  failedAttempts Int       @default(0)
+  emailSentAt    DateTime?
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([newEmail])
+  @@index([expiresAt])
+}
+
+// Request history is independent of the challenge so replacing a code cannot
+// reset the hourly quota.
+model EmailChangeOtpRequest {
+  id          String   @id @default(uuid())
+  userId      String
+  email       String
+  requestedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, requestedAt])
   @@index([email, requestedAt])
   @@index([requestedAt])
 }
