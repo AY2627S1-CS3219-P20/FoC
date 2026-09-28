@@ -53,7 +53,7 @@ const ManageUsersPage = () => {
     };
 
     return (
-        <main className="px-5 py-5 md:px-10 md:py-8">
+        <main className="px-5 py-5 md:px-10">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex flex-col gap-1">
                     <h1 className="text-xl md:text-2xl font-bold">Manage Users</h1>
