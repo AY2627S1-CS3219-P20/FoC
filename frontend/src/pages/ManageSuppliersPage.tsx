@@ -64,8 +64,9 @@ const viewHasSuppliers = async (page: number): Promise<boolean> => {
     try {
         const data = await viewSuppliersForAdmin(page);
         return data.length > 0;
-    } catch {
-        return false;
+    } catch (error) {
+        if ((error as ParsedError)?.statusCode === 400) return false;
+        throw error;
     }
 };
 
