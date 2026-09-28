@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 
 import type { ParsedError } from "@/utils/errorHandler";
 import {
+    countSuppliersForAdmin,
     viewSuppliersForAdmin,
     createSupplier,
     updateSupplier,
@@ -56,42 +57,6 @@ const buildPayload = (
     };
 };
 
-// The admin list endpoint returns only the suppliers for a single page and
-// throws a 400 when a page is out of range. There is no count endpoint that
-// includes deactivated suppliers, so the number of pages is derived on the
-// frontend by probing pages (exponential scan + binary search => log N requests).
-const viewHasSuppliers = async (page: number): Promise<boolean> => {
-    try {
-        const data = await viewSuppliersForAdmin(page);
-        return data.length > 0;
-    } catch (error) {
-        if ((error as ParsedError)?.statusCode === 400) return false;
-        throw error;
-    }
-};
-
-const computeTotalPages = async (): Promise<number> => {
-    if (!(await viewHasSuppliers(1))) return 0;
-
-    let upper = 1;
-    while (await viewHasSuppliers(upper)) {
-        upper *= 2;
-    }
-
-    let low = Math.floor(upper / 2);
-    let high = upper;
-    while (low < high - 1) {
-        const mid = Math.floor((low + high) / 2);
-        if (await viewHasSuppliers(mid)) {
-            low = mid;
-        } else {
-            high = mid;
-        }
-    }
-
-    return low;
-};
-
 const ManageSuppliersPage = () => {
     const queryClient = useQueryClient();
     const [currentPage, setCurrentPage] = useState(1);
@@ -99,12 +64,14 @@ const ManageSuppliersPage = () => {
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [supplierToDeactivate, setSupplierToDeactivate] = useState<Supplier | null>(null);
 
+    const LIMIT = 15; // number of suppliers shown per page; kept in sync with the backend
+
     const totalPagesQuery = useQuery<number, ParsedError>({
         queryKey: ["admin-suppliers-total-pages"],
-        queryFn: computeTotalPages,
+        queryFn: countSuppliersForAdmin,
     });
 
-    const totalPages = totalPagesQuery.data ?? 0;
+    const totalPages = Math.ceil((totalPagesQuery.data ?? 0) / LIMIT);
 
     // The backend returns 400 for out-of-range pages; derive the effective (in-range)
     // page during render so the query stays valid even after the page count shrinks.

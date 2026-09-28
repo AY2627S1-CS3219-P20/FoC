@@ -18,6 +18,7 @@ import {
 import {
     countForEachType,
     countActiveSuppliers,
+    countSuppliers,
     createType,
     deleteType,
     fetchSupplierTypes,
@@ -38,6 +39,18 @@ export async function countAllActiveSuppliers(req: Request, res: Response) {
         success: true,
         data: {
             message: "All active suppliers counted successfully",
+            data: count,
+        },
+    });
+}
+
+export async function countAllSuppliers(_req: Request, res: Response) {
+    const count = await countSuppliers();
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "All suppliers counted successfully",
             data: count,
         },
     });

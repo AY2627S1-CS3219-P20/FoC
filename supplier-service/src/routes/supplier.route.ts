@@ -13,6 +13,7 @@ import {
     uploadSupplierImage,
     serveAsset,
     countAllActiveSuppliers,
+    countAllSuppliers,
     getAllSupplierTypes,
 } from "../controllers/supplier.controller.js";
 import { upload } from "../libs/upload.js";
@@ -42,6 +43,9 @@ supplierRouter.get("/count-supplier-type", authorize(Role.ADMIN), countSupplierT
 
 // Admin: list all suppliers including deactivated (management page)
 supplierRouter.get("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
+
+// Admin: count all suppliers including deactivated (management page)
+supplierRouter.get("/count-all-suppliers", authorize(Role.ADMIN), countAllSuppliers);
 
 // Admin: upload a supplier location image
 supplierRouter.post("/upload-image", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);

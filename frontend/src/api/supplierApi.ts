@@ -55,6 +55,18 @@ export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
     }
 };
 
+export const countSuppliersForAdmin = async (): Promise<number> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<{ message: string; data: number }>>(
+            `${ENDPOINTS.supplier.countSuppliersForAdmin}`,
+        );
+
+        return response.data.data?.data ?? 0;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
 export const countSupplierTypes = async (): Promise<SupplierTypeCount[]> => {
     try {
         const response = await supplierApi.get<ApiResponse<{ message: string; data: SupplierType[] }>>(

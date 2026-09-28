@@ -226,6 +226,13 @@ export async function countActiveSuppliers(searchString?: string | null, typeFil
     return count;
 }
 
+// count the total number of suppliers (including deactivated) for the admin page
+export async function countSuppliers() {
+    const count = await prisma.supplier.count();
+    console.log(count)
+    return count;
+}
+
 // this function returns all supplier types available
 export async function fetchSupplierTypes() {
     const types = await prisma.supplierType.findMany({
