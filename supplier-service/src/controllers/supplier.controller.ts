@@ -18,6 +18,7 @@ import {
 import {
     countForEachType,
     countActiveSuppliers,
+    countSuppliers,
     createType,
     deleteType,
     fetchSupplierTypes,
@@ -38,6 +39,22 @@ export async function countAllActiveSuppliers(req: Request, res: Response) {
         success: true,
         data: {
             message: "All active suppliers counted successfully",
+            data: count,
+        },
+    });
+}
+
+export async function countAllSuppliers(req: Request, res: Response) {
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const count = await countSuppliers(requestBody.data.searchString, requestBody.data.typeFilter);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: "All suppliers counted successfully",
             data: count,
         },
     });
@@ -81,7 +98,15 @@ export async function viewSuppliersForAdmin(req: Request, res: Response) {
     if (!request.success) {
         throw new AppError("Parameters not input correctly", 400);
     }
-    const suppliers = await fetchAllSuppliers(request.data.page);
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body.data);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const suppliers = await fetchAllSuppliers(
+        request.data.page,
+        requestBody.data.searchString,
+        requestBody.data.typeFilter,
+    );
 
     return res.status(200).json({
         success: true,

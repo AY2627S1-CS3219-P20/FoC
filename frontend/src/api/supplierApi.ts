@@ -55,6 +55,23 @@ export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
     }
 };
 
+export const countSuppliersForAdmin = async (searchString: string, typeFilter: string): Promise<number> => {
+    const jsonBody = {
+        searchString: searchString,
+        typeFilter: typeFilter
+    }
+    try {
+        const response = await supplierApi.post<ApiResponse<{ message: string; data: number }>>(
+            `${ENDPOINTS.supplier.countSuppliersForAdmin}`,
+            jsonBody
+        );
+
+        return response.data.data?.data ?? 0;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
 export const countSupplierTypes = async (): Promise<SupplierTypeCount[]> => {
     try {
         const response = await supplierApi.get<ApiResponse<{ message: string; data: SupplierType[] }>>(
@@ -100,10 +117,15 @@ export const deleteSupplierType = async (type: SupplierTypeCount): Promise<Suppl
     }
 };
 
-export const viewSuppliersForAdmin = async (page: number = 1): Promise<Supplier[]> => {
+export const viewSuppliersForAdmin = async (page: number, searchString: string, typeFilter: string): Promise<Supplier[]> => {
+    const requestBody = {
+        searchString: searchString,
+        typeFilter: typeFilter
+    }
     try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; data: Supplier[] }>>(
+        const response = await supplierApi.post<ApiResponse<{ message: string; data: Supplier[] }>>(
             `${ENDPOINTS.supplier.viewSuppliersForAdmin}?page=${page}`,
+            { data: requestBody }
         );
 
         return response.data.data?.data ?? [];

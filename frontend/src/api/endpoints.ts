@@ -34,6 +34,7 @@ export const ENDPOINTS = {
         viewSuppliersInPage: (page: number) => `${BASE_SUPPLIER}/?page=${page}`,
         countActiveSuppliers: `${BASE_SUPPLIER}/count-active-suppliers`,
         getAllSupplierTypes: `${BASE_SUPPLIER}/get-supplier-types`,
+        countSuppliersForAdmin: `${BASE_SUPPLIER}/count-all-suppliers`,
         createSupplierType: `${BASE_SUPPLIER}/new-supplier-type`,
         deleteSupplierType: `${BASE_SUPPLIER}/delete-supplier-type`,
         countSupplierType: `${BASE_SUPPLIER}/count-supplier-type`,

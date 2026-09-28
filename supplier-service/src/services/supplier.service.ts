@@ -10,8 +10,11 @@ export const STATUS = {
 } as const;
 
 function toPrismaTime(time: string): Date {
-    const padded = /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time;
-    return new Date(`2020-01-01T${padded}`);
+    // Opening hours are stored as wall-clock SGT. Parse "HH:MM" / "HH:MM:SS"
+    // as a UTC instant so the value round-trips identically regardless of the
+    // server timezone and matches the frontend's getUTCHours rendering.
+    const [hours, minutes, seconds = "00"] = String(time).split(":");
+    return new Date(Date.UTC(1970, 0, 1, Number(hours), Number(minutes), Number(seconds)));
 }
 
 function assertNoDuplicateDays(openingHours: OpeningHoursInput[] | undefined): void {
@@ -91,7 +94,7 @@ export async function createSupplier(
             address: input.address,
             latitude: input.latitude ?? null,
             longitude: input.longitude ?? null,
-            imageUrl: input.imageUrl ?? null,
+            ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
             openingHours: {
                 create: mapOpeningHours(input.openingHours ?? []),
             },
@@ -223,6 +226,28 @@ export async function countActiveSuppliers(searchString?: string | null, typeFil
     return count;
 }
 
+// count the total number of suppliers (including deactivated) for the admin page
+export async function countSuppliers(searchString?: string | null, typeFilter?: string | null) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
+    const count = await prisma.supplier.count({
+        where: { 
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            }, 
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        }
+    });
+    return count;
+}
+
 // this function returns all supplier types available
 export async function fetchSupplierTypes() {
     const types = await prisma.supplierType.findMany({
@@ -233,8 +258,21 @@ export async function fetchSupplierTypes() {
 }
 
 // public fetch for the admin page: every supplier, including deactivated
-export async function fetchAllSuppliers(page: number) {
-    return fetchSuppliers(page);
+export async function fetchAllSuppliers(
+    page: number,
+    searchString?: string | null,
+    typeFilter?: string | null,
+) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
+
+    return fetchSuppliers(page, {
+        name: { contains: search, mode: 'insensitive' },
+        type: { contains: type, mode: 'insensitive' },
+    });
 }
 
 // shared paginated fetch; callers supply an optional where clause
