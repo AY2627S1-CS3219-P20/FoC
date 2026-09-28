@@ -63,8 +63,8 @@ export interface SupplierTypeCount {
 export interface CreateSupplierInput {
     name: string;
     type: string;
-    building?: string | null;
-    floor?: number | null;
+    building: string;
+    floor: number;
     description: string;
     address: string;
     latitude?: number | null;

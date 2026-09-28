@@ -222,7 +222,7 @@ const SupplierForm = ({
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                       aria-invalid={isInvalid}
-                      placeholder="Optional"
+                      placeholder="e.g. COM1"
                     />
                     {isInvalid && <FieldError errors={field.state.meta.errors} />}
                   </FieldContent>
@@ -247,7 +247,7 @@ const SupplierForm = ({
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                       aria-invalid={isInvalid}
-                      placeholder="Optional"
+                      placeholder="e.g. 1"
                     />
                     {isInvalid && <FieldError errors={field.state.meta.errors} />}
                   </FieldContent>
