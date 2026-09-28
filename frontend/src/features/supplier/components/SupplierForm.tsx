@@ -323,7 +323,7 @@ const SupplierForm = ({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
-                    placeholder="Describe what the supplier offers"
+                    placeholder="Describe the location of this supplier."
                   />
                   {isInvalid && <FieldError errors={field.state.meta.errors} />}
                 </FieldContent>
