@@ -27,7 +27,7 @@ export const ENDPOINTS = {
 
     supplier: {
         viewSuppliersForAdmin: `${BASE_SUPPLIER}/all`,
-        createSupplier: `${BASE_SUPPLIER}/`,
+        createSupplier: `${BASE_SUPPLIER}/create`,
         updateSupplier: `${BASE_SUPPLIER}/:id`,
         deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
         uploadSupplierImage: `${BASE_SUPPLIER}/upload-image`,

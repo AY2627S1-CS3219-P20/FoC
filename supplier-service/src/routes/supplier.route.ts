@@ -47,7 +47,7 @@ supplierRouter.get("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
 supplierRouter.post("/upload-image", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);
 
 // Admin supplier management
-supplierRouter.post("/", authorize(Role.ADMIN), createSupplier);
+supplierRouter.post("/create", authorize(Role.ADMIN), createSupplier);
 supplierRouter.patch("/:id", authorize(Role.ADMIN), updateSupplier);
 supplierRouter.patch("/:id/deactivate", authorize(Role.ADMIN), deactivateSupplierRoute);
 
