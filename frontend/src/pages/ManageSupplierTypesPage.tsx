@@ -41,7 +41,7 @@ const ManageSupplierTypesPage = () => {
 
     return (
         <>
-            <div className="flex flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
+            <div className="flex flex-col px-5 md:px-10 py-5 gap-4">
                 <h1 className="text-xl md:text-2xl font-bold">Manage Suppliers</h1>
                 <div className="flex flex-col gap-4 sm:flex-row">
                     <Button
@@ -55,9 +55,7 @@ const ManageSupplierTypesPage = () => {
                         Create New Supplier Type
                     </Button>
                 </div>
-            </div>
 
-            <div className="flex flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
                 {isCreateOpen && (
                     <CreateSupplierTypeForm
                         submitLabel="Add New Supplier Type"
@@ -65,9 +63,7 @@ const ManageSupplierTypesPage = () => {
                         onCancel={() => setIsCreateOpen(false)}
                     />
                 )}
-            </div>
 
-            <div className="flex flex-col w-full px-5 py-5 items-center justify-center md:px-10 py-5">
                 {supplierTypesIsLoading && <p>Loading supplier types...</p>}
                 {supplierTypesIsError && <p>Failed to load supplier types: {countSupplierTypesQuery.error.message}</p>}
 
@@ -75,17 +71,19 @@ const ManageSupplierTypesPage = () => {
                     <p className="text-sm text-muted-foreground">No supplier types yet.</p>
                 )}
 
-                <div className="w-full grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                <div className="w-full grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-6">
                     {supplierTypes.map((type) => (
-                        <Card key={type.id} className="w-[150px] px-5 items-center flex flex-row overflow-hidden rounded-xl bg-card shadow-md ring-1 ring-foreground/10">
-                            <div className="text-md w-2/3 justify-center">{type.type[0] + type.type.substring(1).toLowerCase()}</div>
+                        <Card key={type.id} className="px-5 flex flex-row items-center h-full w-full overflow-hidden">
+                            <div className="text-md font-semibold w-2/3 justify-center shrink-0 text-wrap">
+                                {type.type[0] + type.type.substring(1).toLowerCase()}
+                            </div>
                             {type.count === 0 &&
                                 <Button
-                                    className="bg-white hover:bg-gray-200"
+                                    variant="ghost"
                                     onClick={() => handleTypeDelete(type)}
                                     disabled={deleteSupplierTypeMutation.isPending} // disable button when mutation is pending
                                 >
-                                    <Trash2 className='w-1/3 justify-end text-red-600'/>
+                                    <Trash2 className='w-1/3 justify-end text-red-600' />
                                 </Button>
                             }
                         </Card>
