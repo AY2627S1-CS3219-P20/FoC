@@ -5,12 +5,11 @@ import type { ParsedError } from "@/utils/errorHandler";
 import { viewSuppliersInPage, countActiveSuppliers, getAllSupplierTypes } from "@/api/supplierApi";
 import type { Supplier, SupplierType } from "@/types/api.types";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
-import { Card } from "@/components/ui/card";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from "@/components/ui/pagination";
 import { Field } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Menubar, MenubarMenu, MenubarTrigger } from '@/components/ui/menubar';
-
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { SearchIcon } from 'lucide-react';
 
 const SupplierPage = () => {
     const LIMIT: number = 15;
@@ -29,11 +28,11 @@ const SupplierPage = () => {
     const handleSearchKeyInput = (event: React.ChangeEvent<HTMLInputElement>) => {
         console.log(searchString)
         setSearchParams({ page: '1' }) // reset the page to be 1 upon any change in search input
-        setSearchString(event.target.value); 
+        setSearchString(event.target.value);
     }
     const handleFilterInput = (filter: string) => {
         setSearchParams({ page: '1' }) // reset the page to be 1 upon any change in type filter used
-        setTypeFilter(filter.toUpperCase()); 
+        setTypeFilter(filter.toUpperCase());
     }
 
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
@@ -67,16 +66,21 @@ const SupplierPage = () => {
     return (
         <>
             <div className="flex flex-col px-5 md:px-10 py-5 gap-4">
-                <div className="flex md:flex-row lg: flex-col items-start justify-between gap-4">
+                <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                     <h1 className="text-xl md:text-2xl font-bold">Suppliers</h1>
-                    <Field className="md:w-full lg:w-[500px]">
-                        <Input
-                            id="input-search-key"
-                            type="text"
-                            placeholder="Search for a supplier"
-                            onChange={handleSearchKeyInput}
-                        />
+                    <Field className="w-full md:w-1/3">
+                        <InputGroup className="bg-white h-10">
+                            <InputGroupAddon align="inline-start">
+                                <SearchIcon />
+                            </InputGroupAddon>
+                            <InputGroupInput
+                                id="input-search-key"
+                                type="text"
+                                placeholder="Search for a supplier"
+                                onChange={handleSearchKeyInput} />
+                        </InputGroup>
                     </Field>
+
                 </div>
                 {supplierTypesIsLoading && <p>Loading supplier types...</p>}
                 {supplierTypesIsError && <p>Failed to load supplier types: {supplierTypesQuery.error.message}</p>}
@@ -85,11 +89,11 @@ const SupplierPage = () => {
                     <p className="text-sm text-muted-foreground">No supplier types yet.</p>
                 )}
 
-                <Menubar className="w-fit">
+                <Menubar className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-2.5 overflow-x-auto overflow-y-hidden">
                     <MenubarMenu>
-                        <MenubarTrigger 
+                        <MenubarTrigger
                             key="all"
-                            className={typeFilter === "ALL" ? "bg-accent text-accent-foreground" : ""} // ensure that the filter is shown as selected on frontend
+                            className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === "ALL" ? "bg-accent!" : ""}`} // ensure that the filter is shown as selected on frontend
                             onClick={() => handleFilterInput("ALL")}
                         >
                             ALL
@@ -97,9 +101,9 @@ const SupplierPage = () => {
                     </MenubarMenu>
                     {supplierTypes.map(type => (
                         <MenubarMenu>
-                            <MenubarTrigger 
-                                key={type.id} 
-                                className={typeFilter === type.type ? "bg-accent text-accent-foreground" : ""} // ensure that the filter is shown as selected on frontend
+                            <MenubarTrigger
+                                key={type.id}
+                                className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === type.type ? "bg-accent!" : ""}`} // ensure that the filter is shown as selected on frontend
                                 onClick={() => handleFilterInput(type.type)}
                             >
                                 {type.type}
@@ -117,42 +121,43 @@ const SupplierPage = () => {
                     <p className="text-sm text-muted-foreground">No suppliers yet.</p>
                 )}
 
-                <Card className="w-full p-5">
+                <div className="w-full flex flex-col gap-6">
                     {suppliers.length > 0 && (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {suppliers.map(supplier => (
                                 <SupplierCard key={supplier.id} supplier={supplier} />
                             ))}
                         </div>
                     )}
-                    <Pagination className="p-4 border-1 rounded-xl w-fit">
+
+                    <Pagination className="p-2 border rounded-xl w-fit shadow-sm border-slate-200 bg-white">
                         <PaginationContent>
                             {currentPage > 1 && (
                                 <PaginationItem>
-                                    <PaginationPrevious 
-                                        href={`?page=${Math.max(currentPage-1, 1)}`} 
+                                    <PaginationPrevious
+                                        href={`?page=${Math.max(currentPage - 1, 1)}`}
                                     />
                                 </PaginationItem>
                             )}
                             {Array.from({ length: totalNumberOfPages }, (_, i) => (
                                 <PaginationItem key={i}>
-                                    <PaginationLink 
-                                        href={`?page=${i+1}`}
+                                    <PaginationLink
+                                        href={`?page=${i + 1}`}
                                     >
-                                        {i+1}
+                                        {i + 1}
                                     </PaginationLink>
                                 </PaginationItem>
                             ))}
                             {currentPage < totalNumberOfPages && (
                                 <PaginationItem>
-                                    <PaginationNext 
-                                        href={`?page=${Math.min(currentPage+1, totalNumberOfPages)}`} 
+                                    <PaginationNext
+                                        href={`?page=${Math.min(currentPage + 1, totalNumberOfPages)}`}
                                     />
                                 </PaginationItem>
                             )}
                         </PaginationContent>
                     </Pagination>
-                </Card>
+                </div>
             </div>
         </>
     );

@@ -1,7 +1,12 @@
-import { ClockIcon, LogOutIcon, MapPinIcon, PencilIcon } from "lucide-react";
+import { ClockIcon, LogOutIcon, MapIcon, MapPinIcon, PencilIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Supplier, SupplierDay } from "@/types/api.types";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import useAuth from "@/hooks/useAuth";
+import { useLocation } from "react-router-dom";
+import { ROUTES } from "@/routes/routes";
 
 const DAY_ORDER: SupplierDay[] = [
     "MONDAY",
@@ -87,75 +92,63 @@ interface SupplierCardProps {
 }
 
 const SupplierCard = ({ supplier, onEdit, onDeactivate }: SupplierCardProps) => {
+    const { user } = useAuth();
+    const isAdmin = user?.role === "ADMIN";
     const isDeactivated = supplier.status === "DEACTIVATED";
+    const location = useLocation();
 
     return (
-        <div
-            className={[
-                "group/card flex flex-col overflow-hidden rounded-xl bg-card shadow-md ring-1 ring-foreground/10",
-                isDeactivated ? "opacity-60" : "",
-            ].join(" ")}
-        >
-            {supplier.imageUrl ? (
+        <Card className={`p-4 w-full h-full ${isDeactivated ? "opacity-60" : ""}`}>
+            <div className="aspect-video md:aspect-square w-full overflow-hidden rounded-lg">
                 <img
-                    src={supplier.imageUrl}
+                    src={supplier.imageUrl!}
                     alt={supplier.name}
-                    className="aspect-[3/2] w-full object-cover"
+                    className="h-full w-full object-cover object-center"
                 />
-            ) : (
-                <div className="flex aspect-[3/2] w-full items-center justify-center bg-muted text-muted-foreground">
-                    <MapPinIcon className="size-6" />
-                </div>
-            )}
+            </div>
 
-            <div className="flex flex-1 flex-col gap-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col gap-1">
-                        <span className="inline-flex w-fit items-center rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                            {supplier.type}
-                        </span>
-                        <h3 className="text-base leading-snug font-medium">
-                            {supplier.name}
-                        </h3>
-                    </div>
-                    <span
-                        className={[
-                            "inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                            isDeactivated
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-indigo-900 text-white",
-                        ].join(" ")}
-                    >
+            <div className="flex flex-col gap-2.5 w-full">
+                <div className="flex flex-row items-start justify-between gap-2">
+                    <Badge variant="gray">{supplier.type}</Badge>
+                    <Badge variant={isDeactivated ? "muted" : "indigo900"}>
                         {isDeactivated ? "Deactivated" : "Active"}
-                    </span>
+                    </Badge>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <MapPinIcon className="size-4 shrink-0" />
-                    <span>
+                <div className="flex flex-col gap-1">
+                    <span className="text-lg lg:text-xl leading-none font-bold text-wrap">
+                        {supplier.name}
+                    </span>
+                    {supplier.description && (
+                        <span className="text-sm leading-none text-slate-500 text-wrap">
+                            {supplier.description}
+                        </span>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                    <MapIcon className="size-4 shrink-0" />
+                    <span className="text-wrap leading-none">
                         {supplier.building}, Floor {supplier.floor}
                     </span>
                 </div>
 
-                {supplier.description && (
-                    <p className="text-sm leading-snug text-muted-foreground">
-                        {supplier.description}
-                    </p>
-                )}
-
                 {supplier.address && (
-                    <p className="text-sm leading-snug text-muted-foreground">{supplier.address}</p>
-                )}
-
-                {supplier.openingHours && supplier.openingHours.length > 0 && (
-                    <div className="mt-auto flex items-start gap-1.5 pt-2 text-sm text-muted-foreground">
-                        <ClockIcon className="size-4 shrink-0 pt-0.5" />
-                        <span>{formatHoursSummary(supplier.openingHours)}</span>
+                    <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                        <MapPinIcon className="size-4 shrink-0" />
+                        <span className="text-sm leading-none text-wrap">{supplier.address}</span>
                     </div>
                 )}
 
-                {!isDeactivated && (
-                    <div className="mt-2 flex items-center justify-end gap-2 border-t pt-3">
+                {supplier.openingHours && supplier.openingHours.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                        <ClockIcon className="size-4 shrink-0" />
+                        <span className="text-wrap leading-none">{formatHoursSummary(supplier.openingHours)}</span>
+                    </div>
+                )}
+
+                {isAdmin && !isDeactivated && location.pathname === ROUTES.ADMIN.MANAGE_SUPPLIERS && (
+                    <div className="flex items-end justify-end gap-2 border-t border-slate-200 pt-3">
                         {onEdit && (
                             <Button
                                 type="button"
@@ -181,7 +174,7 @@ const SupplierCard = ({ supplier, onEdit, onDeactivate }: SupplierCardProps) => 
                     </div>
                 )}
             </div>
-        </div>
+        </Card>
     );
 };
 

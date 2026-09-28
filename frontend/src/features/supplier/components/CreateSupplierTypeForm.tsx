@@ -7,6 +7,7 @@ import type { ParsedError } from "@/utils/errorHandler";
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 interface CreateSupplierTypeFormProps {
     submitLabel: string;
@@ -39,7 +40,7 @@ const CreateSupplierTypeForm = ({ submitLabel, onSuccess, onCancel }: CreateSupp
     });
 
     return (
-        <div className="bg-white w-2/3 px-5 py-5 rounded-xl border-xs">
+        <Card className="w-full md:w-2/3 p-5">
             <form
                 onSubmit={(e) => {
                     e.preventDefault()
@@ -53,23 +54,23 @@ const CreateSupplierTypeForm = ({ submitLabel, onSuccess, onCancel }: CreateSupp
                         {(field) => {
                             const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
                             return (
-                            <Field data-invalid={isInvalid}>
-                                <FieldLabel htmlFor={field.name}>Create New Type</FieldLabel>
-                                <FieldDescription>Input a new supplier type that does not exist yet.</FieldDescription>
-                                <FieldContent>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                    aria-invalid={isInvalid}
-                                    placeholder="Enter new supplier type"
-                                    className="overflow-hidden text-ellipsis whitespace-nowrap"
-                                />
-                                    {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                                </FieldContent>
-                            </Field>
+                                <Field data-invalid={isInvalid}>
+                                    <FieldLabel htmlFor={field.name}>Create New Type</FieldLabel>
+                                    <FieldDescription>Input a new supplier type that does not exist yet.</FieldDescription>
+                                    <FieldContent>
+                                        <Input
+                                            id={field.name}
+                                            name={field.name}
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                            aria-invalid={isInvalid}
+                                            placeholder="Enter new supplier type"
+                                            className="overflow-hidden text-ellipsis whitespace-nowrap"
+                                        />
+                                        {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                                    </FieldContent>
+                                </Field>
                             );
                         }}
                     </form.Field>
@@ -84,7 +85,7 @@ const CreateSupplierTypeForm = ({ submitLabel, onSuccess, onCancel }: CreateSupp
                     </Button>
                 </div>
             </form>
-        </div>
+        </Card>
     )
 }
 
