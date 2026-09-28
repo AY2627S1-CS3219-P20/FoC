@@ -200,11 +200,11 @@ const ManageSuppliersPage = () => {
                     <p className="text-sm text-muted-foreground">No supplier types yet.</p>
                 )}
 
-                <Menubar className="w-fit">
+                <Menubar className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-2.5 overflow-x-auto overflow-y-hidden">
                     <MenubarMenu>
                         <MenubarTrigger
                             key="all"
-                            className={typeFilter === "ALL" ? "bg-accent text-accent-foreground" : ""}
+                            className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === "ALL" ? "bg-accent text-accent-foreground" : ""}`}
                             onClick={() => handleFilterInput("ALL")}
                         >
                             ALL
@@ -213,7 +213,7 @@ const ManageSuppliersPage = () => {
                     {supplierTypes.map(type => (
                         <MenubarMenu key={type.id}>
                             <MenubarTrigger
-                                className={typeFilter === type.type ? "bg-accent text-accent-foreground" : ""}
+                                className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === type.type ? "bg-accent text-accent-foreground" : ""}`}
                                 onClick={() => handleFilterInput(type.type)}
                             >
                                 {type.type}
