@@ -10,8 +10,11 @@ export const STATUS = {
 } as const;
 
 function toPrismaTime(time: string): Date {
-    const padded = /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time;
-    return new Date(`2020-01-01T${padded}`);
+    // Opening hours are stored as wall-clock SGT. Parse "HH:MM" / "HH:MM:SS"
+    // as a UTC instant so the value round-trips identically regardless of the
+    // server timezone and matches the frontend's getUTCHours rendering.
+    const [hours, minutes, seconds = "00"] = String(time).split(":");
+    return new Date(Date.UTC(1970, 0, 1, Number(hours), Number(minutes), Number(seconds)));
 }
 
 function assertNoDuplicateDays(openingHours: OpeningHoursInput[] | undefined): void {
