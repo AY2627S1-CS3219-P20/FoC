@@ -45,8 +45,8 @@ const buildPayload = (
     return {
         name: values.name,
         type: values.type,
-        building: values.building?.trim() || null,
-        floor: values.floor?.trim() ? Number(values.floor) : null,
+        building: values.building,
+        floor: Number(values.floor),
         description: values.description,
         address: values.address,
         latitude: values.latitude?.trim() ? Number(values.latitude) : null,
