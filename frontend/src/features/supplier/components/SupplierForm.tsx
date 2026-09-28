@@ -12,10 +12,13 @@ import {
   supplierFormSchema,
   supplierDayValues,
   supplierDayLabels,
-  SUPPLIER_TYPES,
   type SupplierFormValues,
 } from "@/features/supplier/schemas/supplier.schema";
 import type { Supplier, SupplierDay } from "@/types/api.types";
+import { useQuery } from "@tanstack/react-query";
+import type { SupplierType } from "@/types/api.types";
+import type { ParsedError } from "@/utils/errorHandler";
+import { getAllSupplierTypes } from "@/api/supplierApi";
 
 interface OpeningHourRow {
   day: SupplierDay;
@@ -63,6 +66,16 @@ const SupplierForm = ({
         }))
       : [],
   );
+
+  const supplierTypesQuery = useQuery<SupplierType[], ParsedError>({
+    queryKey: ["get-supplier-types"],
+    queryFn: () => getAllSupplierTypes(),
+    refetchOnMount: "always",
+  });
+
+  const supplierTypesIsLoading = supplierTypesQuery.isLoading;
+  const supplierTypesIsError = supplierTypesQuery.isError;
+  const supplierTypes = supplierTypesQuery.data ?? [];
 
   const form = useForm({
     defaultValues: {
@@ -157,9 +170,9 @@ const SupplierForm = ({
                       className={`${inputBaseClass} cursor-pointer appearance-none pr-8`}
                     >
                       <option value="">Select a supplier type</option>
-                      {SUPPLIER_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
+                      {supplierTypes.map((type) => (
+                        <option key={type.id} value={type.type}>
+                          {type.type}
                         </option>
                       ))}
                     </select>
