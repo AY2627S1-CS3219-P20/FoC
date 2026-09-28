@@ -73,7 +73,6 @@ async function main() {
                 address: row.Address,
                 latitude: Number(row.Latitude) || null, // field may be null
                 longitude: Number(row.Longitude) || null, // field may be null
-                imageUrl: row.ImageURL || null, // field may be null
             },
             update: {}
         }); 
