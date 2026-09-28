@@ -94,7 +94,7 @@ export async function createSupplier(
             address: input.address,
             latitude: input.latitude ?? null,
             longitude: input.longitude ?? null,
-            imageUrl: input.imageUrl ?? null,
+            ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
             openingHours: {
                 create: mapOpeningHours(input.openingHours ?? []),
             },

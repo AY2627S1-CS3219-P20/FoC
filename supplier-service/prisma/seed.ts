@@ -73,8 +73,9 @@ async function main() {
                 address: row.Address,
                 latitude: Number(row.Latitude) || null, // field may be null
                 longitude: Number(row.Longitude) || null, // field may be null
+                ...(row.ImageURL ? { imageUrl: row.ImageURL } : {}),
             },
-            update: {}
+            update: row.ImageURL ? { imageUrl: row.ImageURL } : {}
         }); 
 
         for (const day of days) {
