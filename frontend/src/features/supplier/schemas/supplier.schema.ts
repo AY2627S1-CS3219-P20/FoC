@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-export const SUPPLIER_TYPES = ["FOOD", "RETAIL", "FACILITIES"] as const;
-
-export type SupplierType = typeof SUPPLIER_TYPES[number];
-
 export const supplierDayValues = [
     "MONDAY",
     "TUESDAY",
@@ -18,10 +14,7 @@ export const supplierFormSchema = z.object({
     name: z.string().min(1, "Name is required"),
     type: z
         .string()
-        .min(1, "Please select a supplier type")
-        .refine(value => (SUPPLIER_TYPES as readonly string[]).includes(value), {
-            message: "Please select a supplier type",
-        }),
+        .min(1, "Please select a supplier type"),
     description: z.string().min(1, "Description is required"),
     address: z.string().min(1, "Address is required"),
     building: z.string(),
