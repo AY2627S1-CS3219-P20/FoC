@@ -42,10 +42,10 @@ supplierRouter.post("/delete-supplier-type", authorize(Role.ADMIN), deleteSuppli
 supplierRouter.get("/count-supplier-type", authorize(Role.ADMIN), countSupplierType) // count the number of suppliers for each type
 
 // Admin: list all suppliers including deactivated (management page)
-supplierRouter.get("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
+supplierRouter.post("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
 
 // Admin: count all suppliers including deactivated (management page)
-supplierRouter.get("/count-all-suppliers", authorize(Role.ADMIN), countAllSuppliers);
+supplierRouter.post("/count-all-suppliers", authorize(Role.ADMIN), countAllSuppliers);
 
 // Admin: upload a supplier location image
 supplierRouter.post("/upload-image", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);

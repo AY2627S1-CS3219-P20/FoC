@@ -44,8 +44,12 @@ export async function countAllActiveSuppliers(req: Request, res: Response) {
     });
 }
 
-export async function countAllSuppliers(_req: Request, res: Response) {
-    const count = await countSuppliers();
+export async function countAllSuppliers(req: Request, res: Response) {
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const count = await countSuppliers(requestBody.data.searchString, requestBody.data.typeFilter);
 
     return res.status(200).json({
         success: true,
@@ -94,7 +98,15 @@ export async function viewSuppliersForAdmin(req: Request, res: Response) {
     if (!request.success) {
         throw new AppError("Parameters not input correctly", 400);
     }
-    const suppliers = await fetchAllSuppliers(request.data.page);
+    const requestBody = filterSearchSupplierSchema.safeParse(req.body.data);
+    if (!requestBody.success) {
+        throw new AppError("JSON body not input correctly", 400);
+    }
+    const suppliers = await fetchAllSuppliers(
+        request.data.page,
+        requestBody.data.searchString,
+        requestBody.data.typeFilter,
+    );
 
     return res.status(200).json({
         success: true,

@@ -227,9 +227,24 @@ export async function countActiveSuppliers(searchString?: string | null, typeFil
 }
 
 // count the total number of suppliers (including deactivated) for the admin page
-export async function countSuppliers() {
-    const count = await prisma.supplier.count();
-    console.log(count)
+export async function countSuppliers(searchString?: string | null, typeFilter?: string | null) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
+    const count = await prisma.supplier.count({
+        where: { 
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            }, 
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        }
+    });
     return count;
 }
 
@@ -243,8 +258,21 @@ export async function fetchSupplierTypes() {
 }
 
 // public fetch for the admin page: every supplier, including deactivated
-export async function fetchAllSuppliers(page: number) {
-    return fetchSuppliers(page);
+export async function fetchAllSuppliers(
+    page: number,
+    searchString?: string | null,
+    typeFilter?: string | null,
+) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
+
+    return fetchSuppliers(page, {
+        name: { contains: search, mode: 'insensitive' },
+        type: { contains: type, mode: 'insensitive' },
+    });
 }
 
 // shared paginated fetch; callers supply an optional where clause

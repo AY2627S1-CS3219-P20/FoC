@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { ChangeEvent } from "react";
 import { PlusIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -9,6 +10,7 @@ import {
     viewSuppliersForAdmin,
     createSupplier,
     updateSupplier,
+    getAllSupplierTypes,
 } from "@/api/supplierApi";
 import { deactivateSupplier } from "@/api/supplierDeactivateApi";
 import {
@@ -20,10 +22,13 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 import DeactivateModal from "@/features/supplier/components/DeactivateModal";
-import type { Supplier, SupplierDay, CreateSupplierInput } from "@/types/api.types";
+import type { Supplier, SupplierDay, CreateSupplierInput, SupplierType } from "@/types/api.types";
 import type { SupplierFormValues } from "@/features/supplier/schemas/supplier.schema";
 import { Button } from "@/components/ui/button";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import SupplierForm from "@/features/supplier/components/SupplierForm";
 import SupplierModal from "@/features/supplier/components/SupplierModal";
 
@@ -64,11 +69,19 @@ const ManageSuppliersPage = () => {
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [supplierToDeactivate, setSupplierToDeactivate] = useState<Supplier | null>(null);
 
+    // keep the search string and type filter across navigations, matching the /suppliers page
+    const [searchString, setSearchString] = useState(() => sessionStorage.getItem("searchString") ?? "");
+    const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem("typeFilter") ?? "all");
+    useEffect(() => {
+        sessionStorage.setItem("searchString", searchString);
+        sessionStorage.setItem("typeFilter", typeFilter);
+    }, [searchString, typeFilter]);
+
     const LIMIT = 15; // number of suppliers shown per page; kept in sync with the backend
 
     const totalPagesQuery = useQuery<number, ParsedError>({
-        queryKey: ["admin-suppliers-total-pages"],
-        queryFn: countSuppliersForAdmin,
+        queryKey: ["admin-suppliers-total-pages", searchString, typeFilter],
+        queryFn: () => countSuppliersForAdmin(searchString, typeFilter),
     });
 
     const totalPages = Math.ceil((totalPagesQuery.data ?? 0) / LIMIT);
@@ -78,8 +91,15 @@ const ManageSuppliersPage = () => {
     const effectivePage = Math.min(currentPage, Math.max(1, totalPages));
 
     const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["admin-suppliers", effectivePage],
-        queryFn: () => viewSuppliersForAdmin(effectivePage),
+        queryKey: ["admin-suppliers", effectivePage, searchString, typeFilter],
+        queryFn: () => viewSuppliersForAdmin(effectivePage, searchString, typeFilter),
+        refetchOnMount: "always",
+    });
+
+    const supplierTypesQuery = useQuery<SupplierType[], ParsedError>({
+        queryKey: ["admin-supplier-types"],
+        queryFn: () => getAllSupplierTypes(),
+        refetchOnMount: "always",
     });
 
     const suppliersIsLoading = suppliersQuery.isLoading;
@@ -87,6 +107,10 @@ const ManageSuppliersPage = () => {
     // Backend returns 400 "No records found for this page" when there is nothing to show.
     const isNoRecords = suppliersIsError && suppliersQuery.error?.statusCode === 400;
     const suppliers = suppliersQuery.data ?? [];
+
+    const supplierTypesIsLoading = supplierTypesQuery.isLoading;
+    const supplierTypesIsError = supplierTypesQuery.isError;
+    const supplierTypes = supplierTypesQuery.data ?? [];
 
     const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: ["admin-suppliers"], exact: false });
@@ -96,6 +120,16 @@ const ManageSuppliersPage = () => {
     const goToPage = (page: number) => {
         if (page < 1 || page > totalPages || page === effectivePage) return;
         setCurrentPage(page);
+    };
+
+    const handleSearchKeyInput = (event: ChangeEvent<HTMLInputElement>) => {
+        setCurrentPage(1); // reset to the first page on any change in search input
+        setSearchString(event.target.value);
+    };
+
+    const handleFilterInput = (filter: string) => {
+        setCurrentPage(1); // reset to the first page on any change in type filter
+        setTypeFilter(filter.toUpperCase());
     };
 
     const createMutation = useMutation({
@@ -147,14 +181,55 @@ const ManageSuppliersPage = () => {
 
     return (
         <>
-            <div className="flex flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
-                <h1 className="text-xl md:text-2xl font-bold">Manage Suppliers</h1>
+            <div className="flex flex-col gap-4 px-5 md:px-10 py-5">
+                <div className="flex w-full items-start justify-between gap-4">
+                    <h1 className="text-xl md:text-2xl font-bold">Manage Suppliers</h1>
+                    <Field className="min-w-0 flex-1 lg:w-[500px]">
+                        <Input
+                            id="input-search-key"
+                            type="text"
+                            placeholder="Search for a supplier"
+                            onChange={handleSearchKeyInput}
+                        />
+                    </Field>
+                </div>
+
+                {supplierTypesIsLoading && <p>Loading supplier types...</p>}
+                {supplierTypesIsError && <p>Failed to load supplier types: {supplierTypesQuery.error?.message}</p>}
+                {!supplierTypesIsLoading && !supplierTypesIsError && supplierTypes.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No supplier types yet.</p>
+                )}
+
+                <Menubar className="w-fit">
+                    <MenubarMenu>
+                        <MenubarTrigger
+                            key="all"
+                            className={typeFilter === "ALL" ? "bg-accent text-accent-foreground" : ""}
+                            onClick={() => handleFilterInput("ALL")}
+                        >
+                            ALL
+                        </MenubarTrigger>
+                    </MenubarMenu>
+                    {supplierTypes.map(type => (
+                        <MenubarMenu key={type.id}>
+                            <MenubarTrigger
+                                className={typeFilter === type.type ? "bg-accent text-accent-foreground" : ""}
+                                onClick={() => handleFilterInput(type.type)}
+                            >
+                                {type.type}
+                            </MenubarTrigger>
+                        </MenubarMenu>
+                    ))}
+                </Menubar>
+            </div>
+
+            <div className="px-5 md:px-10 pb-4">
                 <Button
                     type="button"
                     variant="indigo"
                     size="lg"
                     onClick={() => setIsCreateOpen(true)}
-                    className="self-start"
+                    className="w-full self-start md:w-auto"
                 >
                     <PlusIcon />
                     Create Supplier
@@ -170,9 +245,15 @@ const ManageSuppliersPage = () => {
                 {!suppliersIsLoading &&
                     (isNoRecords || (!suppliersIsError && suppliers.length === 0)) && (
                         <p className="text-sm text-muted-foreground">
-                            No suppliers yet.
-                            <br />
-                            Click “Create Supplier” to add one.
+                            {searchString || typeFilter !== "all"
+                                ? "No suppliers match the current search and filter."
+                                : (
+                                    <>
+                                        No suppliers yet.
+                                        <br />
+                                        Click “Create Supplier” to add one.
+                                    </>
+                                )}
                         </p>
                     )}
 
