@@ -10,6 +10,14 @@ import {
     updateSupplier,
 } from "@/api/supplierApi";
 import { deactivateSupplier } from "@/api/supplierDeactivateApi";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 import DeactivateModal from "@/features/supplier/components/DeactivateModal";
 import type { Supplier, SupplierDay, CreateSupplierInput } from "@/types/api.types";
 import type { SupplierFormValues } from "@/features/supplier/schemas/supplier.schema";
@@ -48,20 +56,78 @@ const buildPayload = (
     };
 };
 
+// The admin list endpoint returns only the suppliers for a single page and
+// throws a 400 when a page is out of range. There is no count endpoint that
+// includes deactivated suppliers, so the number of pages is derived on the
+// frontend by probing pages (exponential scan + binary search => log N requests).
+const viewHasSuppliers = async (page: number): Promise<boolean> => {
+    try {
+        const data = await viewSuppliersForAdmin(page);
+        return data.length > 0;
+    } catch {
+        return false;
+    }
+};
+
+const computeTotalPages = async (): Promise<number> => {
+    if (!(await viewHasSuppliers(1))) return 0;
+
+    let upper = 1;
+    while (await viewHasSuppliers(upper)) {
+        upper *= 2;
+    }
+
+    let low = Math.floor(upper / 2);
+    let high = upper;
+    while (low < high - 1) {
+        const mid = Math.floor((low + high) / 2);
+        if (await viewHasSuppliers(mid)) {
+            low = mid;
+        } else {
+            high = mid;
+        }
+    }
+
+    return low;
+};
+
 const ManageSuppliersPage = () => {
     const queryClient = useQueryClient();
+    const [currentPage, setCurrentPage] = useState(1);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [supplierToDeactivate, setSupplierToDeactivate] = useState<Supplier | null>(null);
 
-    const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["admin-suppliers"],
-        queryFn: () => viewSuppliersForAdmin(1),
-        refetchOnMount: "always",
+    const totalPagesQuery = useQuery<number, ParsedError>({
+        queryKey: ["admin-suppliers-total-pages"],
+        queryFn: computeTotalPages,
     });
 
+    const totalPages = totalPagesQuery.data ?? 0;
+
+    // The backend returns 400 for out-of-range pages; derive the effective (in-range)
+    // page during render so the query stays valid even after the page count shrinks.
+    const effectivePage = Math.min(currentPage, Math.max(1, totalPages));
+
+    const suppliersQuery = useQuery<Supplier[], ParsedError>({
+        queryKey: ["admin-suppliers", effectivePage],
+        queryFn: () => viewSuppliersForAdmin(effectivePage),
+    });
+
+    const suppliersIsLoading = suppliersQuery.isLoading;
+    const suppliersIsError = suppliersQuery.isError;
+    // Backend returns 400 "No records found for this page" when there is nothing to show.
+    const isNoRecords = suppliersIsError && suppliersQuery.error?.statusCode === 400;
+    const suppliers = suppliersQuery.data ?? [];
+
     const invalidate = () => {
-        queryClient.invalidateQueries({ queryKey: ["admin-suppliers"] });
+        queryClient.invalidateQueries({ queryKey: ["admin-suppliers"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["admin-suppliers-total-pages"] });
+    };
+
+    const goToPage = (page: number) => {
+        if (page < 1 || page > totalPages || page === effectivePage) return;
+        setCurrentPage(page);
     };
 
     const createMutation = useMutation({
@@ -111,10 +177,6 @@ const ManageSuppliersPage = () => {
         }
     };
 
-    const isLoading = suppliersQuery.isLoading;
-    const isError = suppliersQuery.isError;
-    const suppliers = suppliersQuery.data ?? [];
-
     return (
         <>
             <div className="flex flex-col items-start justify-between gap-4 px-5 md:px-10 py-5">
@@ -132,27 +194,81 @@ const ManageSuppliersPage = () => {
             </div>
 
             <div className="px-5 md:px-10 pb-10">
-                {isLoading && <p>Loading suppliers...</p>}
-                {isError && <p>Failed to load suppliers: {suppliersQuery.error.message}</p>}
-
-                {!isLoading && !isError && suppliers.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                        No suppliers yet.
-                        <br />
-                        Click “Create Supplier” to add one.
-                    </p>
+                {suppliersIsLoading && <p>Loading suppliers...</p>}
+                {suppliersIsError && !isNoRecords && (
+                    <p>Failed to load suppliers: {suppliersQuery.error.message}</p>
                 )}
 
+                {!suppliersIsLoading &&
+                    (isNoRecords || (!suppliersIsError && suppliers.length === 0)) && (
+                        <p className="text-sm text-muted-foreground">
+                            No suppliers yet.
+                            <br />
+                            Click “Create Supplier” to add one.
+                        </p>
+                    )}
+
                 {suppliers.length > 0 && (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {suppliers.map(supplier => (
-                            <SupplierCard
-                                key={supplier.id}
-                                supplier={supplier}
-                                onEdit={() => setEditingSupplier(supplier)}
-                                onDeactivate={() => setSupplierToDeactivate(supplier)}
-                            />
-                        ))}
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {suppliers.map(supplier => (
+                                <SupplierCard
+                                    key={supplier.id}
+                                    supplier={supplier}
+                                    onEdit={() => setEditingSupplier(supplier)}
+                                    onDeactivate={() => setSupplierToDeactivate(supplier)}
+                                />
+                            ))}
+                        </div>
+
+                        {totalPages > 1 && !totalPagesQuery.isLoading && (
+                            <Pagination className="flex justify-center">
+                                <PaginationContent>
+                                    {effectivePage > 1 && (
+                                        <PaginationItem>
+                                            <PaginationPrevious
+                                                href="#"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    goToPage(effectivePage - 1);
+                                                }}
+                                            />
+                                        </PaginationItem>
+                                    )}
+                                    {Array.from({ length: totalPages }, (_, i) => (
+                                        <PaginationItem key={i}>
+                                            <PaginationLink
+                                                 href="#"
+                                                 isActive={effectivePage === i + 1}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    goToPage(i + 1);
+                                                }}
+                                            >
+                                                {i + 1}
+                                            </PaginationLink>
+                                        </PaginationItem>
+                                    ))}
+                                    {effectivePage < totalPages && (
+                                        <PaginationItem>
+                                            <PaginationNext
+                                                href="#"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    goToPage(effectivePage + 1);
+                                                }}
+                                            />
+                                        </PaginationItem>
+                                    )}
+                                </PaginationContent>
+                            </Pagination>
+                        )}
+
+                        {totalPagesQuery.isLoading && totalPages > 1 && (
+                            <p className="text-center text-sm text-muted-foreground">
+                                Loading pagination...
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
