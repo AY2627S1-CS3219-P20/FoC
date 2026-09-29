@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ChangeEvent } from "react";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, SearchIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
@@ -27,10 +27,10 @@ import type { SupplierFormValues } from "@/features/supplier/schemas/supplier.sc
 import { Button } from "@/components/ui/button";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import SupplierForm from "@/features/supplier/components/SupplierForm";
 import SupplierModal from "@/features/supplier/components/SupplierModal";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 
 interface OpeningHourRow {
     day: SupplierDay;
@@ -182,15 +182,19 @@ const ManageSuppliersPage = () => {
     return (
         <>
             <div className="flex flex-col gap-4 px-5 md:px-10 py-5">
-                <div className="flex w-full items-start justify-between gap-4">
+                <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                     <h1 className="text-xl md:text-2xl font-bold">Manage Suppliers</h1>
-                    <Field className="min-w-0 flex-1 lg:w-[500px]">
-                        <Input
-                            id="input-search-key"
-                            type="text"
-                            placeholder="Search for a supplier"
-                            onChange={handleSearchKeyInput}
-                        />
+                    <Field className="w-full md:w-1/3">
+                        <InputGroup className="bg-white h-10">
+                            <InputGroupAddon align="inline-start">
+                                <SearchIcon />
+                            </InputGroupAddon>
+                            <InputGroupInput
+                                id="input-search-key"
+                                type="text"
+                                placeholder="Search for a supplier"
+                                onChange={handleSearchKeyInput} />
+                        </InputGroup>
                     </Field>
                 </div>
 
@@ -271,7 +275,7 @@ const ManageSuppliersPage = () => {
                         </div>
 
                         {totalPages > 1 && !totalPagesQuery.isLoading && (
-                            <Pagination className="flex justify-center">
+                            <Pagination className="p-2 border rounded-xl w-fit shadow-sm border-slate-200 bg-white">
                                 <PaginationContent>
                                     {effectivePage > 1 && (
                                         <PaginationItem>
@@ -287,8 +291,8 @@ const ManageSuppliersPage = () => {
                                     {Array.from({ length: totalPages }, (_, i) => (
                                         <PaginationItem key={i}>
                                             <PaginationLink
-                                                 href="#"
-                                                 isActive={effectivePage === i + 1}
+                                                href="#"
+                                                isActive={effectivePage === i + 1}
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     goToPage(i + 1);
