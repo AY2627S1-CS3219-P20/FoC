@@ -41,7 +41,7 @@ model Supplier {
   type String
   status SupplierStatus @default(ACTIVATED)
   building String
-  floor Int
+  floor String
   description String
   address String
   openingHours OpeningHours[]

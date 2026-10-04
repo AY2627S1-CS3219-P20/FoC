@@ -14,7 +14,7 @@ type SupplierData = {
     type: string;
     status: string;
     latitude: number;
-    floor: number;
+    floor: string;
     openingHours: {
         create: Array<{ day: string }>;
         deleteMany?: unknown;
@@ -27,7 +27,7 @@ const MOCK_SUPPLIER = {
     type: "FOOD",
     status: "ACTIVATED",
     building: "Engineering Building",
-    floor: 1,
+    floor: "1",
     description: "Coffee and pastries",
     address: "4 Engineering Road",
     latitude: 1.3,
@@ -42,7 +42,7 @@ const validCreateInput: CreateSupplierInput = {
     name: "Starbucks",
     type: "FOOD",
     building: "Engineering Building",
-    floor: 1,
+    floor: "1",
     description: "Coffee and pastries",
     address: "4 Engineering Road",
     latitude: 1.3,
@@ -237,7 +237,7 @@ test("updateSupplier changes scalar fields and replaces opening hours", async ()
 
     const result = await updateSupplier(prisma, "sup_1", {
         name: "Starbucks Rebranded",
-        floor: 5,
+        floor: "5",
         openingHours: [{ day: "FRIDAY", openingTime: "09:00", closingTime: "17:00" }],
     });
 
@@ -246,7 +246,7 @@ test("updateSupplier changes scalar fields and replaces opening hours", async ()
 
     const data = (captured.updateArgs as { data: SupplierData }).data;
     assert.equal(data.name, "Starbucks Rebranded");
-    assert.equal(data.floor, 5);
+    assert.equal(data.floor, "5");
     assert.ok(data.openingHours.deleteMany);
     assert.equal(data.openingHours.create.length, 1);
     assert.equal(data.openingHours.create[0]!.day, "FRIDAY");

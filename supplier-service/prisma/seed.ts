@@ -68,7 +68,7 @@ async function main() {
                 type: enforceSupplierType(row.Type),
                 status: "ACTIVATED", // default to every supplier being activated
                 building: row.Building,
-                floor: Number(row.Floor),
+                floor: row.Floor,
                 description: row["Location Description"],
                 address: row.Address,
                 latitude: Number(row.Latitude) || null, // field may be null
