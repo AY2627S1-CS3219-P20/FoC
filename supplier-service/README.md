@@ -75,7 +75,7 @@ Request body:
   "name": "Starbucks",
   "type": "FOOD",
   "building": "Engineering Building",
-  "floor": 1,
+  "floor": "1",
   "description": "Coffee and pastries",
   "address": "4 Engineering Road",
   "latitude": 1.30,

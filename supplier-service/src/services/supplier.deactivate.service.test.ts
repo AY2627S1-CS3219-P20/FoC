@@ -15,7 +15,7 @@ const MOCK_SUPPLIER = {
     type: "FOOD",
     status: "ACTIVATED",
     building: "Engineering Building",
-    floor: 1,
+    floor: "1",
     description: "Coffee and pastries",
     address: "4 Engineering Road",
     latitude: 1.3,
