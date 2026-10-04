@@ -84,7 +84,7 @@ const SupplierForm = ({
       description: initialData?.description ?? "",
       address: initialData?.address ?? "",
       building: initialData?.building ?? "",
-      floor: initialData?.floor != null ? String(initialData.floor) : "",
+      floor: initialData?.floor ?? "",
       latitude: initialData?.latitude != null ? String(initialData.latitude) : "",
       longitude: initialData?.longitude != null ? String(initialData.longitude) : "",
       imageUrl: initialData?.imageUrl ?? "",
@@ -241,13 +241,11 @@ const SupplierForm = ({
                     <Input
                       id={field.name}
                       name={field.name}
-                      type="number"
-                      min={0}
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                       aria-invalid={isInvalid}
-                      placeholder="e.g. 1"
+                      placeholder="e.g. B1"
                     />
                     {isInvalid && <FieldError errors={field.state.meta.errors} />}
                   </FieldContent>

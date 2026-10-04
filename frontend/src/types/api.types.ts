@@ -38,7 +38,7 @@ export interface Supplier {
     type: string;
     status: SupplierStatus;
     building: string;
-    floor: number;
+    floor: string;
     description: string;
     address: string;
     latitude: number | null;
@@ -64,7 +64,7 @@ export interface CreateSupplierInput {
     name: string;
     type: string;
     building: string;
-    floor: number;
+    floor: string;
     description: string;
     address: string;
     latitude?: number | null;
