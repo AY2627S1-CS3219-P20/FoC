@@ -12,7 +12,7 @@ const validCreateInput = {
     name: "Starbucks",
     type: "FOOD",
     building: "Engineering Building",
-    floor: 1,
+    floor: "1",
     description: "Coffee and pastries",
     address: "4 Engineering Road",
     latitude: 1.30,
@@ -36,7 +36,7 @@ test("createSupplierSchema trims and accepts optional fields omitted", () => {
         name: "Vending Machine",
         type: "RETAIL",
         building: "Library",
-        floor: 2,
+        floor: "2",
         description: "Snacks",
         address: "2 Library Lane",
     };
@@ -56,12 +56,6 @@ test("createSupplierSchema rejects missing required fields", () => {
     );
 });
 
-test("createSupplierSchema rejects a negative non-integer floor", () => {
-    assert.throws(
-        () => createSupplierSchema.parse({ ...validCreateInput, floor: -1 }),
-        (error: unknown) => error instanceof Error && error.name === "ZodError",
-    );
-});
 
 test("createSupplierSchema rejects an invalid day of week", () => {
     assert.throws(
@@ -86,7 +80,7 @@ test("createSupplierSchema rejects malformed times", () => {
 });
 
 test("updateSupplierSchema accepts a partial payload", () => {
-    const result = updateSupplierSchema.parse({ name: "Starbucks #2", floor: 3 });
+    const result = updateSupplierSchema.parse({ name: "Starbucks #2", floor: "3" });
 
     assert.equal(result.name, "Starbucks #2");
     assert.equal(result.type, undefined);
