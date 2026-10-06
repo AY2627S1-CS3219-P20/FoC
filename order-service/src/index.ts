@@ -35,5 +35,5 @@ app.use(errorHandler);
 const PORT = config.port;
 
 app.listen(PORT, () => {
-    console.log(`Supplier service is running at http://localhost:${PORT}`);
+    console.log(`Order service is running at http://localhost:${PORT}`);
 });
