@@ -14,10 +14,10 @@ orderRouter.use(authenticate);
 // orderRouter.get("/");
 
 // Orders created by the authenticated requester
-// orderRouter.get("/mine/requester");
+// orderRouter.get("/me/requester");
 
 // Orders accepted by the authenticated courier
-// orderRouter.get("/mine/courier");
+// orderRouter.get("/me/courier");
 
 // Update a specific order by ID
 // orderRouter.patch("/:orderId");
