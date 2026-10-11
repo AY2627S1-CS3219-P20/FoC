@@ -8,6 +8,8 @@ import { errorHandler } from "./middlewares/error.middleware.js";
 import cookieParser from "cookie-parser";
 import config from "./config/config.js";
 import { AppError } from "./errors/errors.js";
+import { prisma } from "./libs/prisma.js";
+import { bootstrapAdmin } from "./services/bootstrap-admin.service.js";
 
 const app = express();
 
@@ -32,6 +34,14 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-app.listen(PORT, () => {
-    console.log(`User service is running at http://localhost:${PORT}`);
-});
+try {
+    const result = await bootstrapAdmin(prisma);
+    console.info(`Admin bootstrap: ${result}`);
+    app.listen(PORT, () => {
+        console.log(`User service is running at http://localhost:${PORT}`);
+    });
+} catch (error) {
+    console.error(error instanceof Error ? error.message : "Admin bootstrap failed");
+    await prisma.$disconnect();
+    process.exitCode = 1;
+}

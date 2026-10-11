@@ -17,6 +17,12 @@ enum Role {
   ADMIN
 }
 
+// Permanent bootstrap completion; intentionally not linked to a User.
+model BootstrapState {
+  key         String   @id
+  completedAt DateTime @default(now())
+}
+
 // Canonical email/phone CHECK constraints are maintained in SQL migrations.
 model User {
   userId      String   @id @default(uuid())
