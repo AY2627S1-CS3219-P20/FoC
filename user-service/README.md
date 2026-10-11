@@ -667,6 +667,53 @@ Variable                | Description
 
 ## Security
 
+### First administrator setup
+
+The user service can create its first administrator before accepting requests.
+Apply migrations with `npx prisma migrate deploy` and generate the client with
+`npm run db:generate` before starting the updated service.
+
+Set all four variables in `user-service/.env` or the service's deployment
+environment:
+
+```env
+BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+BOOTSTRAP_ADMIN_USERNAME=FirstAdmin
+BOOTSTRAP_ADMIN_PHONE_NUMBER=91234567
+BOOTSTRAP_ADMIN_PASSWORD="<provide a unique strong password>"
+```
+
+Replace the password placeholder with a password meeting the normal registration
+rules: at least eight characters, including uppercase, lowercase, a number, and a
+special character. Username and Singapore mobile validation also match registration.
+Emails are trimmed and lowercased; mobile numbers are stored in `+65` format.
+
+Start normally with `npm run dev`, or `npm run build` followed by `npm start`.
+The account can immediately log in using the existing login endpoint. This is
+trusted deployment provisioning and does not send an OTP, invitation email, or
+issue login tokens. Use the existing admin invitation or promotion flow for
+additional administrators.
+
+All four variables unset or empty disables bootstrap. Otherwise, incomplete or
+invalid credentials fail startup. Identity conflicts never overwrite or promote
+an existing user. Database failures also stop startup. Logs report the bootstrap
+outcome without including credentials or raw database errors.
+
+After success, remove all four credentials from the deployment environment and
+local `.env`. Do not commit secrets. A permanent `BootstrapState` row keyed by
+`first-admin` prevents repeats even if credentials change, the password changes,
+or the administrator is deleted or demoted. Completed bootstrap ignores leftover
+invalid credentials. Do not delete this marker to recover an account: bootstrap
+is initial setup, not account recovery.
+
+The marker and account commit in one database transaction. Concurrent startups
+compete for the same unique marker; only the winner creates the account. Failed
+creation rolls back the marker so a corrected deployment can retry. Migrations
+mark databases with an existing administrator complete without modifying users;
+startup also checks for an existing administrator before creating one. Historical
+admin deletion or demotion before this feature was installed cannot be inferred
+from the current database; leave bootstrap disabled on those installations.
+
 ### Password Security
 
 Passwords are hashed using **Argon2** before being stored in the database.
