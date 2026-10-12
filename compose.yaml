@@ -1,0 +1,23 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    hostname: foc-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_NODENAME: rabbit@foc-rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-foc}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-foc-local-only}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  rabbitmq_data:
