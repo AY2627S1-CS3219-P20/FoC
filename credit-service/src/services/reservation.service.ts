@@ -28,10 +28,10 @@ async function mutate(prisma: PrismaClient, input: ReservationInput, abort: bool
                 const account = await tx.creditAccount.findUnique({ where: { userId: input.requesterId } });
                 if (!account || account.id !== existing.accountId) throw new AppError("Reservation account is inconsistent", 409);
                 const updated = await tx.creditAccount.updateMany({
-                    where: { id: account.id, reservedCredits: { gte: input.amount } },
+                    where: { id: account.id, reservedCredits: { gte: input.amount }, availableCredits: { lte: 2_147_483_647 - input.amount } },
                     data: { availableCredits: { increment: input.amount }, reservedCredits: { decrement: input.amount } },
                 });
-                if (updated.count !== 1) throw new AppError("Reserved balance is inconsistent", 409);
+                if (updated.count !== 1) throw new AppError("Reserved balance is inconsistent or available balance would overflow", 409);
                 const reservation = await tx.creditReservation.update({
                     where: { id: existing.id },
                     data: { status: "ABORTED", settlementReason: "CREATION_ABORTED", settledAt: new Date() },
@@ -63,10 +63,10 @@ async function mutate(prisma: PrismaClient, input: ReservationInput, abort: bool
             } });
             insertingReservation = false;
             const updated = await tx.creditAccount.updateMany({
-                where: { id: account.id, availableCredits: { gte: input.amount } },
+                where: { id: account.id, availableCredits: { gte: input.amount }, reservedCredits: { lte: 2_147_483_647 - input.amount } },
                 data: { availableCredits: { decrement: input.amount }, reservedCredits: { increment: input.amount } },
             });
-            if (updated.count !== 1) throw new AppError("Insufficient available credits", 409);
+            if (updated.count !== 1) throw new AppError("Insufficient available credits or reserved balance would overflow", 409);
             await tx.creditTransaction.create({ data: {
                 accountId: account.id, reservationId: reservation.id, orderId: input.orderId,
                 type: "RESERVATION", amount: input.amount, availableDelta: -input.amount, reservedDelta: input.amount,
