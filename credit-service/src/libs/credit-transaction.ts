@@ -20,7 +20,7 @@ export async function creditTransaction<T>(prisma: PrismaClient, run: (tx: Prism
         try {
             return await prisma.$transaction(run, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         } catch (error) {
-            if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2034") {
+            if (!(error instanceof Prisma.PrismaClientKnownRequestError) || !["P2028", "P2034"].includes(error.code)) {
                 if (isTemporaryDatabaseError(error)) {
                     const unavailable = new AppError("Credit database temporarily unavailable", 503, "SERVICE_UNAVAILABLE");
                     unavailable.cause = error;
