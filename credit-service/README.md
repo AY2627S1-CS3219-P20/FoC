@@ -1,8 +1,8 @@
 # Credit service
 
-Groups 1 and 2 provide PostgreSQL/Prisma credit storage, an idempotent initial-grant function, and RabbitMQ delivery from the user-service transactional outbox. Current balances live in `CreditAccount`; an append-only `CreditTransaction` ledger records changes. This is not full event sourcing.
+Credit-service provides PostgreSQL/Prisma credit storage, an idempotent initial-grant function, and RabbitMQ delivery from the user-service transactional outbox. Current balances live in `CreditAccount`; an append-only `CreditTransaction` ledger records changes. This is not full event sourcing.
 
-Balance/history endpoints and frontend changes remain subsequent work. Reservation, transfer, release, refund, and order-consumer workflows (F4–F9) remain out of scope; their transaction types are reserved in the schema.
+Authenticated, student-only read APIs expose current balances and transaction history for the navbar and transaction-history UI. Reservation, transfer, release, refund, and order-consumer workflows are not implemented; their transaction types are reserved in the schema.
 
 ## Setup
 
@@ -35,7 +35,7 @@ npm run db:generate
 npm run build
 ```
 
-Start development with `npm run dev`, or run the compiled application with `npm start`. The registration consumer starts in the background after HTTP begins listening and reconnects during broker outages. `GET /credits` reports HTTP liveness, not broker connectivity or successful provisioning. No public grant, balance, or history endpoint is available yet.
+Start development with `npm run dev`, or run the compiled application with `npm start`. The registration consumer starts in the background after HTTP begins listening and reconnects during broker outages. `GET /credits` reports HTTP liveness, not broker connectivity or successful provisioning. Authenticated read endpoints are available under `/api/credits/me`; no public grant endpoint is exposed.
 
 ## RabbitMQ and service startup
 
@@ -95,7 +95,7 @@ Publishers use persistent messages, mandatory routing, and publisher confirms, w
 
 The consumer processes one delivery at a time (`prefetch: 1`). It acknowledges only after the grant function resolves, including duplicate-grant success. Transient database connection failures, timeouts, and transaction conflicts receive five delayed retries after the first attempt: up to six application processing attempts. `x-retry-count` starts at zero and increments on each scheduled retry. The 10-second TTL is a minimum waiting period; outages or backlog can delay delivery further.
 
-Malformed/unsupported events, invalid retry metadata, permanent failures (including `CREDIT_ACCOUNT_INCONSISTENT`), and retry exhaustion go to the dead-letter queue. Every application retry or dead-letter transfer must be confirmed before the original is acknowledged. Failed forwarding leaves the original unacknowledged and triggers reconnection. Reconnect backoff is capped at 60 seconds. Lost confirmations/acknowledgments can cause extra deliveries beyond the scheduled retry count; Group 1's idempotency prevents additional grants.
+Malformed/unsupported events, invalid retry metadata, permanent failures (including `CREDIT_ACCOUNT_INCONSISTENT`), and retry exhaustion go to the dead-letter queue. Every application retry or dead-letter transfer must be confirmed before the original is acknowledged. Failed forwarding leaves the original unacknowledged and triggers reconnection. Reconnect backoff is capped at 60 seconds. Lost confirmations/acknowledgments can cause extra deliveries beyond the scheduled retry count; The initial-grant function’s idempotency prevents additional grants.
 
 ## Inspecting and redriving dead letters
 
@@ -137,7 +137,7 @@ Database invariants:
 - Transaction `amount` is a positive integer; `availableDelta` and `reservedDelta` are signed integers.
 - `idempotencyKey` is unique across the ledger.
 - A SQL partial unique index permits at most one `INITIAL_ALLOCATION` per account.
-- A PostgreSQL trigger rejects ledger `UPDATE`, `DELETE`, and `TRUNCATE` statements. Corrections require new entries; no correction workflow is implemented in Group 1.
+- A PostgreSQL trigger rejects ledger `UPDATE`, `DELETE`, and `TRUNCATE` statements. Corrections require new entries; no correction workflow is implemented.
 - The local account foreign key uses `ON DELETE RESTRICT ON UPDATE RESTRICT`. Ledger records cannot be cascaded away with an account.
 
 Checks, the partial unique index, and the trigger/function are maintained in migration SQL. Preserve them when creating future migrations; Prisma schema declarations alone do not describe all these invariants. Use `npm run db:migrate -- --name <change_name>` only to author migrations against a development database, and review the generated SQL. Use the checked-in migrations for deployment rather than substituting `prisma db push`. `npm run db:reset` destroys database data and is not an upgrade procedure.
@@ -197,16 +197,225 @@ These statuses are error metadata, not a public HTTP grant API. A connection fai
 - Call the internal function only for newly verified students. It does not query user-service or verify role/verification state itself. Do not run it over all existing users as a migration or startup backfill.
 - User-service commits user creation and its provisioning outbox event together. Registration succeeds while credit provisioning is pending; an absent account must not be mistaken for a successfully provisioned zero balance.
 - Acknowledge delivery after the function resolves, including `created: false`. If acknowledgment is lost after commit, redelivery is safe. Retry transient database failures; route invalid IDs and `CREDIT_ACCOUNT_INCONSISTENT` failures for investigation rather than repeatedly granting or resetting credits.
-- Future balance/history endpoints must enforce student-only access; admins cannot read balances or history. Promotion to admin must preserve existing credit records.
+- Balance/history endpoints enforce student-only access; admins cannot read balances or history. Promotion to admin preserves existing credit records. Authorization uses the role in the verified JWT; these endpoints do not query user-service or revoke already-issued student tokens on promotion.
 - Future balance changes and their transaction entries must commit atomically. Display available and reserved balances separately: available credits are already spendable, so do not subtract reserved credits again.
 
-## History contract for subsequent groups
+## Credit read API contract
 
-Supported types are `INITIAL_ALLOCATION`, `RESERVATION`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, `RELEASE`, and `REFUND`. Only initial allocation has an implemented write workflow.
+Both endpoints require `Authorization: Bearer <access-token>`. Tokens must verify using RS256 and contain a UUID `userId`, a string `email`, and a recognized role. Only `STUDENT` is authorized; valid `ADMIN` tokens receive 403, including when an account exists from before promotion.
 
-History queries must scope to the student's account. The default order is `createdAt DESC, id DESC`; ascending timestamp sorting uses `createdAt ASC, id ASC`, with ID as the deterministic tie-breaker. Apply transaction-type filtering within the same account scope.
+The account is selected exclusively from the verified JWT user ID. There is no account/user ID route parameter or query parameter. Neither endpoint reads an identity from the request body. Send GET requests without bodies. Reads never create accounts, grant credits, or change the ledger.
 
-The schema includes indexes on `(accountId, createdAt DESC, id DESC)` and `(accountId, type, createdAt DESC, id DESC)` to support these queries. Indexes do not themselves establish a query's ordering; callers must specify it explicitly. History endpoints, pagination, and navbar display remain subsequent work.
+### Exact response types
+
+The following are the JSON wire types for frontend consumers. Backend response definitions live in `src/types/credit.types.ts`; the transaction-type values come from the Prisma enum.
+
+```ts
+type CreditTransactionType =
+  | "INITIAL_ALLOCATION"
+  | "RESERVATION"
+  | "TRANSFER_SENT"
+  | "TRANSFER_RECEIVED"
+  | "RELEASE"
+  | "REFUND";
+
+type ProvisioningResponse = {
+  success: true;
+  data: { status: "PROVISIONING" };
+};
+
+type BalanceReadyResponse = {
+  success: true;
+  data: {
+    status: "READY";
+    availableCredits: number;
+    reservedCredits: number;
+    updatedAt: string;
+  };
+};
+
+type CreditTransactionItem = {
+  id: string;
+  type: CreditTransactionType;
+  amount: number;
+  availableDelta: number;
+  reservedDelta: number;
+  createdAt: string;
+  orderId: string | null;
+};
+
+type TransactionsReadyResponse = {
+  success: true;
+  data: {
+    status: "READY";
+    items: CreditTransactionItem[];
+    nextCursor: string | null;
+  };
+};
+
+type BalanceResponse = BalanceReadyResponse | ProvisioningResponse;
+type TransactionsResponse = TransactionsReadyResponse | ProvisioningResponse;
+
+type CreditErrorResponse = {
+  success: false;
+  code: string;
+  message: string;
+};
+```
+
+READY responses use HTTP 200; PROVISIONING responses use HTTP 202. Errors use the error envelope without `data`. All fields shown in each response variant are required. IDs are UUID strings; timestamps are UTC ISO strings serialized with milliseconds and a trailing `Z`. Balances are non-negative integers, transaction amounts are positive integers, and deltas are signed integers. `orderId` is always present, including when `null`. Account IDs, user IDs, and idempotency keys are not returned as item fields.
+
+### Balance endpoint
+
+```http
+GET /api/credits/me/balance
+Authorization: Bearer <access-token>
+```
+
+This endpoint accepts no query parameters. A provisioned account returns HTTP 200:
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "READY",
+    "availableCredits": 50,
+    "reservedCredits": 0,
+    "updatedAt": "2026-10-12T00:00:00.000Z"
+  }
+}
+```
+
+Display available and reserved credits separately. Available credits are already spendable; do not subtract reserved credits again. Zero balances are valid READY values. `updatedAt` is the account's stored update time, not the request time.
+
+### Provisioning (both endpoints)
+
+When an account lookup succeeds but no account exists, either endpoint returns HTTP 202:
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "PROVISIONING"
+  }
+}
+```
+
+This response has no numeric balances, timestamps, items, or cursor. Treat it as pending, not as a zero balance or empty transaction history. Axios treats 202 as success: inspect `response.data.data.status` before reading READY fields. A database failure returns an error instead of this response.
+
+An absent legacy account also produces PROVISIONING; reads do not backfill it, and the response does not guarantee eventual provisioning. No polling interval or completion deadline is supplied by the API. Provide a refresh/retry action without treating repeated 202 responses as completed provisioning.
+
+### Transaction-history endpoint
+
+```http
+GET /api/credits/me/transactions?type=INITIAL_ALLOCATION&sort=desc&limit=20
+Authorization: Bearer <access-token>
+```
+
+| Query parameter | Accepted value | When omitted |
+| --- | --- | --- |
+| `type` | One exact, case-sensitive `CreditTransactionType` value | All types |
+| `sort` | `asc` or `desc` | `desc` |
+| `limit` | Digits representing an integer from 1 through 100 | `20` |
+| `cursor` | Nonempty opaque token returned by the API, at most 1,024 characters | First page |
+
+Unknown parameters, repeated parameters/arrays, empty values, invalid enum values, and invalid limits return 400. Limits containing signs, spaces, decimal points, or exponent notation are invalid. Do not send `type=ALL`, `cursor=null`, or empty strings to represent omission.
+
+History is restricted to the authenticated student's account, including when filtering. Only initial allocation has an implemented write workflow; the other enum values are supported filters for future workflows.
+
+HTTP 200 example with one transaction and no further page:
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "READY",
+    "items": [
+      {
+        "id": "f6cef655-f9a9-4819-bce9-71261870fab0",
+        "type": "INITIAL_ALLOCATION",
+        "amount": 50,
+        "availableDelta": 50,
+        "reservedDelta": 0,
+        "createdAt": "2026-10-12T00:00:00.000Z",
+        "orderId": null
+      }
+    ],
+    "nextCursor": null
+  }
+}
+```
+
+An existing account with no matching transactions returns HTTP 200:
+
+```json
+{
+  "success": true,
+  "data": { "status": "READY", "items": [], "nextCursor": null }
+}
+```
+
+`amount` is a positive magnitude; use `availableDelta` and `reservedDelta` when displaying signed changes to each balance.
+
+### Sorting and pagination
+
+The API explicitly orders by `createdAt DESC, id DESC` by default and `createdAt ASC, id ASC` for `sort=asc`. Preserve the returned order in the UI: PostgreSQL timestamps retain microseconds, which the serialized timestamps cannot fully represent. Transaction ID is the tie-breaker for equal stored timestamps.
+
+Each page contains at most `limit` items. `nextCursor` is a string only when a further row was found; it is `null` at the end. Cursors are scoped to the account, type filter (including no filter), and sort direction. They must refer to an existing transaction within that scope. Malformed or incompatible cursors return 400. Treat tokens as opaque; do not decode, edit, or construct them in the frontend. The server independently enforces account access regardless of cursor content.
+
+Keep type and sort unchanged between pages; changing either resets the list and cursor. Changing `limit` is allowed. Query syntax and cursor structure are validated before account lookup; account-dependent cursor checks occur only after an account is found. A structurally valid request for a missing account returns 202.
+
+Example consuming a first page and, when available, a second page using the service's Axios client:
+
+```ts
+// creditApi uses the credit-service origin as its baseURL and the existing
+// bearer-token/refresh interceptors. These paths include /api/credits.
+const params = { sort: "desc", limit: 20 } as const; // all transaction types
+const first = await creditApi.get<TransactionsResponse>(
+  "/api/credits/me/transactions", { params },
+);
+
+if (first.data.data.status === "READY") {
+  const items = [...first.data.data.items];
+  const cursor = first.data.data.nextCursor;
+  if (cursor !== null) {
+    const second = await creditApi.get<TransactionsResponse>(
+      "/api/credits/me/transactions",
+      { params: { ...params, cursor } }, // Axios URL-encodes the returned token
+    );
+    if (second.data.data.status === "READY") {
+      items.push(...second.data.data.items);
+      // Retain second.data.data.nextCursor for the next load-more action.
+    }
+  }
+  // Render items in their returned order; handle PROVISIONING separately.
+}
+```
+
+Pagination reads live data rather than a frozen snapshot. Newly inserted rows before the current cursor are seen by refreshing the first page; rows after it may appear on subsequent pages. Do not infer a total count from page length. Existing indexes on `(accountId, createdAt DESC, id DESC)` and `(accountId, type, createdAt DESC, id DESC)` support these reads; no new migration is required.
+
+### Errors and frontend handling
+
+| HTTP | `code` | `message` | Meaning |
+| --- | --- | --- | --- |
+| 400 | `BAD_REQUEST` | `Invalid query parameters` | Unsupported/invalid query fields, including empty or oversized cursor parameters |
+| 400 | `BAD_REQUEST` | `Invalid cursor` | Cursor decoding, schema, scope, or anchor validation failed |
+| 401 | `AUTHENTICATION_REQUIRED` | `Authentication required` | Missing/empty bearer authentication or unsupported authorization scheme |
+| 401 | `UNAUTHORIZED` | `Invalid token, please sign out and back in` | Invalid/expired token, signature, or required claims |
+| 403 | `FORBIDDEN` | `You do not have permission to access this resource` | Valid admin token cannot access credit reads |
+| 500 | `INTERNAL_SERVER_ERROR` | `An unexpected error occurred` | Unexpected failure, including database errors |
+
+Example HTTP 400:
+
+```json
+{
+  "success": false,
+  "code": "BAD_REQUEST",
+  "message": "Invalid cursor"
+}
+```
+
+Frontend consumers should hide credit UI for admins and use the existing authentication refresh handling for 401 responses. Do not treat 403 or 500 as provisioning, zero balance, or empty history. On a cursor error, offer a restart from the first page. The transaction-history UI should distinguish READY with no items, PROVISIONING, and request errors; discard stale page responses after the user changes filters or sort.
 
 ## Validation
 
@@ -216,4 +425,4 @@ npm run db:generate
 npm run build
 ```
 
-No automated tests were added for Groups 1 or 2. The current `npm test` script is a placeholder that exits with an error. Schema validation, compilation, and CLI help checks do not verify live migration execution, concurrent grants, broker failover, or redrive delivery guarantees.
+There are no checked-in automated credit-service tests. The current `npm test` script is a placeholder that exits with an error. Compilation and static review do not verify live database pagination, microsecond ordering, migration execution, concurrent grants, broker failover, or redrive delivery guarantees. The read API examples above describe the contract; they are not captured integration-test results.
