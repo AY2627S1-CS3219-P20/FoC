@@ -322,7 +322,7 @@ Authorization: Bearer <access-token>
 
 Unknown parameters, repeated parameters/arrays, empty values, invalid enum values, and invalid limits return 400. Limits containing signs, spaces, decimal points, or exponent notation are invalid. Do not send `type=ALL`, `cursor=null`, or empty strings to represent omission.
 
-History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. Transfer and lifecycle settlement remain future workflows.
+History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. F5 receipt transfers write `TRANSFER_SENT` and `TRANSFER_RECEIVED` rows. Cancellation/expiry/failure settlement remains pending.
 
 HTTP 200 example with one transaction and no further page:
 
@@ -434,7 +434,7 @@ CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_t
 
 The integration suite creates a randomly named schema, applies all checked-in migrations there, and drops only that schema afterward. The database role needs schema-creation permission. No integration URL means the database suite is skipped. Use a dedicated test database; do not point tests at production.
 
-Validated locally: schema/client generation, TypeScript build, three unit/HTTP-auth tests, and nine PostgreSQL subtests covering reservations, duplicate/concurrent requests, insufficient credits, rollback after injected ledger failure, abort races/tombstones, HTTP contracts, adapter connection failure, F1/F2/F3 regressions and existing SQL protections. Full Order creation/recovery, settlement, broker failure drills and browser E2E remain unverified.
+Validated locally: schema/client generation, TypeScript build, three unit/HTTP-auth tests, and nine PostgreSQL subtests covering reservations, duplicate/concurrent requests, insufficient credits, rollback after injected ledger failure, abort races/tombstones, HTTP contracts, adapter connection failure, F1/F2/F3 regressions and existing SQL protections. F5 validation is documented below. Full Order creation/recovery, F6/F7 settlement, broker restart drills and browser E2E remain unverified.
 
 ## Internal F4 reservation API
 
@@ -462,3 +462,96 @@ UUIDs are normalized to lowercase. Amounts must be positive integers at most 2,1
 Reservation, conditional balance update and ledger insertion commit together with Serializable isolation and at most three serialization/deadlock attempts. Reservation-insert uniqueness collisions are resolved after rollback and never authorize mismatched inputs. A reserve of 10 from 50 leaves 40 available and 10 reserved; reserve never provisions an account. Funded abort returns credits with one `RELEASE` row. Unfunded abort creates an `ABORTED` tombstone without an account or ledger row; delayed reserve returns that terminal state without holding funds.
 
 Order must persist the attempt and IDs before calling Credit, reuse them after timeouts, and finalize an order only after observing `RESERVED`. A terminal response is not permission to create an OPEN order. Only a durably fenced ABORTING creation attempt may invoke abort; do not use this endpoint for ordinary cancellation or release holds based on age/timeouts. That Order-side attempt/finalization/recovery workflow is still pending.
+
+## F5 receipt settlement
+
+Credit consumes only `ORDER_RECEIVED` v1 on `foc.events` / `order.received.v1`.
+`ORDER_COMPLETED` does not pay the courier. No browser-facing transfer endpoint exists.
+Order must authorize receipt and commit its guarded status transition and outbox event
+atomically; that Order producer and outbox publisher are still pending.
+
+Publish persistent JSON with publisher confirms and mandatory routing. `messageId`
+must equal the lowercase `eventId` (the original outbox UUID). Retries preserve it and
+all envelope fields:
+
+```json
+{
+  "eventId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6490",
+  "eventVersion": 1,
+  "eventType": "ORDER_RECEIVED",
+  "occurredAt": "2026-10-12T00:00:00.000Z",
+  "orderId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6482",
+  "orderVersion": 7,
+  "reservationId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6481",
+  "requesterId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6483",
+  "courierId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6484",
+  "amount": 10,
+  "orderName": "Lunch"
+}
+```
+
+All fields are required; extra fields are rejected. Maximum body size is 64 KiB.
+UUIDs are normalized to lowercase; amount is a positive PostgreSQL Int;
+orderVersion is an integer from 0 through 2,147,483,647; occurredAt is an ISO datetime
+with timezone; orderName is 1–255 characters. Requester and courier must differ.
+The complete validated envelope is stored to reject altered replays, including
+changes to orderVersion, occurredAt or orderName.
+
+A Serializable transaction checks the exact reservation's order/requester/amount,
+claims RESERVED → TRANSFERRED, deducts the stored amount from requester reserved
+credits, adds it to courier available credits, and writes both ledger rows. It
+stores RECEIVED, courier, event identity, envelope and settledAt together. Existing
+accounts are required; transfers never provision accounts. Insufficient reserved
+balance, account inconsistency, courier Int overflow, a reused event ID on another
+cycle, or a contradictory terminal outcome rolls back unchanged. Identical replay
+is a no-op. At most three local serialization/deadlock attempts run before delayed
+retry. Balances settle asynchronously after Order receipt.
+
+The separate durable quorum queues are `credit.order-settlement.v1`,
+`credit.order-settlement.retry.v1` and `credit.order-settlement.dead.v1`. Only the
+receipt route is bound for F5; registration topology is unchanged. The retry queue
+uses a 10-second TTL, reject-publish overflow and at-least-once dead-lettering back
+to the receipt route. Missing account/reservation or exhausted local serialization
+retries get at most five delayed retries (six processing attempts); malformed
+messages and conflicts go directly to the DLQ. Dead letters have no TTL. A database
+outage closes the consumer session and backs off from 1 to 60 seconds without
+incrementing the per-event retry count. Retry/DLQ forwarding requires confirmation
+and successful routing before acknowledging the original. The consumer starts
+alongside registration after HTTP listening, uses prefetch 1, and stops before
+Prisma disconnects. No additional environment variables or migration are needed.
+
+Inspect the DLQ, repair the underlying cause, then replay valid original events:
+
+```sh
+npm run redrive:settlement -- --limit 10
+```
+
+This bounded command preserves body and event/message identity, resets the retry
+count, increments the redrive count, and acknowledges the DLQ delivery only after
+confirmed routing. Invalid envelopes stop the run and remain queued. Contradictory
+terminal events need investigation; replay cannot overwrite a settled reservation.
+Never edit balances, replace event IDs, purge queues or delete broker volumes to
+recover held funds. Deployment still requires a private broker, dedicated virtual
+host, restricted publisher/consumer credentials and TLS.
+
+Optional broker integration checks run together with PostgreSQL tests:
+
+```sh
+CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_test" \
+CREDIT_TEST_RABBITMQ_URL="amqp://username:password@localhost:5672/isolated_test_vhost" \
+npm run test:integration
+```
+
+Use a fresh dedicated RabbitMQ vhost with topology permissions and no other
+consumers; the suite does not purge existing queues. Remove the test vhost after
+the run. PostgreSQL tests create/drop isolated schemas; existing application data
+and real credentials are untouched. Without test URLs, the corresponding checks
+are skipped.
+
+Validated locally: five envelope/forwarding/outage unit tests; nine F4 PostgreSQL
+subtests and nine F5 PostgreSQL/broker subtests. F5 covers conservation, immutable
+replay, missing-account recovery, concurrency, abort races, rollback after ledger
+failure, overflow and reserved-balance guards, F3 history, lost acknowledgment,
+real delayed retry, DLQ/redrive, mandatory unroutable publication, connection loss
+between commit and acknowledgment, and background-consumer shutdown. Broker restart,
+complete Order/browser workflows and deployed access control remain unverified.

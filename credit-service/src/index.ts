@@ -9,6 +9,7 @@ import creditRouter from "./routes/credit.route.js";
 import { prisma } from "./libs/prisma.js";
 import { startRegistrationConsumer } from "./services/registration-consumer.service.js";
 import { createInternalCreditRouter } from "./routes/internal-credit.route.js";
+import { startSettlementConsumer } from "./services/settlement-consumer.service.js";
 
 const app = express();
 
@@ -39,10 +40,14 @@ app.use(errorHandler);
 const PORT = config.port;
 
 let stopConsumer: (() => Promise<void>) | undefined;
+let stopSettlement: (() => Promise<void>) | undefined;
 let shuttingDown = false;
 const server = app.listen(PORT, () => {
     console.log(`Credit service is running at http://localhost:${PORT}`);
-    if (!shuttingDown) stopConsumer = startRegistrationConsumer(prisma);
+    if (!shuttingDown) {
+        stopConsumer = startRegistrationConsumer(prisma);
+        stopSettlement = startSettlementConsumer(prisma);
+    }
 });
 
 const shutdown = async () => {
@@ -53,6 +58,7 @@ const shutdown = async () => {
     try {
         await Promise.all([
             stopConsumer?.(),
+            stopSettlement?.(),
             new Promise<void>((resolve, reject) => {
                 server.close(error => error ? reject(error) : resolve());
             }),
