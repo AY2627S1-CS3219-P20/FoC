@@ -7,7 +7,9 @@ import {
     type PrismaClient,
 } from "../generated/prisma/client.js";
 import { AppError } from "../errors/errors.js";
-import type { BalanceResponse } from "../types/credit.types.js";
+import type { BalanceResponse, TransactionsResponse } from "../types/credit.types.js";
+import type { TransactionQuery } from "../schemas/credit.schema.js";
+import { decodeTransactionCursor, encodeTransactionCursor } from "../libs/credit-cursor.js";
 
 /** Read current balances without provisioning or changing the account. */
 export async function getCreditBalance(
@@ -26,6 +28,72 @@ export async function getCreditBalance(
         availableCredits: account.availableCredits,
         reservedCredits: account.reservedCredits,
         updatedAt: account.updatedAt.toISOString(),
+    };
+}
+
+/** Read an account-scoped ledger page; never provision an absent account. */
+export async function getCreditTransactions(
+    prisma: PrismaClient,
+    userId: string,
+    query: TransactionQuery,
+): Promise<TransactionsResponse["data"]> {
+    // Reject malformed tokens even when the account is not provisioned yet.
+    const cursor = query.cursor === undefined ? undefined : decodeTransactionCursor(query.cursor);
+    const account = await prisma.creditAccount.findUnique({
+        where: { userId },
+        select: { id: true },
+    });
+    if (!account) return { status: "PROVISIONING" };
+
+    const where: Prisma.CreditTransactionWhereInput = {
+        accountId: account.id,
+        ...(query.type === undefined ? {} : { type: query.type }),
+    };
+
+    if (cursor) {
+        if (cursor.accountId !== account.id || cursor.type !== (query.type ?? null) || cursor.sort !== query.sort) {
+            throw new AppError("Invalid cursor", 400);
+        }
+        const anchor = await prisma.creditTransaction.findFirst({
+            where: { ...where, id: cursor.transactionId },
+            select: { id: true },
+        });
+        if (!anchor) throw new AppError("Invalid cursor", 400);
+    }
+
+    const rows = await prisma.creditTransaction.findMany({
+        where,
+        orderBy: [{ createdAt: query.sort }, { id: query.sort }],
+        take: query.limit + 1,
+        // Prisma resolves the anchor's ordering values in PostgreSQL, preserving
+        // microseconds that would be lost by using a JavaScript Date boundary.
+        ...(cursor ? { cursor: { id: cursor.transactionId }, skip: 1 } : {}),
+        select: {
+            id: true,
+            type: true,
+            amount: true,
+            availableDelta: true,
+            reservedDelta: true,
+            createdAt: true,
+            orderId: true,
+        },
+    });
+    const page = rows.slice(0, query.limit);
+    const last = page.at(-1);
+    const nextCursor = rows.length > query.limit && last
+        ? encodeTransactionCursor({
+            version: 1,
+            accountId: account.id,
+            type: query.type ?? null,
+            sort: query.sort,
+            transactionId: last.id,
+        })
+        : null;
+
+    return {
+        status: "READY",
+        items: page.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })),
+        nextCursor,
     };
 }
 
