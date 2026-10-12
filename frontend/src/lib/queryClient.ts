@@ -1,5 +1,6 @@
 import { parseError } from "@/utils/errorHandler";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -15,7 +16,12 @@ const queryClient = new QueryClient({
         mutations: {
             retry: false,
         },
-    }
+    },
+    queryCache: new QueryCache({
+        onError: (error) => {
+            toast.error(error.message ? error.message : "An unexpected error occurred. Please try again later.");
+        },
+    }),
 });
 
 export default queryClient;
