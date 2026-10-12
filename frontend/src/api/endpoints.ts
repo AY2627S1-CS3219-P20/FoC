@@ -7,6 +7,7 @@ export const ENDPOINTS = {
 
     credit: {
         balance: `${BASE_CREDIT}/me/balance`,
+        transactions: `${BASE_CREDIT}/me/transactions`,
     },
 
     auth: {
