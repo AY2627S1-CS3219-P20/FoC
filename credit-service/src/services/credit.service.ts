@@ -7,6 +7,27 @@ import {
     type PrismaClient,
 } from "../generated/prisma/client.js";
 import { AppError } from "../errors/errors.js";
+import type { BalanceResponse } from "../types/credit.types.js";
+
+/** Read current balances without provisioning or changing the account. */
+export async function getCreditBalance(
+    prisma: PrismaClient,
+    userId: string,
+): Promise<BalanceResponse["data"]> {
+    const account = await prisma.creditAccount.findUnique({
+        where: { userId },
+        select: { availableCredits: true, reservedCredits: true, updatedAt: true },
+    });
+
+    if (!account) return { status: "PROVISIONING" };
+
+    return {
+        status: "READY",
+        availableCredits: account.availableCredits,
+        reservedCredits: account.reservedCredits,
+        updatedAt: account.updatedAt.toISOString(),
+    };
+}
 
 const INITIAL_CREDITS = 50;
 const userIdSchema = z.uuid().transform((value) => value.toLowerCase());
