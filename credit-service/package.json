@@ -7,7 +7,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --import tsx --test test/*.test.ts",
     "dev": "nodemon --exec tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
@@ -17,7 +17,9 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:deploy": "prisma migrate deploy",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "test:integration": "node --import tsx --test test/*.integration.ts",
+    "redrive:settlement": "node --import tsx src/scripts/redrive-settlement.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

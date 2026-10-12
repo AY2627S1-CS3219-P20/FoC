@@ -2,7 +2,7 @@
 
 Credit-service provides PostgreSQL/Prisma credit storage, an idempotent initial-grant function, and RabbitMQ delivery from the user-service transactional outbox. Current balances live in `CreditAccount`; an append-only `CreditTransaction` ledger records changes. This is not full event sourcing.
 
-Authenticated, student-only read APIs expose current balances and transaction history for the navbar and transaction-history UI. Reservation, transfer, release, refund, and order-consumer workflows are not implemented; their transaction types are reserved in the schema.
+Authenticated, student-only read APIs expose current balances and transaction history for the navbar and transaction-history UI. F4 reservation and creation-abort recovery APIs are implemented for trusted Order Service calls. Transfer, lifecycle release/refund, and order-settlement consumer workflows remain unimplemented.
 
 ## Setup
 
@@ -23,6 +23,7 @@ If `.env` does not already exist, copy `.env.example` to `.env`. Configure:
 | `RABBITMQ_URL` | AMQP connection URL; local default `amqp://foc:foc-local-only@localhost:5672?heartbeat=20`. |
 | `PORT` | HTTP port, for example `3003`. |
 | `FRONTEND_URL` | Allowed frontend origin, for example `http://localhost:5173`. |
+| `ORDER_CREDIT_SERVICE_TOKEN` | Shared secret for internal Order → Credit requests. Missing configuration denies all internal requests. |
 | `JWT_PUBLIC_KEY_PATH` | Path to the PEM public key matching user-service's RS256 signing key. Relative paths resolve from the process working directory. |
 
 The Prisma CLI needs `DATABASE_URL`. The application and shared Prisma-client module load the full application configuration; starting the HTTP server also reads the JWT public-key file. Keep credentials and key files out of Git.
@@ -321,7 +322,7 @@ Authorization: Bearer <access-token>
 
 Unknown parameters, repeated parameters/arrays, empty values, invalid enum values, and invalid limits return 400. Limits containing signs, spaces, decimal points, or exponent notation are invalid. Do not send `type=ALL`, `cursor=null`, or empty strings to represent omission.
 
-History is restricted to the authenticated student's account, including when filtering. Only initial allocation has an implemented write workflow; the other enum values are supported filters for future workflows.
+History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. Transfer and lifecycle settlement remain future workflows.
 
 HTTP 200 example with one transaction and no further page:
 
@@ -425,4 +426,39 @@ npm run db:generate
 npm run build
 ```
 
-There are no checked-in automated credit-service tests. The current `npm test` script is a placeholder that exits with an error. Compilation and static review do not verify live database pagination, microsecond ordering, migration execution, concurrent grants, broker failover, or redrive delivery guarantees. The read API examples above describe the contract; they are not captured integration-test results.
+Run input/authentication/retry tests with `npm test`. Run PostgreSQL integration tests with:
+
+```sh
+CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_test" npm run test:integration
+```
+
+The integration suite creates a randomly named schema, applies all checked-in migrations there, and drops only that schema afterward. The database role needs schema-creation permission. No integration URL means the database suite is skipped. Use a dedicated test database; do not point tests at production.
+
+Validated locally: schema/client generation, TypeScript build, three unit/HTTP-auth tests, and nine PostgreSQL subtests covering reservations, duplicate/concurrent requests, insufficient credits, rollback after injected ledger failure, abort races/tombstones, HTTP contracts, adapter connection failure, F1/F2/F3 regressions and existing SQL protections. Full Order creation/recovery, settlement, broker failure drills and browser E2E remain unverified.
+
+## Internal F4 reservation API
+
+These routes require `Authorization: Bearer <ORDER_CREDIT_SERVICE_TOKEN>`. Student JWTs do not authorize them. Keep `/internal/credits` off public ingress and use HTTPS between deployed services. The token is read from environment at request time; it is never returned or logged.
+
+| Method/path | Purpose |
+| --- | --- |
+| `POST /internal/credits/reservations` | Create a hold or return an identical retry's current state. |
+| `GET /internal/credits/reservations/:reservationId` | Recover committed state after a timeout. |
+| `POST /internal/credits/reservations/:reservationId/abort` | Return a creation hold or create an unfunded abort tombstone. |
+
+Both POST bodies contain exactly these immutable fields (abort's body ID must match the path):
+
+```json
+{
+  "reservationId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6481",
+  "orderId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6482",
+  "requesterId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6483",
+  "amount": 10
+}
+```
+
+UUIDs are normalized to lowercase. Amounts must be positive integers at most 2,147,483,647. Responses use `{ success: true, data: <reservation> }`; `data.id` is the supplied reservation ID, and `data.status` is the current committed lifecycle state. New reserve returns 201; identical retry, lookup and abort return 200. Errors use the existing `{ success: false, code, message }` envelope: invalid input 400, invalid/missing service token 401, absent account/reservation 404, insufficient credits/immutable mismatch/active-order conflict/invalid abort lifecycle 409, temporary database unavailability or exhausted serialization retries 503.
+
+Reservation, conditional balance update and ledger insertion commit together with Serializable isolation and at most three serialization/deadlock attempts. Reservation-insert uniqueness collisions are resolved after rollback and never authorize mismatched inputs. A reserve of 10 from 50 leaves 40 available and 10 reserved; reserve never provisions an account. Funded abort returns credits with one `RELEASE` row. Unfunded abort creates an `ABORTED` tombstone without an account or ledger row; delayed reserve returns that terminal state without holding funds.
+
+Order must persist the attempt and IDs before calling Credit, reuse them after timeouts, and finalize an order only after observing `RESERVED`. A terminal response is not permission to create an OPEN order. Only a durably fenced ABORTING creation attempt may invoke abort; do not use this endpoint for ordinary cancellation or release holds based on age/timeouts. That Order-side attempt/finalization/recovery workflow is still pending.
