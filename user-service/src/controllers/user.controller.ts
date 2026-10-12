@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { AppError } from "../errors/errors.js";
 import {
   changePasswordSchema,
@@ -23,6 +23,7 @@ import {
 import {
   changePassword as changePasswordService,
   getMyProfile as getMyProfileService,
+  getUserByIdService,
   listUsers as listUsersService,
   promoteUserToAdmin,
   updateMyProfile as updateMyProfileService,
@@ -237,5 +238,25 @@ export async function changePassword(
   return res.status(200).json({
     success: true,
     message: "Password changed successfully.",
+  });
+}
+
+export async function getUserById(req: Request, res: Response) {
+  const userId = req.params.userId;
+
+  if (typeof userId !== "string" || !userId) {
+    throw new AppError("User id is required", 400);
+  }
+
+  const user = await getUserByIdService(userId);
+
+  if (!user) {
+    throw new AppError("User not found", 404, "USER_NOT_FOUND");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "User fetched successfully",
+    data: user,
   });
 }

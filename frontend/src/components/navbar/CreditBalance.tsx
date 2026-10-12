@@ -2,7 +2,7 @@
 
 const CreditBalance = () => {
     return (
-        <div className="flex w-fit flex-col items-start justify-center pr-3">
+        <div className="flex w-fit flex-col items-start justify-center pr-3 shrink-0">
             <span className="text-sm font-semibold">
                 Available Credits{" "}
                 {/* {isLoading ? "—" : data?.availableCredits ?? 0} */}

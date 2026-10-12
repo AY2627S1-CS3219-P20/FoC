@@ -15,6 +15,8 @@ import {
     countAllActiveSuppliers,
     countAllSuppliers,
     getAllSupplierTypes,
+    getSupplierById,
+    getSuppliersByIds,
 } from "../controllers/supplier.controller.js";
 import { upload } from "../libs/upload.js";
 import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
@@ -54,5 +56,13 @@ supplierRouter.post("/upload-image", authorize(Role.ADMIN), upload.single("image
 supplierRouter.post("/create", authorize(Role.ADMIN), createSupplier);
 supplierRouter.patch("/:id", authorize(Role.ADMIN), updateSupplier);
 supplierRouter.patch("/:id/deactivate", authorize(Role.ADMIN), deactivateSupplierRoute);
+
+
+// ------------------- For order service ------------------- 
+// Get suppliers by a list of IDs
+supplierRouter.get("/by-ids", getSuppliersByIds);
+
+// Get supplier by id
+supplierRouter.get("/:supplierId", getSupplierById);
 
 export default supplierRouter;

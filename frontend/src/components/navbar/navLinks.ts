@@ -6,6 +6,7 @@ import {
     ClipboardListIcon,
     CoinsIcon,
     HouseIcon,
+    PackageIcon,
     ShapesIcon,
     UserIcon,
 } from "lucide-react";
@@ -23,9 +24,14 @@ export const studentNavLinks: NavLinkItem[] = [
         icon: HouseIcon,
     },
     {
-        label: "Activity",
-        href: ROUTES.ACTIVITY,
+        label: "Requester Activity",
+        href: ROUTES.REQUESTER_ACTIVITY,
         icon: ClipboardListIcon,
+    },
+    {
+        label: "Courier Activity",
+        href: ROUTES.COURIER_ACTIVITY,
+        icon: PackageIcon,
     },
     {
         label: "Suppliers",
