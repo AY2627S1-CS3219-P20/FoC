@@ -322,7 +322,7 @@ Authorization: Bearer <access-token>
 
 Unknown parameters, repeated parameters/arrays, empty values, invalid enum values, and invalid limits return 400. Limits containing signs, spaces, decimal points, or exponent notation are invalid. Do not send `type=ALL`, `cursor=null`, or empty strings to represent omission.
 
-History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. F5 receipt transfers write `TRANSFER_SENT` and `TRANSFER_RECEIVED` rows. Cancellation/expiry/failure settlement remains pending.
+History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. F5 receipt transfers write `TRANSFER_SENT` and `TRANSFER_RECEIVED` rows. F6 cancellation/expiry writes `RELEASE` rows. F7 failure settlement remains pending.
 
 HTTP 200 example with one transaction and no further page:
 
@@ -463,9 +463,10 @@ Reservation, conditional balance update and ledger insertion commit together wit
 
 Order must persist the attempt and IDs before calling Credit, reuse them after timeouts, and finalize an order only after observing `RESERVED`. A terminal response is not permission to create an OPEN order. Only a durably fenced ABORTING creation attempt may invoke abort; do not use this endpoint for ordinary cancellation or release holds based on age/timeouts. That Order-side attempt/finalization/recovery workflow is still pending.
 
-## F5 receipt settlement
+## F5 receipt and F6 cancellation/expiry settlement
 
-Credit consumes only `ORDER_RECEIVED` v1 on `foc.events` / `order.received.v1`.
+Credit consumes `ORDER_RECEIVED`, `ORDER_CANCELED` and `ORDER_EXPIRED` v1 on
+`foc.events` / `order.received.v1`, `order.canceled.v1` and `order.expired.v1`, respectively.
 `ORDER_COMPLETED` does not pay the courier. No browser-facing transfer endpoint exists.
 Order must authorize receipt and commit its guarded status transition and outbox event
 atomically; that Order producer and outbox publisher are still pending.
@@ -490,7 +491,8 @@ all envelope fields:
 }
 ```
 
-All fields are required; extra fields are rejected. Maximum body size is 64 KiB.
+All fields are required for receipt; cancellation/expiry use the same envelope with
+their eventType and **omit courierId**. Extra fields are rejected. Maximum body size is 64 KiB.
 UUIDs are normalized to lowercase; amount is a positive PostgreSQL Int;
 orderVersion is an integer from 0 through 2,147,483,647; occurredAt is an ISO datetime
 with timezone; orderName is 1–255 characters. Requester and courier must differ.
@@ -507,11 +509,29 @@ cycle, or a contradictory terminal outcome rolls back unchanged. Identical repla
 is a no-op. At most three local serialization/deadlock attempts run before delayed
 retry. Balances settle asynchronously after Order receipt.
 
+F6 claims RESERVED → RELEASED, returns the stored amount from requester reserved
+credits to available credits, and appends one `RELEASE` row with deltas +amount/−amount.
+CANCELED/EXPIRED reason, event identity, full envelope and settledAt commit in the
+same transaction. Available balance overflow or an inconsistent reserved balance
+rolls back. No courier account is required. Identical full-envelope replay is a
+no-op; altered replay, receipt after release, or release after transfer/abort conflicts.
+An old expiry targets only its reservation ID, so it cannot return a renewed hold.
+F7 `ORDER_FAILED` remains unsupported.
+
+Order must authorize cancellation or expiry and atomically guard OPEN → CANCELED/EXPIRED
+with its version, status history and outbox event. Those producers are still pending;
+this Credit implementation does not complete Order's lifecycle workflow. Cancellation
+and expiry do not promise immediate credit availability while delivery is pending.
+
 The separate durable quorum queues are `credit.order-settlement.v1`,
-`credit.order-settlement.retry.v1` and `credit.order-settlement.dead.v1`. Only the
-receipt route is bound for F5; registration topology is unchanged. The retry queue
+`credit.order-settlement.retry.v1` and `credit.order-settlement.dead.v1`. All three
+F5/F6 routes are bound; registration topology is unchanged. The retry queue
 uses a 10-second TTL, reject-publish overflow and at-least-once dead-lettering back
-to the receipt route. Missing account/reservation or exhausted local serialization
+to the existing receipt route. Confirmed retry forwarding preserves the event's
+original route in `x-settlement-routing-key`; the consumer validates that header
+against eventType for delayed retries. This keeps existing durable queue arguments
+compatible without queue deletion. Redrive publishes on the event's own route.
+Missing account/reservation or exhausted local serialization
 retries get at most five delayed retries (six processing attempts); malformed
 messages and conflicts go directly to the DLQ. Dead letters have no TTL. A database
 outage closes the consumer session and backs off from 1 to 60 seconds without
@@ -528,7 +548,8 @@ npm run redrive:settlement -- --limit 10
 
 This bounded command preserves body and event/message identity, resets the retry
 count, increments the redrive count, and acknowledges the DLQ delivery only after
-confirmed routing. Invalid envelopes stop the run and remain queued. Contradictory
+confirmed routing. It closes the channel before the connection to flush DLQ
+acknowledgments. Invalid envelopes stop the run and remain queued. Contradictory
 terminal events need investigation; replay cannot overwrite a settled reservation.
 Never edit balances, replace event IDs, purge queues or delete broker volumes to
 recover held funds. Deployment still requires a private broker, dedicated virtual
@@ -548,10 +569,20 @@ the run. PostgreSQL tests create/drop isolated schemas; existing application dat
 and real credentials are untouched. Without test URLs, the corresponding checks
 are skipped.
 
-Validated locally: five envelope/forwarding/outage unit tests; nine F4 PostgreSQL
+Prior F5 validation: nine F4 PostgreSQL
 subtests and nine F5 PostgreSQL/broker subtests. F5 covers conservation, immutable
 replay, missing-account recovery, concurrency, abort races, rollback after ledger
 failure, overflow and reserved-balance guards, F3 history, lost acknowledgment,
 real delayed retry, DLQ/redrive, mandatory unroutable publication, connection loss
 between commit and acknowledgment, and background-consumer shutdown. Broker restart,
 complete Order/browser workflows and deployed access control remain unverified.
+
+F6 coverage extends the same isolated suite with cancellation/expiry ledger and F3
+history checks, full-envelope replay conflicts, cross-cycle event ID reuse, balance
+bounds, injected ledger rollback, concurrent receive/cancel/expire/abort, renewal
+fencing, lost acknowledgment, and real F6 routing/retry/DLQ/redrive. No migration or
+new dependency is required.
+
+F6 validation: TypeScript build and five unit tests passed. The full isolated
+PostgreSQL/RabbitMQ suite passed all 25 tests with no skips (23 subtests plus two
+parent tests); temporary database/role and broker vhost were removed after the run.

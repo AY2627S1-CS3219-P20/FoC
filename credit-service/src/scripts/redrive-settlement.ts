@@ -38,7 +38,7 @@ async function redrive(limit: number): Promise<void> {
             await publishConfirmed(
                 channel,
                 SETTLEMENT_MESSAGING.exchange,
-                SETTLEMENT_MESSAGING.routingKey,
+                SETTLEMENT_MESSAGING.routingKeys[event.data.eventType],
                 message.content, // Preserve exact event bytes, including occurredAt.
                 {
                     messageId: message.properties.messageId,
@@ -65,7 +65,9 @@ async function redrive(limit: number): Promise<void> {
         console.info("Settlement redrive", { outcome: "complete", forwarded });
     } finally {
         // Failure or interruption before ack leaves the original available for
-        // redelivery. A lost ack can duplicate an event, never another transfer.
+        // redelivery. A lost ack can duplicate an event, never another balance mutation.
+        // Flush acknowledgments on this channel before closing the connection.
+        await channel.close().catch(() => undefined);
         await connection.close().catch(() => undefined);
     }
 }

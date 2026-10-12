@@ -9,7 +9,7 @@ import { reserveCredits, abortReservation, getReservation } from "../src/service
 import { grantInitialCredits, getCreditTransactions } from "../src/services/credit.service.js";
 import { AppError } from "../src/errors/errors.js";
 
-import { transferCredits } from "../src/services/settlement.service.js";
+import { releaseCredits, transferCredits } from "../src/services/settlement.service.js";
 import { processSettlementMessage, startSettlementConsumer } from "../src/services/settlement-consumer.service.js";
 import { connectSettlementMessaging, publishConfirmed, SETTLEMENT_MESSAGING, REGISTRATION_MESSAGING, declareRegistrationTopology } from "../src/libs/rabbitmq.js";
 import { setTimeout as delay } from "node:timers/promises";
@@ -17,7 +17,7 @@ import { spawn } from "node:child_process";
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
 
 const connectionString = process.env.CREDIT_TEST_DATABASE_URL;
-test("F5 PostgreSQL transfers, races, rollback and history", { skip: !connectionString }, async t => {
+test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connectionString }, async t => {
     const schema = `f5_test_${randomUUID().replaceAll("-", "")}`;
     const admin = new pg.Client({ connectionString });
     await admin.connect();
@@ -128,11 +128,89 @@ test("F5 PostgreSQL transfers, races, rollback and history", { skip: !connection
             assert.equal(acked, true); assert.deepEqual(await balances(event.requesterId, event.courierId), [40, 0, 60, 0]);
             assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), 3);
         });
+        function releaseEvent(event: Awaited<ReturnType<typeof held>>["event"], eventType = "ORDER_CANCELED") {
+            const { courierId, ...base } = event;
+            return { ...base, eventType };
+        }
+        await t.test("cancel and expire restore once, retain reason and expose RELEASE through F3", async () => {
+            for (const eventType of ["ORDER_CANCELED", "ORDER_EXPIRED"]) {
+                const { event } = await held(); const release = releaseEvent(event, eventType);
+                const result = await releaseCredits(prisma, release);
+                assert.equal(result.released, true); assert.equal(result.reservation.status, "RELEASED");
+                assert.equal(result.reservation.settlementReason, eventType === "ORDER_CANCELED" ? "CANCELED" : "EXPIRED");
+                assert.equal(result.reservation.settlementEventId, event.eventId); assert.ok(result.reservation.settledAt);
+                assert.equal((await releaseCredits(prisma, { ...release, requesterId: release.requesterId.toUpperCase() })).released, false);
+                assert.deepEqual(await balances(event.requesterId, event.courierId), [50, 0, 50, 0]);
+                const history = await getCreditTransactions(prisma, event.requesterId, { type: "RELEASE", limit: 20, sort: "desc" });
+                assert.ok(history.status === "READY"); assert.equal(history.items.length, 1);
+                assert.deepEqual([history.items[0]?.amount, history.items[0]?.availableDelta, history.items[0]?.reservedDelta], [10, 10, -10]);
+                assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), 2);
+                for (const change of [{ eventId: randomUUID() }, { eventType: eventType === "ORDER_CANCELED" ? "ORDER_EXPIRED" : "ORDER_CANCELED" }, { orderVersion: 8 }, { orderName: "Dinner" }, { occurredAt: "2026-10-01T00:00:00.000Z" }]) {
+                    await assert.rejects(releaseCredits(prisma, { ...release, ...change }), errorStatus(409));
+                }
+                await assert.rejects(transferCredits(prisma, event), errorStatus(409));
+                await assert.rejects(abortReservation(prisma, { reservationId: event.reservationId, orderId: event.orderId, requesterId: event.requesterId, amount: event.amount }), errorStatus(409));
+            }
+        });
+        await t.test("release validates exact cycle, balances and globally unique event identity", async () => {
+            const first = await held(); const release = releaseEvent(first.event);
+            for (const change of [{ amount: 11 }, { orderId: randomUUID() }, { requesterId: randomUUID() }]) {
+                await assert.rejects(releaseCredits(prisma, { ...release, ...change }), errorStatus(409));
+            }
+            await assert.rejects(releaseCredits(prisma, { ...release, reservationId: randomUUID() }), errorStatus(404));
+            await releaseCredits(prisma, release);
+            const second = await held();
+            await assert.rejects(releaseCredits(prisma, { ...releaseEvent(second.event), eventId: release.eventId }), errorStatus(409));
+            await prisma.creditAccount.update({ where: { userId: second.event.requesterId }, data: { availableCredits: 2_147_483_647 } });
+            await assert.rejects(releaseCredits(prisma, releaseEvent(second.event)), errorStatus(409));
+            assert.equal((await getReservation(prisma, second.event.reservationId)).status, "RESERVED");
+            const short = await held(); await prisma.creditAccount.update({ where: { userId: short.event.requesterId }, data: { reservedCredits: 0 } });
+            await assert.rejects(releaseCredits(prisma, releaseEvent(short.event)), errorStatus(409));
+            assert.equal((await getReservation(prisma, short.event.reservationId)).status, "RESERVED");
+            const transferred = await held(); await transferCredits(prisma, transferred.event);
+            await reserveCredits(prisma, { ...transferred.request, reservationId: randomUUID(), orderId: randomUUID() });
+            await assert.rejects(releaseCredits(prisma, releaseEvent(transferred.event)), errorStatus(409));
+            assert.deepEqual(await balances(transferred.event.requesterId, transferred.event.courierId), [30, 10, 60, 0]);
+        });
+        await t.test("release ledger failure rolls back balances and terminal identity", async () => {
+            const { event } = await held();
+            await admin.query(`CREATE FUNCTION fail_release_ledger() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."type" = 'RELEASE' THEN RAISE EXCEPTION 'injected release failure'; END IF; RETURN NEW; END $$`);
+            await admin.query(`CREATE TRIGGER fail_release_ledger BEFORE INSERT ON "CreditTransaction" FOR EACH ROW EXECUTE FUNCTION fail_release_ledger()`);
+            try { await assert.rejects(releaseCredits(prisma, releaseEvent(event)), /injected release failure/); }
+            finally { await admin.query(`DROP TRIGGER fail_release_ledger ON "CreditTransaction"`); }
+            const reservation = await getReservation(prisma, event.reservationId);
+            assert.equal(reservation.status, "RESERVED"); assert.equal(reservation.settlementEventId, null);
+            assert.deepEqual(await balances(event.requesterId, event.courierId), [40, 10, 50, 0]);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), 1);
+        });
+        await t.test("duplicate release and competing receive/cancel/expire/abort have one winner", async () => {
+            const duplicate = await held();
+            const repeats = await Promise.all(Array.from({ length: 3 }, () => releaseCredits(prisma, releaseEvent(duplicate.event))));
+            assert.equal(repeats.filter(result => result.released).length, 1);
+            for (let i = 0; i < 5; i++) {
+                const { event, request } = await held();
+                const results = await Promise.allSettled([transferCredits(prisma, event), releaseCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() })), releaseCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() }, "ORDER_EXPIRED")), abortReservation(prisma, request)]);
+                assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+                const reservation = await getReservation(prisma, event.reservationId);
+                assert.deepEqual(await balances(event.requesterId, event.courierId), reservation.status === "TRANSFERRED" ? [40, 0, 60, 0] : [50, 0, 50, 0]);
+                assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), reservation.status === "TRANSFERRED" ? 3 : 2);
+            }
+        });
+        await t.test("old expiry cannot release renewed cycle; commit before lost ack is safe", async () => {
+            const { event, request } = await held(); const expiry = releaseEvent(event, "ORDER_EXPIRED");
+            const delivery = { content: Buffer.from(JSON.stringify(expiry)), fields: { routingKey: SETTLEMENT_MESSAGING.routingKeys.ORDER_EXPIRED }, properties: { messageId: expiry.eventId } } as ConsumeMessage;
+            await assert.rejects(processSettlementMessage(prisma, { ack: () => { throw new Error("ack lost"); } } as unknown as ConfirmChannel, delivery), /ack lost/);
+            const renewed = { ...request, reservationId: randomUUID() }; await reserveCredits(prisma, renewed);
+            let acked = false; await processSettlementMessage(prisma, { ack: () => { acked = true; } } as unknown as ConfirmChannel, delivery);
+            assert.equal(acked, true); assert.equal((await getReservation(prisma, renewed.reservationId)).status, "RESERVED");
+            assert.deepEqual(await balances(event.requesterId, event.courierId), [40, 10, 50, 0]);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId, type: "RELEASE" } }), 1);
+        });
         await t.test("real broker routing, delayed retry, DLQ, redrive and background consumer", { skip: !process.env.CREDIT_TEST_RABBITMQ_URL }, async () => {
             const previous = process.env.RABBITMQ_URL; process.env.RABBITMQ_URL = process.env.CREDIT_TEST_RABBITMQ_URL;
             const { connection, channel } = await connectSettlementMessaging();
             async function get(queue: string) {
-                const deadline = Date.now() + 15_000;
+                const deadline = Date.now() + 45_000;
                 while (Date.now() < deadline) { const message = await channel.get(queue, { noAck: false }); if (message) return message; await delay(100); }
                 throw new Error(`Timed out waiting for ${queue}`);
             }
@@ -156,11 +234,13 @@ test("F5 PostgreSQL transfers, races, rollback and history", { skip: !connection
                 await publishConfirmed(channel, SETTLEMENT_MESSAGING.exchange, SETTLEMENT_MESSAGING.routingKey, Buffer.from(JSON.stringify(contradictory)), { messageId: contradictory.eventId });
                 await processSettlementMessage(prisma, channel, await get(SETTLEMENT_MESSAGING.queue));
                 const dead = await get(SETTLEMENT_MESSAGING.deadQueue); assert.equal(dead.properties.headers?.["x-credit-failure"], "CONFLICT"); channel.ack(dead);
+                await channel.checkQueue(SETTLEMENT_MESSAGING.deadQueue);
                 const recover = await held(); recover.event.courierId = randomUUID(); const recoverBody = Buffer.from(JSON.stringify(recover.event));
                 await publishConfirmed(channel, "", SETTLEMENT_MESSAGING.deadQueue, recoverBody, { messageId: recover.event.eventId, headers: { "x-retry-count": 5 } });
                 await grantInitialCredits(prisma, recover.event.courierId);
                 const child = spawn(process.execPath, ["--import", "tsx", "src/scripts/redrive-settlement.ts", "--limit", "1"], { cwd: new URL("../", import.meta.url), env: process.env, stdio: "pipe" });
-                const exitCode = await new Promise<number | null>((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); }); assert.equal(exitCode, 0);
+                let redriveOutput = ""; child.stdout.on("data", data => { redriveOutput += data.toString(); });
+                const exitCode = await new Promise<number | null>((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); }); assert.equal(exitCode, 0); assert.match(redriveOutput, /forwarded: 1/);
                 const redriven = await get(SETTLEMENT_MESSAGING.queue); assert.equal(redriven.content.toString(), recoverBody.toString()); assert.equal(redriven.properties.headers?.["x-retry-count"], 0);
                 await processSettlementMessage(prisma, channel, redriven);
                 // Real connection loss after commit returns the unacknowledged delivery.
@@ -174,6 +254,37 @@ test("F5 PostgreSQL transfers, races, rollback and history", { skip: !connection
                 await processSettlementMessage(prisma, channel, replay);
                 assert.deepEqual(await balances(lost.event.requesterId, lost.event.courierId), [40, 0, 60, 0]);
                 assert.equal(await prisma.creditTransaction.count({ where: { reservationId: lost.event.reservationId } }), 3);
+                for (const eventType of ["ORDER_CANCELED", "ORDER_EXPIRED"] as const) {
+                    const { event } = await held(); const release = releaseEvent(event, eventType);
+                    const releaseBody = Buffer.from(JSON.stringify(release)); const route = SETTLEMENT_MESSAGING.routingKeys[eventType];
+                    await publishConfirmed(channel, SETTLEMENT_MESSAGING.exchange, route, releaseBody, { messageId: release.eventId });
+                    const delivery = await get(SETTLEMENT_MESSAGING.queue); assert.equal(delivery.fields.routingKey, route);
+                    assert.equal(await channel.get(REGISTRATION_MESSAGING.queue, { noAck: false }), false);
+                    await processSettlementMessage(prisma, channel, delivery);
+                    assert.deepEqual(await balances(event.requesterId, event.courierId), [50, 0, 50, 0]);
+                    const recovering = await held(); const delayedRequest = { ...recovering.request, reservationId: randomUUID(), orderId: randomUUID() };
+                    const delayed = { ...releaseEvent(recovering.event, eventType), ...delayedRequest, eventId: randomUUID() };
+                    const delayedBody = Buffer.from(JSON.stringify(delayed));
+                    await publishConfirmed(channel, SETTLEMENT_MESSAGING.exchange, route, delayedBody, { messageId: delayed.eventId });
+                    await processSettlementMessage(prisma, channel, await get(SETTLEMENT_MESSAGING.queue));
+                    const retry = await get(SETTLEMENT_MESSAGING.queue);
+                    assert.equal(retry.properties.headers?.["x-settlement-routing-key"], route);
+                    assert.equal(retry.content.toString(), delayedBody.toString());
+                    await reserveCredits(prisma, delayedRequest); await processSettlementMessage(prisma, channel, retry);
+                    assert.equal((await getReservation(prisma, delayed.reservationId)).status, "RELEASED");
+                    await publishConfirmed(channel, SETTLEMENT_MESSAGING.exchange, route, Buffer.from(JSON.stringify({ ...delayed, eventId: randomUUID() })), { messageId: randomUUID() });
+                    await processSettlementMessage(prisma, channel, await get(SETTLEMENT_MESSAGING.queue));
+                    const invalid = await get(SETTLEMENT_MESSAGING.deadQueue); assert.equal(invalid.properties.headers?.["x-credit-failure"], "INVALID_EVENT", JSON.stringify({ headers: invalid.properties.headers, body: invalid.content.toString() })); channel.ack(invalid);
+                    await channel.checkQueue(SETTLEMENT_MESSAGING.deadQueue);
+                    const recover = await held(); const redriveEvent = releaseEvent(recover.event, eventType); const redriveBody = Buffer.from(JSON.stringify(redriveEvent));
+                    await publishConfirmed(channel, "", SETTLEMENT_MESSAGING.deadQueue, redriveBody, { messageId: redriveEvent.eventId, headers: { "x-retry-count": 5 } });
+                    const child = spawn(process.execPath, ["--import", "tsx", "src/scripts/redrive-settlement.ts", "--limit", "1"], { cwd: new URL("../", import.meta.url), env: process.env, stdio: "pipe" });
+                    let redriveOutput = ""; child.stdout.on("data", data => { redriveOutput += data.toString(); });
+                    const code = await new Promise<number | null>((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); }); assert.equal(code, 0); assert.match(redriveOutput, /forwarded: 1/);
+                    const redriven = await get(SETTLEMENT_MESSAGING.queue); assert.equal(redriven.fields.routingKey, route); assert.equal(redriven.content.toString(), redriveBody.toString());
+                    await processSettlementMessage(prisma, channel, redriven);
+                    assert.equal((await getReservation(prisma, redriveEvent.reservationId)).status, "RELEASED");
+                }
                 const unroutable = await connectSettlementMessaging();
                 try {
                     await assert.rejects(publishConfirmed(unroutable.channel, SETTLEMENT_MESSAGING.exchange, "order.unroutable.v1", body, { messageId: event.eventId }), /unroutable/);

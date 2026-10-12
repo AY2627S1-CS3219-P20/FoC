@@ -87,6 +87,11 @@ async function connectMessaging(declareTopology: (channel: Channel) => Promise<v
 export const SETTLEMENT_MESSAGING = {
   exchange: "foc.events",
   routingKey: "order.received.v1",
+  routingKeys: {
+    ORDER_RECEIVED: "order.received.v1",
+    ORDER_CANCELED: "order.canceled.v1",
+    ORDER_EXPIRED: "order.expired.v1",
+  },
   queue: "credit.order-settlement.v1",
   retryQueue: "credit.order-settlement.retry.v1",
   deadQueue: "credit.order-settlement.dead.v1",
@@ -100,7 +105,9 @@ export async function declareSettlementTopology(channel: Channel): Promise<void>
   } };
   await channel.assertExchange(topology.exchange, "topic", { durable: true, autoDelete: false });
   await channel.assertQueue(topology.queue, options);
-  await channel.bindQueue(topology.queue, topology.exchange, topology.routingKey);
+  for (const routingKey of Object.values(topology.routingKeys)) {
+    await channel.bindQueue(topology.queue, topology.exchange, routingKey);
+  }
   await channel.assertQueue(topology.deadQueue, options);
   await channel.assertQueue(topology.retryQueue, { ...options, arguments: {
     ...options.arguments,

@@ -3,8 +3,9 @@ import type { ConsumeMessage, ConfirmChannel } from "amqplib";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { isTemporaryDatabaseError } from "../libs/credit-transaction.js";
 import { AppError } from "../errors/errors.js";
+import { reservationIdSchema } from "../schemas/reservation.schema.js";
 import { MAX_SETTLEMENT_BYTES, settlementEventSchema } from "../schemas/settlement-event.schema.js";
-import { transferCredits } from "./settlement.service.js";
+import { releaseCredits, transferCredits } from "./settlement.service.js";
 import {
     connectSettlementMessaging,
     publishConfirmed,
@@ -35,9 +36,9 @@ export async function processSettlementMessage(
         && Number.isInteger(retryCount) && retryCount >= 0 && retryCount <= MAX_RETRIES;
     // Log only individually validated identifiers, never raw malformed payloads.
     const fields = record(payload);
-    const eventId = settlementEventSchema.shape.eventId.safeParse(fields.eventId);
-    const reservationId = settlementEventSchema.shape.reservationId.safeParse(fields.reservationId);
-    const orderId = settlementEventSchema.shape.orderId.safeParse(fields.orderId);
+    const eventId = reservationIdSchema.safeParse(fields.eventId);
+    const reservationId = reservationIdSchema.safeParse(fields.reservationId);
+    const orderId = reservationIdSchema.safeParse(fields.orderId);
     const startedAt = Date.now();
     const context = {
         eventId: eventId.success ? eventId.data : null,
@@ -57,6 +58,7 @@ export async function processSettlementMessage(
                     ...message.properties.headers,
                     ...(nextRetry === null ? {} : { "x-retry-count": nextRetry }),
                     "x-credit-failure": reason,
+                    "x-settlement-routing-key": parsed.success ? SETTLEMENT_MESSAGING.routingKeys[parsed.data.eventType] : message.fields.routingKey,
                 },
             });
             channel.ack(message);
@@ -71,8 +73,13 @@ export async function processSettlementMessage(
         }
     }
 
+    // The existing retry queue dead-letters on the receipt route; retain the
+    // original event route in metadata without replacing a durable queue.
+    const routingKey = validRetry && retryCount > 0 && message.fields.routingKey === SETTLEMENT_MESSAGING.routingKey
+        ? message.properties.headers?.["x-settlement-routing-key"] ?? message.fields.routingKey
+        : message.fields.routingKey;
     if (!parsed.success || message.properties.messageId !== parsed.data.eventId
-        || message.fields.routingKey !== SETTLEMENT_MESSAGING.routingKey) {
+        || routingKey !== SETTLEMENT_MESSAGING.routingKeys[parsed.data.eventType]) {
         await forward(SETTLEMENT_MESSAGING.deadQueue, "INVALID_EVENT", null);
         return;
     }
@@ -81,9 +88,11 @@ export async function processSettlementMessage(
         return;
     }
 
-    let transferred: boolean;
+    let applied: boolean;
     try {
-        ({ transferred } = await transferCredits(prisma, parsed.data));
+        applied = parsed.data.eventType === "ORDER_RECEIVED"
+            ? (await transferCredits(prisma, parsed.data)).transferred
+            : (await releaseCredits(prisma, parsed.data)).released;
     } catch (error) {
         // Close/reconnect on outages without spending per-event retry budgets.
         if (error instanceof AppError && error.statusCode === 503 && isTemporaryDatabaseError(error.cause)) {
@@ -102,7 +111,7 @@ export async function processSettlementMessage(
     }
     // Ack is outside the transaction catch: redelivery after commit is a no-op.
     channel.ack(message);
-    console.info("Settlement consumer", { ...context, outcome: transferred ? "transferred" : "already_transferred", durationMs: Date.now() - startedAt });
+    console.info("Settlement consumer", { ...context, outcome: applied ? (parsed.data.eventType === "ORDER_RECEIVED" ? "transferred" : "released") : "already_settled", durationMs: Date.now() - startedAt });
 }
 
 /** One in-flight delivery; HTTP startup does not await broker availability. */
