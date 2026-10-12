@@ -1,8 +1,13 @@
 const BASE_AUTH = "/auth";
 const BASE_USER = "/users";
 const BASE_SUPPLIER = "/supplier";
+const BASE_CREDIT = "/credits";
 
 export const ENDPOINTS = {
+
+    credit: {
+        balance: `${BASE_CREDIT}/me/balance`,
+    },
 
     auth: {
         login: `${BASE_AUTH}/login`,
