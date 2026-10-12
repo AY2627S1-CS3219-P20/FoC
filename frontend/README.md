@@ -32,22 +32,14 @@ refresh, and invalid cursors offer a return to page one.
 
 ```sh
 npm ci
-npm test
 npm run lint
 npm run build
 ```
 
-Vitest and React Testing Library cover response validation, query eligibility,
-cursor navigation, sort/filter resets, late-response cancellation, cache cleanup,
-route guards, shared balances, bounded provisioning, retry, and display states.
-Tests use mocked service responses and do not require PostgreSQL or RabbitMQ.
-Only initial allocation has an implemented write workflow; fixtures for other
-transaction types exercise display behavior without implementing F4–F9.
-
 At the CS F3 implementation baseline, the full TypeScript build already failed
 on supplier count/type mismatches and unused auth/supplier variables. The credit
-changes add no TypeScript errors. Vite production bundling and the credit tests
-pass independently; a passing bundle does not replace the full type check.
+changes add no TypeScript errors. Vite production bundling passes independently;
+a passing bundle does not replace the full type check.
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

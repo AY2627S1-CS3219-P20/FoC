@@ -61,12 +61,7 @@ export const getCreditTransactionsService = async (
     signal?: AbortSignal,
 ): Promise<CreditTransactions> => {
     const response = await creditApi.get<unknown>(ENDPOINTS.credit.transactions, {
-        params: {
-            sort: params.sort,
-            limit: params.limit,
-            ...(params.type === undefined ? {} : { type: params.type }),
-            ...(params.cursor === undefined ? {} : { cursor: params.cursor }),
-        },
+        params,
         signal,
     });
     const result = transactionsResponseSchema.safeParse(response.data);

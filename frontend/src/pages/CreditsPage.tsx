@@ -5,15 +5,17 @@ import { Spinner } from "@/components/ui/spinner";
 import CreditHistory from "@/features/credit/components/CreditHistory";
 import { formatCredits } from "@/features/credit/credit.presentation";
 import useCreditBalance from "@/features/credit/hooks/useCreditBalance";
+import useAuth from "@/hooks/useAuth";
 
 const CreditsPage = () => {
+    const { user } = useAuth();
     const credit = useCreditBalance();
     const busy = credit.fetchStatus !== "idle";
     const denied = credit.error?.statusCode === 401 || credit.error?.statusCode === 403;
     const balance = !denied && credit.data?.status === "READY" ? credit.data : undefined;
     const { state } = credit;
 
-    if (!credit.isEligible) return null;
+    if (!credit.isEligible || !user) return null;
 
     return (
         <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-8 md:px-10 md:py-10">
@@ -85,7 +87,8 @@ const CreditsPage = () => {
                     <CardDescription>See how each transaction changes your available and reserved credits.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {balance ? <CreditHistory /> : (
+                    {/* A new account starts with fresh history controls and cursors. */}
+                    {balance ? <CreditHistory key={user.id} userId={user.id} /> : (
                         <p className="py-8 text-center text-sm text-slate-600">
                             {state.status === "unavailable"
                                 ? "Retry loading your balances to check transaction history."

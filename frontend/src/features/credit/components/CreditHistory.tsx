@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import useAuth from "@/hooks/useAuth";
 import { creditKeys } from "../credit.keys";
 import { creditTimeZone, transactionLabels } from "../credit.presentation";
 import useCreditTransactions from "../hooks/useCreditTransactions";
@@ -21,7 +20,7 @@ interface HistoryView {
 
 const selectClassName = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-indigo-600 sm:w-auto";
 
-const StudentCreditHistory = ({ userId }: { userId: string }) => {
+const CreditHistory = ({ userId }: { userId: string }) => {
     const queryClient = useQueryClient();
     const [view, setView] = useState<HistoryView>({ sort: "desc", cursors: [undefined] });
     const cursor = view.cursors.at(-1);
@@ -131,18 +130,13 @@ const StudentCreditHistory = ({ userId }: { userId: string }) => {
                     }))}>Previous</Button>
                     <span className="text-sm text-slate-600">Page {view.cursors.length}</span>
                     <Button variant="outline" disabled={busy || query.isError || !page?.nextCursor} onClick={() => {
-                        if (page?.nextCursor) setView(current => ({ ...current, cursors: [...current.cursors, page.nextCursor!] }));
+                        const nextCursor = page?.nextCursor;
+                        if (nextCursor) setView(current => ({ ...current, cursors: [...current.cursors, nextCursor] }));
                     }}>Next</Button>
                 </nav>
             )}
         </div>
     );
-};
-
-const CreditHistory = () => {
-    const { user } = useAuth();
-    // Reset navigation immediately when the authenticated account changes.
-    return <StudentCreditHistory key={user?.id ?? ""} userId={user?.id ?? ""} />;
 };
 
 export default CreditHistory;
