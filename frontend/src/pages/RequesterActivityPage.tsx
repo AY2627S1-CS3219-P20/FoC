@@ -120,14 +120,14 @@ const RequesterActivtyPage = () => {
 
                 {requesterOrderHistoryQuery.isError && (
                     <p className="text-red-500">
-                        Failed to load requester activities: {requesterOrderHistoryQuery.error.message}
+                        Failed to load activities: {requesterOrderHistoryQuery.error.message}
                     </p>
                 )}
 
                 {!requesterOrderHistoryQuery.isLoading &&
                     !requesterOrderHistoryQuery.isError &&
                     requests.length === 0 && (
-                        <p className="text-muted-foreground">No requester activities yet.</p>
+                        <p className="text-muted-foreground">No activities yet.</p>
                     )}
 
                 {requests.length > 0 && (
