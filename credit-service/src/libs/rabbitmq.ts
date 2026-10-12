@@ -91,6 +91,7 @@ export const SETTLEMENT_MESSAGING = {
     ORDER_RECEIVED: "order.received.v1",
     ORDER_CANCELED: "order.canceled.v1",
     ORDER_EXPIRED: "order.expired.v1",
+    ORDER_FAILED: "order.failed.v1",
   },
   queue: "credit.order-settlement.v1",
   retryQueue: "credit.order-settlement.retry.v1",

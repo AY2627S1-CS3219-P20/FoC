@@ -20,5 +20,8 @@ export const receiptEventSchema = settlementBaseSchema.extend({
 export const releaseEventSchema = settlementBaseSchema.extend({
     eventType: z.enum(["ORDER_CANCELED", "ORDER_EXPIRED"]),
 });
-export const settlementEventSchema = z.discriminatedUnion("eventType", [receiptEventSchema, releaseEventSchema]);
+export const refundEventSchema = settlementBaseSchema.extend({
+    eventType: z.literal("ORDER_FAILED"),
+});
+export const settlementEventSchema = z.discriminatedUnion("eventType", [receiptEventSchema, releaseEventSchema, refundEventSchema]);
 export type SettlementEvent = z.infer<typeof settlementEventSchema>;

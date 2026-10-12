@@ -2,7 +2,7 @@
 
 Credit-service provides PostgreSQL/Prisma credit storage, an idempotent initial-grant function, and RabbitMQ delivery from the user-service transactional outbox. Current balances live in `CreditAccount`; an append-only `CreditTransaction` ledger records changes. This is not full event sourcing.
 
-Authenticated, student-only read APIs expose current balances and transaction history for the navbar and transaction-history UI. F4 reservation and creation-abort recovery APIs are implemented for trusted Order Service calls. Transfer, lifecycle release/refund, and order-settlement consumer workflows remain unimplemented.
+Authenticated, student-only read APIs expose current balances and transaction history for the navbar and transaction-history UI. F4 reservation and creation-abort recovery APIs are implemented for trusted Order Service calls. F5 receipt transfer, F6 cancellation/expiry release and F7 failure refund are implemented through the order-settlement consumer. Order producers and full workflow integration remain pending.
 
 ## Setup
 
@@ -322,7 +322,7 @@ Authorization: Bearer <access-token>
 
 Unknown parameters, repeated parameters/arrays, empty values, invalid enum values, and invalid limits return 400. Limits containing signs, spaces, decimal points, or exponent notation are invalid. Do not send `type=ALL`, `cursor=null`, or empty strings to represent omission.
 
-History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. F5 receipt transfers write `TRANSFER_SENT` and `TRANSFER_RECEIVED` rows. F6 cancellation/expiry writes `RELEASE` rows. F7 failure settlement remains pending.
+History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. F5 receipt transfers write `TRANSFER_SENT` and `TRANSFER_RECEIVED` rows. F6 cancellation/expiry writes `RELEASE` rows. F7 failure writes `REFUND` rows.
 
 HTTP 200 example with one transaction and no further page:
 
@@ -434,7 +434,7 @@ CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_t
 
 The integration suite creates a randomly named schema, applies all checked-in migrations there, and drops only that schema afterward. The database role needs schema-creation permission. No integration URL means the database suite is skipped. Use a dedicated test database; do not point tests at production.
 
-Validated locally: schema/client generation, TypeScript build, three unit/HTTP-auth tests, and nine PostgreSQL subtests covering reservations, duplicate/concurrent requests, insufficient credits, rollback after injected ledger failure, abort races/tombstones, HTTP contracts, adapter connection failure, F1/F2/F3 regressions and existing SQL protections. F5 validation is documented below. Full Order creation/recovery, F6/F7 settlement, broker restart drills and browser E2E remain unverified.
+Validated locally: schema/client generation, TypeScript build, three unit/HTTP-auth tests, and nine PostgreSQL subtests covering reservations, duplicate/concurrent requests, insufficient credits, rollback after injected ledger failure, abort races/tombstones, HTTP contracts, adapter connection failure, F1/F2/F3 regressions and existing SQL protections. F5 validation is documented below. Full Order creation/recovery, broker restart drills and browser E2E remain unverified. Credit F5–F7 settlement validation is documented below.
 
 ## Internal F4 reservation API
 
@@ -463,10 +463,10 @@ Reservation, conditional balance update and ledger insertion commit together wit
 
 Order must persist the attempt and IDs before calling Credit, reuse them after timeouts, and finalize an order only after observing `RESERVED`. A terminal response is not permission to create an OPEN order. Only a durably fenced ABORTING creation attempt may invoke abort; do not use this endpoint for ordinary cancellation or release holds based on age/timeouts. That Order-side attempt/finalization/recovery workflow is still pending.
 
-## F5 receipt and F6 cancellation/expiry settlement
+## F5–F7 receipt, release and failure settlement
 
-Credit consumes `ORDER_RECEIVED`, `ORDER_CANCELED` and `ORDER_EXPIRED` v1 on
-`foc.events` / `order.received.v1`, `order.canceled.v1` and `order.expired.v1`, respectively.
+Credit consumes `ORDER_RECEIVED`, `ORDER_CANCELED`, `ORDER_EXPIRED` and `ORDER_FAILED` v1 on
+`foc.events` / `order.received.v1`, `order.canceled.v1`, `order.expired.v1` and `order.failed.v1`, respectively.
 `ORDER_COMPLETED` does not pay the courier. No browser-facing transfer endpoint exists.
 Order must authorize receipt and commit its guarded status transition and outbox event
 atomically; that Order producer and outbox publisher are still pending.
@@ -491,7 +491,7 @@ all envelope fields:
 }
 ```
 
-All fields are required for receipt; cancellation/expiry use the same envelope with
+All fields are required for receipt; cancellation/expiry/failure use the same envelope with
 their eventType and **omit courierId**. Extra fields are rejected. Maximum body size is 64 KiB.
 UUIDs are normalized to lowercase; amount is a positive PostgreSQL Int;
 orderVersion is an integer from 0 through 2,147,483,647; occurredAt is an ISO datetime
@@ -516,16 +516,22 @@ same transaction. Available balance overflow or an inconsistent reserved balance
 rolls back. No courier account is required. Identical full-envelope replay is a
 no-op; altered replay, receipt after release, or release after transfer/abort conflicts.
 An old expiry targets only its reservation ID, so it cannot return a renewed hold.
-F7 `ORDER_FAILED` remains unsupported.
+F7 claims RESERVED → REFUNDED for `ORDER_FAILED`, restores the held amount and
+appends one `REFUND` row with deltas +amount/−amount. FAILED reason, identity, full
+envelope and settledAt commit atomically. It has the same replay and balance guards
+as F6, requires no courier account, and rejects refunds after transfer, release or abort.
+It returns held funds only; it never reclaims credits already paid to a courier.
 
 Order must authorize cancellation or expiry and atomically guard OPEN → CANCELED/EXPIRED
 with its version, status history and outbox event. Those producers are still pending;
-this Credit implementation does not complete Order's lifecycle workflow. Cancellation
-and expiry do not promise immediate credit availability while delivery is pending.
+Order must likewise guard COMPLETED → FAILED against manual/automatic receipt
+and write its failure outbox event atomically. This Credit implementation does not
+complete Order's lifecycle workflow. Cancellation,
+expiry and failure do not promise immediate credit availability while delivery is pending.
 
 The separate durable quorum queues are `credit.order-settlement.v1`,
-`credit.order-settlement.retry.v1` and `credit.order-settlement.dead.v1`. All three
-F5/F6 routes are bound; registration topology is unchanged. The retry queue
+`credit.order-settlement.retry.v1` and `credit.order-settlement.dead.v1`. All four
+F5–F7 routes are bound; registration topology is unchanged. The retry queue
 uses a 10-second TTL, reject-publish overflow and at-least-once dead-lettering back
 to the existing receipt route. Confirmed retry forwarding preserves the event's
 original route in `x-settlement-routing-key`; the consumer validates that header
@@ -586,3 +592,13 @@ new dependency is required.
 F6 validation: TypeScript build and five unit tests passed. The full isolated
 PostgreSQL/RabbitMQ suite passed all 25 tests with no skips (23 subtests plus two
 parent tests); temporary database/role and broker vhost were removed after the run.
+
+F7 validation: TypeScript build and six unit tests passed; all 28 isolated
+PostgreSQL/RabbitMQ tests passed with no skips (26 subtests plus two parent tests).
+Refund coverage includes exactly-once concurrent replay, complete-envelope conflicts,
+REFUND history/deltas, event-ID reuse, overflow/short reserved balance, post-transfer
+conflicts with another outstanding hold, injected ledger rollback, lost acknowledgment,
+renewed-cycle isolation, competing receive/release/refund/abort, and real failure
+routing/delayed retry/DLQ/redrive. Temporary test database and broker vhost were removed.
+Order failure producers/outbox/recovery, broker restart survival, deployed security
+and browser E2E remain unverified.

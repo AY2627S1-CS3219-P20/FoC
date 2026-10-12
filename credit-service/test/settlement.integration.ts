@@ -9,7 +9,7 @@ import { reserveCredits, abortReservation, getReservation } from "../src/service
 import { grantInitialCredits, getCreditTransactions } from "../src/services/credit.service.js";
 import { AppError } from "../src/errors/errors.js";
 
-import { releaseCredits, transferCredits } from "../src/services/settlement.service.js";
+import { refundCredits, releaseCredits, transferCredits } from "../src/services/settlement.service.js";
 import { processSettlementMessage, startSettlementConsumer } from "../src/services/settlement-consumer.service.js";
 import { connectSettlementMessaging, publishConfirmed, SETTLEMENT_MESSAGING, REGISTRATION_MESSAGING, declareRegistrationTopology } from "../src/libs/rabbitmq.js";
 import { setTimeout as delay } from "node:timers/promises";
@@ -17,7 +17,7 @@ import { spawn } from "node:child_process";
 import type { ConfirmChannel, ConsumeMessage } from "amqplib";
 
 const connectionString = process.env.CREDIT_TEST_DATABASE_URL;
-test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connectionString }, async t => {
+test("F5/F6/F7 PostgreSQL settlement, races, rollback and history", { skip: !connectionString }, async t => {
     const schema = `f5_test_${randomUUID().replaceAll("-", "")}`;
     const admin = new pg.Client({ connectionString });
     await admin.connect();
@@ -132,6 +132,60 @@ test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connec
             const { courierId, ...base } = event;
             return { ...base, eventType };
         }
+        await t.test("failure refunds once, validates full replay and exposes REFUND through F3", async () => {
+            const { event } = await held(); const failure = releaseEvent(event, "ORDER_FAILED");
+            const results = await Promise.all(Array.from({ length: 3 }, () => refundCredits(prisma, failure)));
+            assert.equal(results.filter(result => result.refunded).length, 1);
+            const reservation = await getReservation(prisma, event.reservationId);
+            assert.equal(reservation.status, "REFUNDED"); assert.equal(reservation.settlementReason, "FAILED");
+            assert.equal(reservation.settlementEventId, event.eventId); assert.equal(reservation.courierId, null); assert.ok(reservation.settledAt);
+            assert.equal((await refundCredits(prisma, { ...failure, requesterId: failure.requesterId.toUpperCase() })).refunded, false);
+            assert.deepEqual(await balances(event.requesterId, event.courierId), [50, 0, 50, 0]);
+            const history = await getCreditTransactions(prisma, event.requesterId, { type: "REFUND", limit: 20, sort: "desc" });
+            assert.ok(history.status === "READY"); assert.equal(history.items.length, 1);
+            assert.deepEqual([history.items[0]?.amount, history.items[0]?.availableDelta, history.items[0]?.reservedDelta], [10, 10, -10]);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), 2);
+            for (const change of [{ eventId: randomUUID() }, { amount: 11 }, { orderId: randomUUID() }, { requesterId: randomUUID() }, { orderVersion: 8 }, { orderName: "Dinner" }, { occurredAt: "2026-10-01T00:00:00.000Z" }]) {
+                await assert.rejects(refundCredits(prisma, { ...failure, ...change }), errorStatus(409));
+            }
+            await assert.rejects(refundCredits(prisma, { ...failure, courierId: event.courierId }), errorStatus(400));
+            await assert.rejects(releaseCredits(prisma, releaseEvent(event)), errorStatus(409));
+            await assert.rejects(transferCredits(prisma, event), errorStatus(409));
+        });
+        await t.test("refund rejects missing cycle, event reuse, balance bounds and already paid holds", async () => {
+            const first = await held(); const failure = releaseEvent(first.event, "ORDER_FAILED");
+            await assert.rejects(refundCredits(prisma, { ...failure, reservationId: randomUUID() }), errorStatus(404));
+            await transferCredits(prisma, first.event);
+            await reserveCredits(prisma, { ...first.request, reservationId: randomUUID(), orderId: randomUUID() });
+            await assert.rejects(refundCredits(prisma, failure), errorStatus(409));
+            assert.deepEqual(await balances(first.event.requesterId, first.event.courierId), [30, 10, 60, 0]);
+            const second = await held();
+            await assert.rejects(refundCredits(prisma, { ...releaseEvent(second.event, "ORDER_FAILED"), eventId: first.event.eventId }), errorStatus(409));
+            await prisma.creditAccount.update({ where: { userId: second.event.requesterId }, data: { availableCredits: 2_147_483_647 } });
+            await assert.rejects(refundCredits(prisma, releaseEvent(second.event, "ORDER_FAILED")), errorStatus(409));
+            assert.equal((await getReservation(prisma, second.event.reservationId)).status, "RESERVED");
+            const short = await held(); await prisma.creditAccount.update({ where: { userId: short.event.requesterId }, data: { reservedCredits: 0 } });
+            await assert.rejects(refundCredits(prisma, releaseEvent(short.event, "ORDER_FAILED")), errorStatus(409));
+            assert.equal((await getReservation(prisma, short.event.reservationId)).status, "RESERVED");
+        });
+        await t.test("refund ledger failure rolls back; lost ack and old cycle replay cannot refund a new hold", async () => {
+            const { event, request } = await held(); const failure = releaseEvent(event, "ORDER_FAILED");
+            await admin.query(`CREATE FUNCTION fail_refund_ledger() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."type" = 'REFUND' THEN RAISE EXCEPTION 'injected refund failure'; END IF; RETURN NEW; END $$`);
+            await admin.query(`CREATE TRIGGER fail_refund_ledger BEFORE INSERT ON "CreditTransaction" FOR EACH ROW EXECUTE FUNCTION fail_refund_ledger()`);
+            try { await assert.rejects(refundCredits(prisma, failure), /injected refund failure/); }
+            finally { await admin.query(`DROP TRIGGER fail_refund_ledger ON "CreditTransaction"`); }
+            const reservation = await getReservation(prisma, event.reservationId);
+            assert.equal(reservation.status, "RESERVED"); assert.equal(reservation.settlementEventId, null);
+            assert.deepEqual(await balances(event.requesterId, event.courierId), [40, 10, 50, 0]);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), 1);
+            const delivery = { content: Buffer.from(JSON.stringify(failure)), fields: { routingKey: SETTLEMENT_MESSAGING.routingKeys.ORDER_FAILED }, properties: { messageId: failure.eventId } } as ConsumeMessage;
+            await assert.rejects(processSettlementMessage(prisma, { ack: () => { throw new Error("ack lost"); } } as unknown as ConfirmChannel, delivery), /ack lost/);
+            const renewed = { ...request, reservationId: randomUUID() }; await reserveCredits(prisma, renewed);
+            let acked = false; await processSettlementMessage(prisma, { ack: () => { acked = true; } } as unknown as ConfirmChannel, delivery);
+            assert.equal(acked, true); assert.equal((await getReservation(prisma, renewed.reservationId)).status, "RESERVED");
+            assert.deepEqual(await balances(event.requesterId, event.courierId), [40, 10, 50, 0]);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId, type: "REFUND" } }), 1);
+        });
         await t.test("cancel and expire restore once, retain reason and expose RELEASE through F3", async () => {
             for (const eventType of ["ORDER_CANCELED", "ORDER_EXPIRED"]) {
                 const { event } = await held(); const release = releaseEvent(event, eventType);
@@ -183,13 +237,13 @@ test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connec
             assert.deepEqual(await balances(event.requesterId, event.courierId), [40, 10, 50, 0]);
             assert.equal(await prisma.creditTransaction.count({ where: { reservationId: event.reservationId } }), 1);
         });
-        await t.test("duplicate release and competing receive/cancel/expire/abort have one winner", async () => {
+        await t.test("duplicate release and competing receive/cancel/expire/fail/abort have one winner", async () => {
             const duplicate = await held();
             const repeats = await Promise.all(Array.from({ length: 3 }, () => releaseCredits(prisma, releaseEvent(duplicate.event))));
             assert.equal(repeats.filter(result => result.released).length, 1);
             for (let i = 0; i < 5; i++) {
                 const { event, request } = await held();
-                const results = await Promise.allSettled([transferCredits(prisma, event), releaseCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() })), releaseCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() }, "ORDER_EXPIRED")), abortReservation(prisma, request)]);
+                const results = await Promise.allSettled([transferCredits(prisma, event), releaseCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() })), releaseCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() }, "ORDER_EXPIRED")), refundCredits(prisma, releaseEvent({ ...event, eventId: randomUUID() }, "ORDER_FAILED")), abortReservation(prisma, request)]);
                 assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
                 const reservation = await getReservation(prisma, event.reservationId);
                 assert.deepEqual(await balances(event.requesterId, event.courierId), reservation.status === "TRANSFERRED" ? [40, 0, 60, 0] : [50, 0, 50, 0]);
@@ -254,7 +308,7 @@ test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connec
                 await processSettlementMessage(prisma, channel, replay);
                 assert.deepEqual(await balances(lost.event.requesterId, lost.event.courierId), [40, 0, 60, 0]);
                 assert.equal(await prisma.creditTransaction.count({ where: { reservationId: lost.event.reservationId } }), 3);
-                for (const eventType of ["ORDER_CANCELED", "ORDER_EXPIRED"] as const) {
+                for (const eventType of ["ORDER_CANCELED", "ORDER_EXPIRED", "ORDER_FAILED"] as const) {
                     const { event } = await held(); const release = releaseEvent(event, eventType);
                     const releaseBody = Buffer.from(JSON.stringify(release)); const route = SETTLEMENT_MESSAGING.routingKeys[eventType];
                     await publishConfirmed(channel, SETTLEMENT_MESSAGING.exchange, route, releaseBody, { messageId: release.eventId });
@@ -271,7 +325,7 @@ test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connec
                     assert.equal(retry.properties.headers?.["x-settlement-routing-key"], route);
                     assert.equal(retry.content.toString(), delayedBody.toString());
                     await reserveCredits(prisma, delayedRequest); await processSettlementMessage(prisma, channel, retry);
-                    assert.equal((await getReservation(prisma, delayed.reservationId)).status, "RELEASED");
+                    assert.equal((await getReservation(prisma, delayed.reservationId)).status, eventType === "ORDER_FAILED" ? "REFUNDED" : "RELEASED");
                     await publishConfirmed(channel, SETTLEMENT_MESSAGING.exchange, route, Buffer.from(JSON.stringify({ ...delayed, eventId: randomUUID() })), { messageId: randomUUID() });
                     await processSettlementMessage(prisma, channel, await get(SETTLEMENT_MESSAGING.queue));
                     const invalid = await get(SETTLEMENT_MESSAGING.deadQueue); assert.equal(invalid.properties.headers?.["x-credit-failure"], "INVALID_EVENT", JSON.stringify({ headers: invalid.properties.headers, body: invalid.content.toString() })); channel.ack(invalid);
@@ -283,7 +337,7 @@ test("F5/F6 PostgreSQL settlement, races, rollback and history", { skip: !connec
                     const code = await new Promise<number | null>((resolve, reject) => { child.once("error", reject); child.once("exit", resolve); }); assert.equal(code, 0); assert.match(redriveOutput, /forwarded: 1/);
                     const redriven = await get(SETTLEMENT_MESSAGING.queue); assert.equal(redriven.fields.routingKey, route); assert.equal(redriven.content.toString(), redriveBody.toString());
                     await processSettlementMessage(prisma, channel, redriven);
-                    assert.equal((await getReservation(prisma, redriveEvent.reservationId)).status, "RELEASED");
+                    assert.equal((await getReservation(prisma, redriveEvent.reservationId)).status, eventType === "ORDER_FAILED" ? "REFUNDED" : "RELEASED");
                 }
                 const unroutable = await connectSettlementMessaging();
                 try {

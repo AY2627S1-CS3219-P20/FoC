@@ -5,7 +5,7 @@ import { isTemporaryDatabaseError } from "../libs/credit-transaction.js";
 import { AppError } from "../errors/errors.js";
 import { reservationIdSchema } from "../schemas/reservation.schema.js";
 import { MAX_SETTLEMENT_BYTES, settlementEventSchema } from "../schemas/settlement-event.schema.js";
-import { releaseCredits, transferCredits } from "./settlement.service.js";
+import { refundCredits, releaseCredits, transferCredits } from "./settlement.service.js";
 import {
     connectSettlementMessaging,
     publishConfirmed,
@@ -92,6 +92,8 @@ export async function processSettlementMessage(
     try {
         applied = parsed.data.eventType === "ORDER_RECEIVED"
             ? (await transferCredits(prisma, parsed.data)).transferred
+            : parsed.data.eventType === "ORDER_FAILED"
+            ? (await refundCredits(prisma, parsed.data)).refunded
             : (await releaseCredits(prisma, parsed.data)).released;
     } catch (error) {
         // Close/reconnect on outages without spending per-event retry budgets.
@@ -111,7 +113,7 @@ export async function processSettlementMessage(
     }
     // Ack is outside the transaction catch: redelivery after commit is a no-op.
     channel.ack(message);
-    console.info("Settlement consumer", { ...context, outcome: applied ? (parsed.data.eventType === "ORDER_RECEIVED" ? "transferred" : "released") : "already_settled", durationMs: Date.now() - startedAt });
+    console.info("Settlement consumer", { ...context, outcome: applied ? (parsed.data.eventType === "ORDER_RECEIVED" ? "transferred" : parsed.data.eventType === "ORDER_FAILED" ? "refunded" : "released") : "already_settled", durationMs: Date.now() - startedAt });
 }
 
 /** One in-flight delivery; HTTP startup does not await broker availability. */

@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 import { AppError } from "../errors/errors.js";
 import { creditTransaction } from "../libs/credit-transaction.js";
-import { receiptEventSchema, releaseEventSchema, type SettlementEvent } from "../schemas/settlement-event.schema.js";
+import { receiptEventSchema, releaseEventSchema, refundEventSchema, type SettlementEvent } from "../schemas/settlement-event.schema.js";
 
 export async function transferCredits(prisma: PrismaClient, input: unknown) {
     const parsed = receiptEventSchema.safeParse(input);
@@ -19,10 +19,18 @@ export async function releaseCredits(prisma: PrismaClient, input: unknown) {
     return { reservation, released: applied };
 }
 
+export async function refundCredits(prisma: PrismaClient, input: unknown) {
+    const parsed = refundEventSchema.safeParse(input);
+    if (!parsed.success) throw new AppError("Invalid refund event", 400);
+    const { reservation, applied } = await settleCredits(prisma, parsed.data);
+    return { reservation, refunded: applied };
+}
+
 async function settleCredits(prisma: PrismaClient, event: SettlementEvent) {
     const isReceipt = event.eventType === "ORDER_RECEIVED";
-    const status = isReceipt ? "TRANSFERRED" : "RELEASED";
-    const reason = isReceipt ? "RECEIVED" : event.eventType === "ORDER_CANCELED" ? "CANCELED" : "EXPIRED";
+    const isRefund = event.eventType === "ORDER_FAILED";
+    const status = isReceipt ? "TRANSFERRED" : isRefund ? "REFUNDED" : "RELEASED";
+    const reason = isReceipt ? "RECEIVED" : isRefund ? "FAILED" : event.eventType === "ORDER_CANCELED" ? "CANCELED" : "EXPIRED";
     const courierId = isReceipt ? event.courierId : null;
     try {
         return await creditTransaction(prisma, async tx => {
@@ -65,7 +73,7 @@ async function settleCredits(prisma: PrismaClient, event: SettlementEvent) {
                 { accountId: requester.id, type: "TRANSFER_SENT" as const, availableDelta: 0, reservedDelta: -reservation.amount },
                 { accountId: courier.id, type: "TRANSFER_RECEIVED" as const, availableDelta: reservation.amount, reservedDelta: 0 },
             ] : [
-                { accountId: requester.id, type: "RELEASE" as const, availableDelta: reservation.amount, reservedDelta: -reservation.amount },
+                { accountId: requester.id, type: isRefund ? "REFUND" as const : "RELEASE" as const, availableDelta: reservation.amount, reservedDelta: -reservation.amount },
             ];
             await tx.creditTransaction.createMany({ data: rows.map(row => ({ ...row,
                 amount: reservation.amount, orderId: reservation.orderId, reservationId: reservation.id,
