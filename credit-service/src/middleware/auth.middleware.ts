@@ -3,7 +3,8 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import type { Response, NextFunction } from "express";
 import { AppError } from "../errors/errors.js";
 import config from "../config/config.js";
-import type { AuthRequest, Role } from "../types/auth.types.js";
+import { z } from "zod";
+import { Role, type AuthRequest } from "../types/auth.types.js";
 
 const publicKey = fs.readFileSync(config.jwtPublicKeyPath, "utf8");
 
@@ -36,22 +37,20 @@ export function authenticate(
         };
 
         if (
+            !z.uuid().safeParse(payload.userId).success ||
             typeof payload.userId !== "string" ||
             typeof payload.email !== "string" ||
-            typeof payload.role !== "string"
+            (payload.role !== Role.STUDENT && payload.role !== Role.ADMIN)
         ) {
             throw new Error("Invalid access token payload");
         }
 
         req.user = {
-            userId: payload.userId,
+            userId: payload.userId.toLowerCase(),
             email: payload.email,
-            role: payload.role as Role,
+            role: payload.role,
         };
 
-        console.log(`Authenticated user: ${req.user.email} with role: ${req.user.role}`);
-
-        next();
     } catch {
         console.log("Access token is invalid or expired");
         throw new AppError(
@@ -59,4 +58,5 @@ export function authenticate(
             401
         );
     }
+    next();
 }

@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import argon2 from "argon2";
 import {
   REGISTRATION_OTP_EXPIRES_IN_MINUTES,
@@ -293,7 +293,7 @@ export async function verifyRegistration(input: VerifyRegistrationInput) {
         );
       }
 
-      return tx.user.create({
+      const user = await tx.user.create({
         data: {
           email: pending.email,
           username: pending.username,
@@ -309,9 +309,30 @@ export async function verifyRegistration(input: VerifyRegistrationInput) {
           role: true,
         },
       });
+
+      const eventId = randomUUID();
+      const occurredAt = new Date();
+      // Persist the exact event once, atomically with OTP consumption and user
+      // creation. Broker publication happens later, outside this transaction.
+      await tx.outboxEvent.create({
+        data: {
+          eventId,
+          payload: {
+            eventId,
+            eventType: "USER_REGISTERED",
+            eventVersion: 1,
+            occurredAt: occurredAt.toISOString(),
+            userId: user.userId,
+            role: Role.STUDENT,
+          },
+          createdAt: occurredAt,
+          nextAttemptAt: occurredAt,
+        },
+      });
+
+      return user;
     });
 
-    // Credit Service has no allocation API yet; the required 50-credit grant. TODO: Implement credit allocation once the API is available.
     return {
       id: user.userId,
       email: user.email,
@@ -321,7 +342,8 @@ export async function verifyRegistration(input: VerifyRegistrationInput) {
     };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError
-      && error.code === "P2002") {
+      && error.code === "P2002"
+      && error.meta?.modelName === "User") {
       await ensureIdentityIsAvailable(pending);
 
       throw new AppError(

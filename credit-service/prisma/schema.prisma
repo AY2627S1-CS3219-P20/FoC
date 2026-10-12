@@ -12,15 +12,47 @@ datasource db {
   provider = "postgresql"
 }
 
+enum CreditTransactionType {
+  INITIAL_ALLOCATION
+  RESERVATION
+  TRANSFER_SENT
+  TRANSFER_RECEIVED
+  RELEASE
+  REFUND
+}
+
 model CreditAccount {
   id String @id @default(uuid()) @db.Uuid
   userId String @unique @db.Uuid
 
+  // Non-negative balance CHECK constraints are maintained in SQL migrations.
   availableCredits Int @default(0)
   reservedCredits  Int @default(0)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
+  transactions CreditTransaction[]
+
   @@index([userId])
+}
+
+// SQL migrations enforce positive amounts, append-only writes, and a partial
+// unique index allowing only one INITIAL_ALLOCATION per account.
+model CreditTransaction {
+  id             String                @id @default(uuid()) @db.Uuid
+  accountId      String                @db.Uuid
+  type           CreditTransactionType
+  amount         Int
+  availableDelta Int
+  reservedDelta  Int
+  createdAt      DateTime              @default(now()) @db.Timestamptz(6)
+  // External reference owned by order-service; no cross-service foreign key.
+  orderId        String?               @db.Uuid
+  idempotencyKey String                @unique
+
+  account CreditAccount @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([accountId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([accountId, type, createdAt(sort: Desc), id(sort: Desc)])
 }

@@ -10,6 +10,7 @@
 - [API Reference](#api-reference)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
+- [Credit provisioning outbox](#credit-provisioning-outbox)
 - [Security](#security)
 - [Acknowledgements](#acknowledgements)
 
@@ -641,6 +642,8 @@ FRONTEND_URL="http://localhost:5173"
 
 DATABASE_URL="postgresql://username:password@localhost:5432/users"
 
+RABBITMQ_URL="amqp://foc:foc-local-only@localhost:5672?heartbeat=20"
+
 JWT_PRIVATE_KEY_PATH="./keys/private.pem"
 
 JWT_PUBLIC_KEY_PATH="./keys/public.pem"
@@ -658,12 +661,57 @@ Variable                | Description
 `NODE_ENV`              | Node environment (development, production, etc.)
 `FRONTEND_URL`          | Frontend URL allowed by CORS
 `DATABASE_URL`          | PostgreSQL connection string
+`RABBITMQ_URL`          | Broker connection URL for the background outbox publisher
 `JWT_PRIVATE_KEY_PATH`  | Path to the RSA private key used to sign access tokens
 `JWT_PUBLIC_KEY_PATH`   | Path to the RSA public key used to verify access tokens
 `JWT_REFRESH_TOKEN_KEY` | Secret used to sign refresh tokens
 `COOKIE_SECRET`         | Secret used for cookie signing
 
 > Do not commit `.env`, private keys, or other secrets to the repository.
+
+## Credit provisioning outbox
+
+Successful student OTP verification consumes the pending challenge, creates the student, and inserts a `USER_REGISTERED` outbox event in one PostgreSQL transaction. Any failure rolls back all three writes. Failed/unverified registration, OTP resends, admin bootstrap, and admin activation emit no registration event. No broker calls run inside this transaction, and no existing users are backfilled.
+
+Deploy the outbox migration before starting the updated service:
+
+```sh
+npm ci
+npm run db:deploy
+npm run db:generate
+npm run build
+```
+
+Configure the existing HTTP/database/auth/email environment plus `RABBITMQ_URL` in `user-service/.env`. The local default is `amqp://foc:foc-local-only@localhost:5672?heartbeat=20`; match the broker credentials and URL-encode special characters. See [RabbitMQ and service startup](../credit-service/README.md#rabbitmq-and-service-startup) for Docker commands and the full [event contract](../credit-service/README.md#registration-delivery-contract).
+
+`npm run dev` or `npm start` starts the publisher in the background after HTTP begins listening. Run one active user-service publisher instance for this version; there are no leases or distributed worker coordination. Accidental duplicate publication cannot grant credits twice, but coordinated multi-instance scheduling is not implemented.
+
+The publisher polls every second and processes one due unpublished event at a time. It stores attempt count and retry timing before contacting RabbitMQ, reuses the immutable event body/ID, sets AMQP `messageId` to `eventId`, and marks `publishedAt` only after confirmed routing. Unpublished entries are retained indefinitely and retried with delays of 1, 2, 4, 8, 16, 32, then 60 seconds. Restarting resumes pending rows. There is no automatic outbox deletion.
+
+If confirmation succeeds but saving `publishedAt` fails, the next attempt can republish the same event. Delivery is at least once; credit-service's grant function supplies idempotency. Registration succeeds during broker or credit-service downtime, while provisioning remains pending. `GET /user` is HTTP liveness, not a check that credits were granted. Missing `RABBITMQ_URL` causes background publishing failures without preventing registration; configure it before expecting delivery.
+
+Publisher logs include event ID, user ID, attempt, and outcome. `lastError` stores the failing operation and a bounded driver code, never raw payloads or credentials. Inspect the following SQL in a client connected to the **user-service database**:
+
+```sql
+SELECT count(*) AS unpublished_count,
+       min("createdAt") AS oldest_unpublished_at,
+       now() - min("createdAt") AS oldest_unpublished_age
+FROM "OutboxEvent"
+WHERE "publishedAt" IS NULL;
+
+-- Five minutes is an example investigation threshold, not a delivery SLA.
+SELECT "eventId", "payload"->>'userId' AS "userId", "createdAt",
+       "attemptCount", "nextAttemptAt", "lastError"
+FROM "OutboxEvent"
+WHERE "publishedAt" IS NULL
+  AND "createdAt" < now() - interval '5 minutes'
+ORDER BY "createdAt", "eventId"
+LIMIT 50;
+```
+
+Old pending rows warrant checking broker connectivity, credentials, and publisher logs. A published row can still correspond to a queued or dead-lettered credit event: publication is not grant completion. For queue counts and safe replay, use the [dead-letter inspection/redrive instructions](../credit-service/README.md#inspecting-and-redriving-dead-letters). Do not rewrite stored payloads or set `publishedAt` manually to clear a backlog.
+
+No automated tests were added for this workflow. Use `npx prisma validate`, `npm run db:generate`, and `npm run build` for schema and compilation checks; these do not verify runtime recovery guarantees.
 
 ## Security
 
