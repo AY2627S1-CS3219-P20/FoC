@@ -283,3 +283,20 @@ export async function changePassword(
 
   return { refreshToken };
 }
+
+
+export async function getUserByIdService(
+  userId: string
+) {
+  return prisma.user.findUnique({
+    where: {
+      userId: userId,
+    },
+    select: {
+      userId: true,
+      username: true,
+      email: true,
+      phoneNumber: true,
+    },
+  });
+}
