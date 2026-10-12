@@ -6,6 +6,8 @@ import config from "./config/config.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { AppError } from "./errors/errors.js";
 import creditRouter from "./routes/credit.route.js";
+import { prisma } from "./libs/prisma.js";
+import { startRegistrationConsumer } from "./services/registration-consumer.service.js";
 
 const app = express();
 
@@ -34,6 +36,31 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-app.listen(PORT, () => {
+let stopConsumer: (() => Promise<void>) | undefined;
+let shuttingDown = false;
+const server = app.listen(PORT, () => {
     console.log(`Credit service is running at http://localhost:${PORT}`);
+    if (!shuttingDown) stopConsumer = startRegistrationConsumer(prisma);
 });
+
+const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    const deadline = setTimeout(() => process.exit(1), 15_000);
+    deadline.unref();
+    try {
+        await Promise.all([
+            stopConsumer?.(),
+            new Promise<void>((resolve, reject) => {
+                server.close(error => error ? reject(error) : resolve());
+            }),
+        ]);
+        await prisma.$disconnect();
+        clearTimeout(deadline);
+    } catch {
+        console.error("Credit service shutdown failed");
+        process.exitCode = 1;
+    }
+};
+process.on("SIGINT", () => { void shutdown(); });
+process.on("SIGTERM", () => { void shutdown(); });
