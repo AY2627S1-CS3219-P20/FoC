@@ -1,0 +1,148 @@
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import useAuth from "@/hooks/useAuth";
+import { creditKeys } from "../credit.keys";
+import { creditTimeZone, transactionLabels } from "../credit.presentation";
+import useCreditTransactions from "../hooks/useCreditTransactions";
+import {
+    CREDIT_TRANSACTION_TYPES,
+    type CreditTransactionSort,
+    type CreditTransactionType,
+} from "../types/credit.types";
+import CreditTransactionList from "./CreditTransactionList";
+
+interface HistoryView {
+    sort: CreditTransactionSort;
+    type?: CreditTransactionType;
+    cursors: (string | undefined)[];
+}
+
+const selectClassName = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-indigo-600 sm:w-auto";
+
+const StudentCreditHistory = ({ userId }: { userId: string }) => {
+    const queryClient = useQueryClient();
+    const [view, setView] = useState<HistoryView>({ sort: "desc", cursors: [undefined] });
+    const cursor = view.cursors.at(-1);
+    const query = useCreditTransactions({ sort: view.sort, type: view.type, cursor, limit: 20 });
+    const busy = query.fetchStatus !== "idle";
+    const firstPage = view.cursors.length === 1;
+    // Never retain cached private rows beneath an authorization failure.
+    const denied = query.error?.statusCode === 401 || query.error?.statusCode === 403;
+    const page = !denied && query.data?.status === "READY" ? query.data : undefined;
+    const cursorError = cursor !== undefined && query.error?.statusCode === 400;
+
+    const restart = () => {
+        if (!query.isEligible || busy) return;
+        // Expire visited pages too: the API paginates live data, not a snapshot.
+        void queryClient.invalidateQueries({ queryKey: creditKeys.transactions(userId), refetchType: "none" });
+        setView(current => ({ ...current, cursors: [undefined] }));
+        if (firstPage) void query.retry();
+    };
+
+    if (!query.isEligible) return null;
+
+    return (
+        <div className="space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
+                    Sort by timestamp
+                    <select
+                        className={selectClassName}
+                        value={view.sort}
+                        onChange={event => setView(current => ({
+                            ...current, sort: event.target.value as CreditTransactionSort, cursors: [undefined],
+                        }))}
+                    >
+                        <option value="desc">Newest first</option>
+                        <option value="asc">Oldest first</option>
+                    </select>
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
+                    Transaction type
+                    <select
+                        className={selectClassName}
+                        value={view.type ?? ""}
+                        onChange={event => setView(current => ({
+                            ...current,
+                            type: event.target.value === "" ? undefined : event.target.value as CreditTransactionType,
+                            cursors: [undefined],
+                        }))}
+                    >
+                        <option value="">All transaction types</option>
+                        {CREDIT_TRANSACTION_TYPES.map(type => (
+                            <option key={type} value={type}>{transactionLabels[type]}</option>
+                        ))}
+                    </select>
+                </label>
+                <Button variant="outline" size="lg" className="sm:ml-auto" disabled={busy} onClick={restart}>
+                    Refresh history
+                </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+                Times shown in your local timezone ({creditTimeZone}). Refresh returns to the first page.
+            </p>
+
+            <div role="status" aria-live="polite" className="text-sm text-slate-600">
+                {query.fetchStatus === "paused" ? "Waiting for a connection…" : query.isFetching ? (
+                    <span className="inline-flex items-center gap-2"><Spinner />Loading transactions…</span>
+                ) : page ? `Page ${view.cursors.length} · ${page.items.length} transactions` : null}
+            </div>
+
+            {query.isError && (
+                <div role="alert" className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm">
+                    <p className="font-medium text-slate-900">Unable to load transactions</p>
+                    <p className="text-slate-700">{query.error.message}</p>
+                    {page && <p className="text-slate-700">Showing previously loaded transactions. They may be outdated.</p>}
+                    <Button variant="outline" disabled={busy} onClick={cursorError ? restart : () => { void query.retry(); }}>
+                        {cursorError ? "Return to first page" : "Retry transactions"}
+                    </Button>
+                </div>
+            )}
+
+            {!query.isError && query.data?.status === "PROVISIONING" && (
+                <div className="space-y-3 rounded-lg bg-slate-50 p-6 text-center text-sm" role="status">
+                    <p className="font-medium text-slate-900">Transaction history is not ready yet</p>
+                    <p className="text-slate-600">Your credit account is still being set up. You can check again later.</p>
+                    <Button variant="outline" disabled={busy} onClick={() => { void query.retry(); }}>Retry transactions</Button>
+                </div>
+            )}
+
+            {page && page.items.length > 0 && <CreditTransactionList items={page.items} />}
+            {page && page.items.length === 0 && !query.isError && (
+                <div className="space-y-3 rounded-lg bg-slate-50 px-4 py-10 text-center text-sm" role="status">
+                    <p className="font-medium text-slate-900">
+                        {!firstPage ? "No transactions on this page" : view.type ? "No transactions match this type" : "No transactions yet"}
+                    </p>
+                    {view.type && (
+                        <Button variant="outline" onClick={() => setView(current => ({ ...current, type: undefined, cursors: [undefined] }))}>
+                            Clear filter
+                        </Button>
+                    )}
+                    {!firstPage && <Button variant="outline" disabled={busy} onClick={restart}>Return to first page</Button>}
+                </div>
+            )}
+
+            {(page || !firstPage) && (
+                <nav aria-label="Transaction pages" className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                    <Button variant="outline" disabled={firstPage || busy} onClick={() => setView(current => ({
+                        ...current, cursors: current.cursors.slice(0, -1),
+                    }))}>Previous</Button>
+                    <span className="text-sm text-slate-600">Page {view.cursors.length}</span>
+                    <Button variant="outline" disabled={busy || query.isError || !page?.nextCursor} onClick={() => {
+                        if (page?.nextCursor) setView(current => ({ ...current, cursors: [...current.cursors, page.nextCursor!] }));
+                    }}>Next</Button>
+                </nav>
+            )}
+        </div>
+    );
+};
+
+const CreditHistory = () => {
+    const { user } = useAuth();
+    // Reset navigation immediately when the authenticated account changes.
+    return <StudentCreditHistory key={user?.id ?? ""} userId={user?.id ?? ""} />;
+};
+
+export default CreditHistory;
