@@ -5,7 +5,8 @@ export const ROUTES = {
     ACTIVATE_ADMIN: "/activate-admin",
 
     // Protected routes for student roles
-    ACTIVITY: "/activity",
+    REQUESTER_ACTIVITY: "/requester-activity",
+    COURIER_ACTIVITY: "/courier-activity",
     CREDITS: "/credits",
 
     // Protected routes for admin roles
