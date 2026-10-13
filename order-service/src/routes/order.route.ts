@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { acceptOrder, getOpenOrders } from "../controllers/order.courier.controller.js";
+import { acceptOrder, getOpenOrders, pickUpOrder } from "../controllers/order.courier.controller.js";
 import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
@@ -50,7 +50,7 @@ orderRouter.post("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
 // orderRouter.delete("/:orderId/acceptance");
 
 // Mark an order as picked up (by courier)
-// orderRouter.post("/:orderId/pickup", authorize(Role.STUDENT), pickUpAcceptedOrder);
+orderRouter.post("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
 
 // Mark an order as completed (by courier)
 // orderRouter.post("/:orderId/completion");

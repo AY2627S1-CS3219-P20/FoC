@@ -18,7 +18,7 @@ export async function updateExpiredOrders() {
     // update database
     const result = await prisma.$transaction(async (tx) => {
         // update rows in the Order table
-        const ordersUpdated = await prisma.order.updateManyAndReturn({
+        const ordersUpdated = await tx.order.updateManyAndReturn({
             where: {
                 status: STATUS.OPEN, // still open 
                 expiryAt: {
@@ -99,7 +99,6 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
     const newStatus: OrderStatus = STATUS.ACCEPTED;
 
     const result = await prisma.$transaction(async (tx) => {
-        // check if the order exists, is still open (F3.1.3) and requester is not trying to accept their own order (F3.1.1)
         const now: Date = new Date();
         const order = await tx.order.findUnique({
             where: {
@@ -120,17 +119,17 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
             throw new AppError(`Order ${orderId} has expired`, 400);
         }
 
-        // order is no longer open
+        // disallow action if order is no longer open (F3.1.3)
         if (order.status !== STATUS.OPEN) {
             throw new AppError(`Order ${orderId} cannot be accepted`, 400);
         }
 
-        // requester is trying to accept their own order
+        // disallow action if requester is trying to accept their own order (F3.1.1)
         if (order.requesterId === courierId) {
             throw new AppError(`Requester ${courierId} cannot accept their own order ${orderId}`, 403);
         }
 
-        // update order status to ACCEPTED (F3.2.1); updatedAt column is automatically updated by Prisma (F4.2.1)
+        // update order status to ACCEPTED (F3.2.1); updatedAt column is automatically updated by Prisma (F3.2.2)
         const updatedOrder = await tx.order.update({
             where: {
                 id: order.id,
@@ -153,6 +152,72 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
             data: {
                 orderId: updatedOrder.id,
                 fromStatus: STATUS.ACCEPTED,
+                toStatus: newStatus, 
+                changedBy: courierId
+            }
+        });
+
+        // check if transaction record was successfully logged
+        if (!transactionRecord) {
+            throw new AppError(`Unable to record status update for order ${updatedOrder.id}`, 500);
+        }
+
+        return updatedOrder;
+    });
+
+    return result;
+}
+
+export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
+    const oldStatus: OrderStatus = STATUS.ACCEPTED;
+    const newStatus: OrderStatus = STATUS.PICKED_UP;
+
+    const result = await prisma.$transaction(async (tx) => {
+        const now: Date = new Date();
+
+        const order = await tx.order.findUnique({
+            where: {
+                id: orderId,
+            }
+        });
+
+        // order id does not exist
+        if (!order) {
+            throw new AppError(`Order ${orderId} does not exist`, 404);
+        }
+
+        // check that the user trying to mark the order as PICKED_UP is listed as the courier of the order (F4.1.1)
+        if (order.courierId !== courierId) {
+            throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
+        }
+
+        // check that order is still in the ACCEPTED status (F4.1.2)
+        if (order.status !== STATUS.ACCEPTED) {
+            throw new AppError(`Order ${orderId} cannot be marked as picked up`, 400);
+        }
+
+        // update order status to PICKED_UP (F4.2); updatedAt column is automatically updated by Prisma (F4.2.1)
+        const updatedOrder = await tx.order.update({
+            where: {
+                id: order.id,
+            }, 
+            data: {
+                status: newStatus,
+                version: order.version + 1,
+                pickedUpAt: now // record time when order was accepted (F4.2.1s)
+            }
+        });
+
+         // check if update was successful
+        if (!updatedOrder || updatedOrder.status != newStatus) {
+            throw new AppError(`Status update for order ${order.id} has failed`, 500);
+        }
+
+        // update the order status history
+        const transactionRecord = await tx.orderStatusHistory.create({
+            data: {
+                orderId: updatedOrder.id,
+                fromStatus: oldStatus,
                 toStatus: newStatus, 
                 changedBy: courierId
             }

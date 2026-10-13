@@ -2,7 +2,8 @@ import type { Request, Response } from "express";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
 import { getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
-import { acceptOpenOrder, getAllOpenOrders } from "../services/order.courier.service.js";
+import { acceptOpenOrder, getAllOpenOrders, pickUpAcceptedOrder } from "../services/order.courier.service.js";
+import { pick } from "zod/mini";
 
 export async function getOpenOrders(req: AuthRequest, res: Response) {
     const courierId = req.user!.userId;
@@ -38,6 +39,17 @@ export async function acceptOrder(req: AuthRequest, res: Response) {
     });
 }
 
-export async function pickUpAcceptedOrder(req: AuthRequest, res: Response) {
+export async function pickUpOrder(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const orderId = req.params.orderId as string; // can safely typecast to a single string since this is a route parameter
 
+    const updatedOrder = await pickUpAcceptedOrder(courierId, orderId);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `Order ${updatedOrder.id} picked up by courier ${updatedOrder.courierId}`,
+            data: updatedOrder,
+        },
+    });
 }
