@@ -24,7 +24,7 @@ export async function getOpenOrders(req: AuthRequest, res: Response) {
     return res.status(200).json({
         success: true,
         data: {
-            message: `All orders on page ${request.data.page} retrieved`,
+            message: `${orders.length} orders on page ${request.data.page} retrieved`,
             data: orders,
         },
     });

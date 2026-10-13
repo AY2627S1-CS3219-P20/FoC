@@ -7,8 +7,7 @@ export const getOpenOrdersSchema = z.object({
     page: z.coerce.number().int().positive(),
     sortBy: z.enum(["offeredCredits", "expiryAt"]).default("expiryAt"),
     sortOrder: z.enum(['asc', 'desc']).default('asc'),
-    // filterBy: z.enum(["pickup", "delivery"]).optional(),
-    // filterLocations: z.string().array().optional(),
+    filterLocation: z.string().optional(), // the string passed in here should be the supplierId
     searchString: z.string().optional()
 });
 

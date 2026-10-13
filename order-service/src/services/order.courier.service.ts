@@ -61,8 +61,7 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
     const page: number = input.page;
     const sortBy: string = input.sortBy; // default set to sorting by expiry time
     const sortOrder: string = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
-    // const filterBy: string = input.filterBy ?? "";
-    // const filterLocations: string[] = input.filterLocations ?? [];
+    const filterLocation = input.filterLocation ?? null; // supplier id we want to filter by
     const searchString: string = input.searchString ?? "";
 
     // ensure that the status of orders are updated
@@ -74,6 +73,15 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
                 contains: searchString, // enforce partial string match
                 mode: 'insensitive', // enforce case insensitivity
             }, 
+            // as long as delivery/pickup supplier id matches, record will be included in the results
+            ...(filterLocation
+            ? {
+                OR: [
+                    { deliverySupplierId: filterLocation },
+                    { pickupSupplierId: filterLocation },
+                ],
+            }
+            : {}),
             status: STATUS.OPEN, 
             requesterId: { 
                 not: courierId
