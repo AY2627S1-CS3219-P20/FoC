@@ -16,6 +16,8 @@ export async function updateExpiredOrders() {
     const now: Date = new Date();
     console.log(now);
     // update database
+    const result = await prisma.$transaction(async (tx) => {
+        // update rows in the Order table
     const ordersUpdated = await prisma.order.updateManyAndReturn({
         where: {
             status: STATUS.OPEN, // still open 
@@ -25,10 +27,34 @@ export async function updateExpiredOrders() {
         }, 
         data: {
             status: STATUS.EXPIRED, // change to expired status
+                version: { increment: 1 }, // increment version number
+                expiredAt: now // set the expiredAt timestamp to the time that we marked the order as expired
         }
     })
+
     console.log(`${ordersUpdated.length} open orders updated to expired`)
+
+        // update OrderStatusHistory table
+        for (const order of ordersUpdated) {
+            const transactionRecord = await tx.orderStatusHistory.create({
+                data: {
+                    orderId: order.id,
+                    fromStatus: STATUS.OPEN,
+                    toStatus: STATUS.EXPIRED, 
+                    changedBy: null // indicate system update with null
+                }
+            });
+
+            // check if transaction record was successfully logged
+            if (!transactionRecord) {
+                throw new AppError(`Unable to record status update for order ${order.id}`, 500);
+            }
+        }
+
     return ordersUpdated; 
+    });
+
+    return result; 
 }
 
 export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersInput) {
