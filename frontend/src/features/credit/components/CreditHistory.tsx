@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { creditKeys } from "../credit.keys";
-import { creditTimeZone, transactionLabels } from "../credit.presentation";
+import { transactionLabels } from "../credit.presentation";
 import useCreditTransactions from "../hooks/useCreditTransactions";
 import {
     CREDIT_TRANSACTION_TYPES,
@@ -44,9 +44,9 @@ const CreditHistory = ({ userId }: { userId: string }) => {
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-                    Sort by timestamp
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <label className="min-w-0">
+                    <span className="sr-only">Sort by timestamp</span>
                     <select
                         className={selectClassName}
                         value={view.sort}
@@ -54,12 +54,12 @@ const CreditHistory = ({ userId }: { userId: string }) => {
                             ...current, sort: event.target.value as CreditTransactionSort, cursors: [undefined],
                         }))}
                     >
-                        <option value="desc">Newest first</option>
-                        <option value="asc">Oldest first</option>
+                        <option value="desc">Sort: Newest first</option>
+                        <option value="asc">Sort: Oldest first</option>
                     </select>
                 </label>
-                <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-700">
-                    Transaction type
+                <label className="min-w-0">
+                    <span className="sr-only">Transaction type</span>
                     <select
                         className={selectClassName}
                         value={view.type ?? ""}
@@ -69,9 +69,9 @@ const CreditHistory = ({ userId }: { userId: string }) => {
                             cursors: [undefined],
                         }))}
                     >
-                        <option value="">All transaction types</option>
+                        <option value="">Type: All transactions</option>
                         {CREDIT_TRANSACTION_TYPES.map(type => (
-                            <option key={type} value={type}>{transactionLabels[type]}</option>
+                            <option key={type} value={type}>Type: {transactionLabels[type]}</option>
                         ))}
                     </select>
                 </label>
@@ -79,9 +79,6 @@ const CreditHistory = ({ userId }: { userId: string }) => {
                     Refresh history
                 </Button>
             </div>
-            <p className="text-xs text-slate-500">
-                Times shown in your local timezone ({creditTimeZone}). Refresh returns to the first page.
-            </p>
 
             <div role="status" aria-live="polite" className="text-sm text-slate-600">
                 {query.fetchStatus === "paused" ? "Waiting for a connection…" : query.isFetching ? (
