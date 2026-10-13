@@ -16,6 +16,7 @@ import RoleRoute from '@/routes/RoleRoute';
 import ManageSupplierTypesPage from '@/pages/ManageSupplierTypesPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminActivationPage from '@/pages/AdminActivationPage';
+import CreditsPage from '@/pages/CreditsPage';
 import RequesterActivtyPage from '@/pages/RequesterActivityPage';
 
 const AppRouter = () => {
@@ -35,6 +36,10 @@ const AppRouter = () => {
                                     <Route path={ROUTES.HOME} element={<HomePage />} />
                                     <Route path={ROUTES.SUPPLIERS} element={<SupplierPage />} />
                                     <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                                </Route>
+
+                                <Route element={<RoleRoute allowedRoles={[ROLES.STUDENT]} />}>
+                                    <Route path={ROUTES.CREDITS} element={<CreditsPage />} />
                                 </Route>
 
                                 <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>

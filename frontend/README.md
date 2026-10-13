@@ -1,5 +1,46 @@
 # React + TypeScript + Vite
 
+## Credits page (CS F3)
+
+Authenticated students can open `/credits` from the existing Credits navigation link.
+The page uses the same `useCreditBalance` query as the navbar, displays available
+credits directly (without subtracting reserved), and waits for a READY account
+before requesting history. Admins cannot mount the page or issue credit queries.
+
+History reads `GET /credits/me/transactions` through the configured credit API
+base URL and existing authentication interceptors. It defaults to 20 entries,
+all transaction types, newest first. Sorting and filtering are performed by the
+server; the UI preserves its order, including timestamp ties. Opaque cursors are
+stored in a local stack for Next/Previous, reset on sort/filter/account changes,
+and never decoded. Refresh history returns to page one and expires visited pages
+because pagination reads live data rather than a frozen snapshot.
+
+Amounts are unsigned magnitudes. Signed available/reserved effects come from
+the returned deltas, with neutral explanations for reservations and releases.
+Missing order IDs display a dash; present IDs are text until an order-detail
+route exists. Desktop tables become labelled cards on mobile, and timestamps
+use the browser's locale and timezone.
+
+Balance provisioning reuses the existing bounded polling and delayed Retry
+state. A PROVISIONING history response offers a manual retry. Neither response
+is treated as zero credits or empty history. Missing legacy accounts can remain
+pending indefinitely; reads do not provision them. Balance/history errors are
+independent, retained data is labelled as potentially outdated after a failed
+refresh, and invalid cursors offer a return to page one.
+
+### Frontend validation
+
+```sh
+npm ci
+npm run lint
+npm run build
+```
+
+At the CS F3 implementation baseline, the full TypeScript build already failed
+on supplier count/type mismatches and unused auth/supplier variables. The credit
+changes add no TypeScript errors. Vite production bundling passes independently;
+a passing bundle does not replace the full type check.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

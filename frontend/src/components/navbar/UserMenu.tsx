@@ -27,11 +27,12 @@ const UserMenu = () => {
                 render={
                     <Button
                         variant="linkIndigo"
-                        className="min-w-0 max-w-[100px] overflow-hidden text-sm font-semibold m-0"
+                        className="min-w-0 text-sm font-semibold m-0"
+                        title={user.username}
                     />
                 }
             >
-                <span className="block min-w-0 truncate">
+                <span className="block min-w-0 max-w-[24ch] truncate">
                     {user.username}
                 </span>
             </DropdownMenuTrigger>

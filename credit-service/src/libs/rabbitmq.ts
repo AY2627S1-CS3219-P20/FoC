@@ -54,7 +54,7 @@ export async function declareRegistrationTopology(channel: Channel): Promise<voi
 }
 
 /** Call from a background worker, never from registration or HTTP startup. */
-export async function connectRegistrationMessaging(): Promise<{
+async function connectMessaging(declareTopology: (channel: Channel) => Promise<void>): Promise<{
   connection: ChannelModel;
   channel: ConfirmChannel;
 }> {
@@ -76,12 +76,55 @@ export async function connectRegistrationMessaging(): Promise<{
   try {
     const channel = await connection.createConfirmChannel();
     channel.on("error", () => console.warn("RabbitMQ channel error; reconnect required"));
-    await declareRegistrationTopology(channel);
+    await declareTopology(channel);
     return { connection, channel };
   } catch (error) {
     await connection.close().catch(() => undefined);
     throw error;
   }
+}
+
+export const SETTLEMENT_MESSAGING = {
+  exchange: "foc.events",
+  routingKey: "order.received.v1",
+  routingKeys: {
+    ORDER_RECEIVED: "order.received.v1",
+    ORDER_CANCELED: "order.canceled.v1",
+    ORDER_EXPIRED: "order.expired.v1",
+    ORDER_FAILED: "order.failed.v1",
+  },
+  queue: "credit.order-settlement.v1",
+  retryQueue: "credit.order-settlement.retry.v1",
+  deadQueue: "credit.order-settlement.dead.v1",
+  retryDelayMs: 10_000,
+} as const;
+
+export async function declareSettlementTopology(channel: Channel): Promise<void> {
+  const topology = SETTLEMENT_MESSAGING;
+  const options = { durable: true, autoDelete: false, arguments: {
+    "x-queue-type": "quorum", "x-delivery-limit": -1, "x-overflow": "reject-publish",
+  } };
+  await channel.assertExchange(topology.exchange, "topic", { durable: true, autoDelete: false });
+  await channel.assertQueue(topology.queue, options);
+  for (const routingKey of Object.values(topology.routingKeys)) {
+    await channel.bindQueue(topology.queue, topology.exchange, routingKey);
+  }
+  await channel.assertQueue(topology.deadQueue, options);
+  await channel.assertQueue(topology.retryQueue, { ...options, arguments: {
+    ...options.arguments,
+    "x-message-ttl": topology.retryDelayMs,
+    "x-dead-letter-exchange": topology.exchange,
+    "x-dead-letter-routing-key": topology.routingKey,
+    "x-dead-letter-strategy": "at-least-once",
+  } });
+}
+
+export function connectRegistrationMessaging() {
+  return connectMessaging(declareRegistrationTopology);
+}
+
+export function connectSettlementMessaging() {
+  return connectMessaging(declareSettlementTopology);
 }
 
 const publishingChannels = new WeakSet<ConfirmChannel>();

@@ -25,17 +25,17 @@ import {
     NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 
-import CreditBalance from "./CreditBalance";
+import CreditBalance, { type CreditBalanceProps } from "./CreditBalance";
 import type { NavLinkItem } from "./navLinks";
 
 interface MobileMenuProps {
     links: NavLinkItem[];
-    showCreditBalance?: boolean;
+    creditBalance: CreditBalanceProps;
 }
 
 const MobileMenu = ({
     links,
-    showCreditBalance = true,
+    creditBalance,
 }: MobileMenuProps) => {
     const location = useLocation();
     const { user } = useAuth();
@@ -66,9 +66,9 @@ const MobileMenu = ({
                 </DrawerHeader>
 
                 <div className="flex flex-col gap-2 p-4">
-                    {showCreditBalance && (
+                    {creditBalance.state.status !== "hidden" && (
                         <>
-                            <CreditBalance />
+                            <CreditBalance {...creditBalance} />
                             <Separator className="bg-slate-300" />
                         </>
                     )}

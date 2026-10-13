@@ -1,4 +1,5 @@
 import useAuth from "@/hooks/useAuth";
+import useCreditBalance from "@/features/credit/hooks/useCreditBalance";
 
 import { Separator } from "@/components/ui/separator";
 import Logo from "@/assets/logo.png";
@@ -12,6 +13,12 @@ import { adminNavLinks, studentNavLinks } from "./navLinks";
 
 const Navbar = () => {
     const { user, isAuthenticated } = useAuth();
+    const credit = useCreditBalance();
+    const creditBalanceProps = {
+        state: credit.state,
+        isBusy: credit.fetchStatus !== "idle",
+        onRetry: credit.retry,
+    };
     const isAdmin = user?.role === ROLES.ADMIN;
     const navLinks = isAdmin ? adminNavLinks : studentNavLinks;
 
@@ -32,10 +39,9 @@ const Navbar = () => {
                         <>
                             <DesktopNav links={navLinks} />
                             <div className="ml-auto hidden md:flex items-center space-x-2">
-                                {/* Only show credit balance for non-admin users, as admin users do not have credits. */}
-                                {!isAdmin && (
+                                {credit.state.status !== "hidden" && (
                                     <>
-                                        <CreditBalance />
+                                        <CreditBalance {...creditBalanceProps} />
                                         <Separator
                                             orientation="vertical"
                                             className="bg-slate-300"
@@ -46,7 +52,7 @@ const Navbar = () => {
                                 <UserMenu />
                             </div>
                             <div className="ml-auto flex md:hidden">
-                                <MobileMenu links={navLinks} showCreditBalance={!isAdmin} />
+                                <MobileMenu links={navLinks} creditBalance={creditBalanceProps} />
                             </div>
                         </>
                     )}
