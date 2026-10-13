@@ -1,0 +1,41 @@
+import { ENDPOINTS } from "@/api/endpoints";
+import type { OrderRelatedUserDetails, RequesterOrderHistoryParams, RequesterOrderHistoryResponse } from "../types/order.types";
+import { parseError } from "@/utils/errorHandler";
+import type { ApiResponse } from "@/types/api.types";
+import orderApi from "@/api/orderApi";
+import authApi from "@/api/authApi";
+
+export const getRequesterOrderHistoryService = async (
+    params: RequesterOrderHistoryParams,
+): Promise<RequesterOrderHistoryResponse> => {
+    try {
+        const queryParams = new URLSearchParams();
+
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined) {
+                queryParams.set(key, String(value));
+            }
+        });
+
+        const response = await orderApi.get<ApiResponse<RequesterOrderHistoryResponse>>(
+            `${ENDPOINTS.order.getRequesterOrderHistory}?${queryParams.toString()}`
+        );
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const getUserByIdService = async (
+    userId: string,
+): Promise<OrderRelatedUserDetails> => {
+    try {
+        const response = await authApi.get<ApiResponse<OrderRelatedUserDetails>>(
+            ENDPOINTS.user.getUserById(userId),
+        );
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};

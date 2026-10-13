@@ -17,6 +17,26 @@ enum Role {
   ADMIN
 }
 
+// Permanent bootstrap completion; intentionally not linked to a User.
+model BootstrapState {
+  key         String   @id
+  completedAt DateTime @default(now())
+}
+
+// Preserve eventId and payload on retries; only publication metadata changes.
+// No User relation: pending events must survive user lifecycle changes.
+model OutboxEvent {
+  eventId       String    @id @db.Uuid
+  payload       Json
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  publishedAt   DateTime? @db.Timestamptz(6)
+  attemptCount  Int       @default(0)
+  nextAttemptAt DateTime  @default(now()) @db.Timestamptz(6)
+  lastError     String?
+
+  @@index([publishedAt, nextAttemptAt, createdAt])
+}
+
 // Canonical email/phone CHECK constraints are maintained in SQL migrations.
 model User {
   userId      String   @id @default(uuid())

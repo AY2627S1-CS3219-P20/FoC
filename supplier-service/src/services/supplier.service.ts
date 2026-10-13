@@ -176,12 +176,12 @@ export async function fetchActiveSuppliers(page: number, searchString?: string |
         type = typeFilter;
     }
     const suppliers = await prisma.supplier.findMany({
-        where: { 
-            status: STATUS.ACTIVATED, 
+        where: {
+            status: STATUS.ACTIVATED,
             name: {
                 contains: search, // enforce partial string match
                 mode: 'insensitive', // enforce case insensitivity
-            }, 
+            },
             type: {
                 contains: type, // should return all types if typeFilter is empty
                 mode: 'insensitive',
@@ -189,7 +189,7 @@ export async function fetchActiveSuppliers(page: number, searchString?: string |
         },
         include: { openingHours: true }, // also get opening hours of suppliers
         orderBy: { name: 'asc' }, // case-sensitive
-        take: LIMIT, 
+        take: LIMIT,
         skip: LIMIT * (page - 1),
     });
 
@@ -208,14 +208,14 @@ export async function countActiveSuppliers(searchString?: string | null, typeFil
         type = typeFilter;
     }
     const count = await prisma.supplier.count({
-        where: { 
+        where: {
             status: {
                 equals: "ACTIVATED"
             },
             name: {
                 contains: search, // enforce partial string match
                 mode: 'insensitive', // enforce case insensitivity
-            }, 
+            },
             type: {
                 contains: type, // should return all types if typeFilter is empty
                 mode: 'insensitive',
@@ -234,11 +234,11 @@ export async function countSuppliers(searchString?: string | null, typeFilter?: 
         type = typeFilter;
     }
     const count = await prisma.supplier.count({
-        where: { 
+        where: {
             name: {
                 contains: search, // enforce partial string match
                 mode: 'insensitive', // enforce case insensitivity
-            }, 
+            },
             type: {
                 contains: type, // should return all types if typeFilter is empty
                 mode: 'insensitive',
@@ -296,12 +296,12 @@ async function fetchSuppliers(
     }
 
     return suppliers;
-} 
+}
 
 // this function creates a new supplier type
 export async function createType(type: string) {
     const duplicateType = await prisma.supplierType.findFirst({
-        where: { 
+        where: {
             type: {
                 equals: type,
                 mode: 'insensitive',
@@ -342,7 +342,7 @@ export async function deleteType(type: string) {
         where: { type: typeToDelete.type },
     });
     // console.log(associatedSuppliers)
-    
+
     if (associatedSuppliers.length > 0) {
         // there are suppliers to the type that the user wants to delete
         throw new AppError("There are suppliers associated to this type, hence it cannot be deleted", 403);
@@ -363,6 +363,30 @@ export async function countForEachType() {
     const results = counts.map((record) => {
         return { id: record.id, type: record.type, count: record._count.suppliers }
     })
-    
+
     return results;
+}
+
+export async function getSupplierByIdService(
+    supplierId: string
+) {
+    return prisma.supplier.findUnique({
+        where: {
+            id: supplierId,
+            status: STATUS.ACTIVATED,
+        },
+    });
+}
+
+export async function getSuppliersByIdsService(ids: string[]) {
+    return prisma.supplier.findMany({
+        where: {
+            id: { in: [...new Set(ids)] },
+        },
+        select: {
+            id: true,
+            name: true,
+            type: true,
+        },
+    });
 }

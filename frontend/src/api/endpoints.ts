@@ -1,6 +1,7 @@
 const BASE_AUTH = "/auth";
 const BASE_USER = "/users";
 const BASE_SUPPLIER = "/supplier";
+const BASE_ORDER = "/orders";
 
 export const ENDPOINTS = {
 
@@ -23,6 +24,7 @@ export const ENDPOINTS = {
         resendEmailChangeOtp: `${BASE_USER}/me/email-change/resend`,
         verifyEmailChange: `${BASE_USER}/me/email-change/verify`,
         passwordChange: `${BASE_USER}/me/password-change`,
+        getUserById: (userId: string) => `${BASE_USER}/${userId}`,
     },
 
     supplier: {
@@ -38,6 +40,15 @@ export const ENDPOINTS = {
         createSupplierType: `${BASE_SUPPLIER}/new-supplier-type`,
         deleteSupplierType: `${BASE_SUPPLIER}/delete-supplier-type`,
         countSupplierType: `${BASE_SUPPLIER}/count-supplier-type`,
+        getSuppliersByIds: (ids: string[]) => {
+            const query = new URLSearchParams();
+            ids.forEach((id) => query.append("ids", id));
+            return `${BASE_SUPPLIER}/by-ids?${query.toString()}`;
+        },
     },
+
+    order: {
+        getRequesterOrderHistory: `${BASE_ORDER}/me/requester`,
+    }
 
 } as const;

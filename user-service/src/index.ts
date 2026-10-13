@@ -8,6 +8,9 @@ import { errorHandler } from "./middlewares/error.middleware.js";
 import cookieParser from "cookie-parser";
 import config from "./config/config.js";
 import { AppError } from "./errors/errors.js";
+import { prisma } from "./libs/prisma.js";
+import { bootstrapAdmin } from "./services/bootstrap-admin.service.js";
+import { startOutboxPublisher } from "./services/outbox-publisher.service.js";
 
 const app = express();
 
@@ -32,6 +35,41 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-app.listen(PORT, () => {
-    console.log(`User service is running at http://localhost:${PORT}`);
-});
+try {
+    const result = await bootstrapAdmin(prisma);
+    console.info(`Admin bootstrap: ${result}`);
+    let stopPublisher: (() => Promise<void>) | undefined;
+    let shuttingDown = false;
+    const server = app.listen(PORT, () => {
+        console.log(`User service is running at http://localhost:${PORT}`);
+        if (!shuttingDown) stopPublisher = startOutboxPublisher(prisma);
+    });
+
+    const shutdown = async () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        // Bound shutdown even if a database or broker connection is stuck.
+        // Unfinished outbox entries are recovered by the next process.
+        const deadline = setTimeout(() => process.exit(1), 15_000);
+        deadline.unref();
+        try {
+            await Promise.all([
+                stopPublisher?.(),
+                new Promise<void>((resolve, reject) => {
+                    server.close(error => error ? reject(error) : resolve());
+                }),
+            ]);
+            await prisma.$disconnect();
+            clearTimeout(deadline);
+        } catch {
+            console.error("User service shutdown failed");
+            process.exitCode = 1;
+        }
+    };
+    process.on("SIGINT", () => { void shutdown(); });
+    process.on("SIGTERM", () => { void shutdown(); });
+} catch (error) {
+    console.error(error instanceof Error ? error.message : "Admin bootstrap failed");
+    await prisma.$disconnect();
+    process.exitCode = 1;
+}
