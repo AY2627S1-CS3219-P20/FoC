@@ -376,9 +376,14 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
 export async function getCourierAcceptanceHistory(courierId: string, input: GetCourierOrderHistoryInput) {
     const page: number = input.page;
     const sortOrder = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
+    const status: OrderStatus | null = input.status ?? null; 
+    console.log(input)
 
     const orders = await prisma.order.findMany({
-        where: { courierId: courierId }, // enforce full string match
+        where: { 
+            courierId: courierId,
+            ...(status ? { status: status } : {}), // If status is provided, include it in the where clause; otherwise, don't filter by status 
+        }, // enforce full string match
         orderBy: { expiryAt: sortOrder }, 
         take: LIMIT, 
         skip: LIMIT * (page - 1),

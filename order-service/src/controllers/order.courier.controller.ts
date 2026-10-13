@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
-import { getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
+import { getCourierOrderHistorySchema, getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
 import { 
     acceptOpenOrder, 
     completePickedUpOrder, 
@@ -94,7 +94,7 @@ export async function getCourierOrderHistory(req: AuthRequest, res: Response) {
     const courierId = req.user!.userId;
     const query = req.query;
 
-    const request = getOpenOrdersSchema.safeParse(query);
+    const request = getCourierOrderHistorySchema.safeParse(query);
     if (!request.success) {
         throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
     }

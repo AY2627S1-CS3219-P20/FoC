@@ -13,6 +13,7 @@ export const getOpenOrdersSchema = z.object({
 
 export const getCourierOrderHistorySchema = z.object({
     page: z.coerce.number().int().positive(),
+    status: z.enum(orderStatuses).optional(),
     sortOrder: z.enum(['asc', 'desc']).default('asc') // only can sort by expiryAt
 });
 
