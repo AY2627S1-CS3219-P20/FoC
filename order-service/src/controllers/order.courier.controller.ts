@@ -37,3 +37,7 @@ export async function acceptOrder(req: AuthRequest, res: Response) {
         },
     });
 }
+
+export async function pickUpAcceptedOrder(req: AuthRequest, res: Response) {
+
+}
