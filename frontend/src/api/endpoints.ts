@@ -46,6 +46,7 @@ export const ENDPOINTS = {
         createSupplierType: `${BASE_SUPPLIER}/new-supplier-type`,
         deleteSupplierType: `${BASE_SUPPLIER}/delete-supplier-type`,
         countSupplierType: `${BASE_SUPPLIER}/count-supplier-type`,
+        getAllActiveSuppliers: `${BASE_SUPPLIER}/active`,
         getSuppliersByIds: (ids: string[]) => {
             const query = new URLSearchParams();
             ids.forEach((id) => query.append("ids", id));
@@ -55,6 +56,6 @@ export const ENDPOINTS = {
 
     order: {
         getRequesterOrderHistory: `${BASE_ORDER}/me/requester`,
+        updateRequest: (orderId: string) => `${BASE_ORDER}/${orderId}`,
     }
-
 } as const;
