@@ -6,7 +6,7 @@ import {
     type ReactNode,
     useRef,
 } from "react";
-import { setToken, removeToken } from "@/utils/token";
+import { getToken, setToken, removeToken } from "@/utils/token";
 import useAuthStore from "@/store/authStore";
 import type { ApiResponse } from "@/types/api.types";
 import { ENDPOINTS } from "@/api/endpoints";
@@ -40,11 +40,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const promise = (async () => {
             setIsInitializing(true);
+            const sessionVersion = useAuthStore.getState().sessionVersion;
+            const token = getToken();
+            const isCurrentSession = () =>
+                useAuthStore.getState().sessionVersion === sessionVersion && getToken() === token;
 
             try {
                 // console.log("REFRESH: starting");
 
                 const response = await authApi.post<ApiResponse<AuthResult>>(ENDPOINTS.auth.refreshToken);
+                if (!isCurrentSession()) return;
                 // console.log("REFRESH: success", response.data);
 
                 const { accessToken, user } = response.data.data!;
@@ -54,8 +59,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(user);
                 // console.log("REFRESH: setUser called");
 
-            } catch (error) {
-                // console.error("REFRESH: FAILED", error);
+            } catch {
+                if (!isCurrentSession()) return;
                 removeToken();
                 clearAuth();
             } finally {
@@ -83,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 toastId: "session-expired",
             });
         };
-        // Listen for the "auth:logout" event from axios interceptor to handle forced logout across tabs
+        // Handle forced logout from the Axios interceptor in this tab.
         window.addEventListener("auth:logout", forcedLogout);
         return () => window.removeEventListener("auth:logout", forcedLogout);
     }, [clearAuth]);

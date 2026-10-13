@@ -4,9 +4,11 @@ import { getToken, setToken, removeToken } from "@/utils/token";
 import { ENDPOINTS } from "@/api/endpoints";
 import type { ApiResponse } from "@/types/api.types";
 import type { AuthResult } from "@/features/auth/types/auth.types";
+import useAuthStore from "@/store/authStore";
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
     _retry?: boolean;
+    _sessionVersion?: number;
 };
 
 const BASE_AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL;
@@ -34,28 +36,53 @@ const refreshAccessToken = async (): Promise<string> => {
 };
 
 
-// To handle multiple requests that fail due to an expired token, 
-// we need to queue them up and retry them once the token is refreshed.
-// This prevents multiple refresh requests from being sent simultaneously.
-let isRefreshing = false;
+// All clients share one refresh for the current session and token. A new login
+// must not join a previous session's pending refresh.
+let pendingRefresh: {
+    sessionVersion: number;
+    token: string;
+    promise: Promise<string>;
+} | null = null;
 
-let failedQueue: {
-    resolve: (token: string) => void;
-    reject: (error: unknown) => void;
-}[] = [];
+const getRefreshedToken = (sessionVersion: number, token: string): Promise<string> => {
+    if (pendingRefresh?.sessionVersion === sessionVersion && pendingRefresh.token === token) {
+        return pendingRefresh.promise;
+    }
 
-// If token refresh is successful, give the new token to all the failed requests in the queue.
-// If token refresh fails, reject all the failed requests in the queue.
-const processQueue = (error: unknown, token: string | null = null): void => {
-    failedQueue.forEach((promise) => {
-        if (error) {
-            promise.reject(error);
-        } else if (token) {
-            promise.resolve(token);
-        }
-    });
+    const isCurrentSession = () =>
+        useAuthStore.getState().sessionVersion === sessionVersion && getToken() === token;
 
-    failedQueue = [];
+    const promise = refreshAccessToken()
+        .then(newToken => {
+            if (!isCurrentSession()) {
+                throw new axios.CanceledError("Session changed during token refresh");
+            }
+            setToken(newToken);
+            return newToken;
+        })
+        .catch(error => {
+            // A late failure must not log out an account that signed in meanwhile.
+            if (isCurrentSession()) {
+                removeToken();
+                window.dispatchEvent(new Event("auth:logout"));
+            }
+            throw error;
+        })
+        .finally(() => {
+            if (pendingRefresh?.promise === promise) pendingRefresh = null;
+        });
+
+    pendingRefresh = { sessionVersion, token, promise };
+    return promise;
+};
+
+const assertCurrentRequest = (config: RetryableRequestConfig): void => {
+    if (config.signal?.aborted || (
+        config._sessionVersion !== undefined
+        && config._sessionVersion !== useAuthStore.getState().sessionVersion
+    )) {
+        throw new axios.CanceledError("Request canceled or session changed");
+    }
 };
 
 // Create an Axios client for a particular microservice API, 
@@ -73,10 +100,14 @@ const createApiClient = (baseURL: string): AxiosInstance => {
 
     // REQUEST INTERCEPTOR
     api.interceptors.request.use(
-        (config: InternalAxiosRequestConfig) => {
+        (config: RetryableRequestConfig) => {
+            assertCurrentRequest(config);
+            config._sessionVersion = useAuthStore.getState().sessionVersion;
             const token = getToken();
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
+            } else {
+                config.headers.delete("Authorization");
             }
             return config;
         },
@@ -93,6 +124,7 @@ const createApiClient = (baseURL: string): AxiosInstance => {
             }
 
             const originalRequest = error.config as RetryableRequestConfig;
+            assertCurrentRequest(originalRequest);
 
             const status = error.response?.status;
             const requestUrl = originalRequest.url ?? "";
@@ -117,43 +149,21 @@ const createApiClient = (baseURL: string): AxiosInstance => {
                 return Promise.reject(error);
             }
 
-            // If the token is already being refreshed, queue the request
-            if (isRefreshing) {
-                return new Promise((resolve, reject) => {
-                    failedQueue.push({
-                        resolve: (token: string) => {
-                            originalRequest.headers.Authorization = `Bearer ${token}`;
-                            resolve(api(originalRequest));
-                        },
-                        reject,
-                    });
-                });
-            }
+            const token = getToken();
+            if (!token) return Promise.reject(error);
 
-            // Start the token refresh process
+            // Mark every request before waiting, including concurrent requests,
+            // so a second 401 never starts another refresh for the same request.
             originalRequest._retry = true;
-            isRefreshing = true;
 
-            try {
-                const newToken = await refreshAccessToken();
-
-                setToken(newToken);
-                processQueue(null, newToken);
-
-                if (originalRequest.headers) {
-                    originalRequest.headers.Authorization =
-                        `Bearer ${newToken}`;
-                }
-
-                return api(originalRequest);
-            } catch (refreshError) {
-                processQueue(refreshError, null);
-                removeToken();
-                window.dispatchEvent(new Event("auth:logout"));
-                return Promise.reject(refreshError);
-            } finally {
-                isRefreshing = false;
+            // Another request may already have refreshed this session's token
+            // before this 401 arrived. Retry with that token instead.
+            if (originalRequest.headers.Authorization === `Bearer ${token}`) {
+                await getRefreshedToken(useAuthStore.getState().sessionVersion, token);
             }
+
+            assertCurrentRequest(originalRequest);
+            return api(originalRequest);
         }
     );
 
