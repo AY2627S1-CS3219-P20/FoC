@@ -4,6 +4,7 @@ import { ENDPOINTS } from "@/api/endpoints";
 import { getToken } from "@/utils/token";
 import type { ApiResponse, CreateSupplierInput, UpdateSupplierInput, Supplier, SupplierType, SupplierTypeCount } from "@/types/api.types";
 import { parseError } from "@/utils/errorHandler";
+import type { OrderRelatedSupplierDetails } from "@/features/order/types/order.types";
 
 export const supplierApi = createApiClient(
     import.meta.env.VITE_SUPPLIER_API_BASE_URL,
@@ -24,6 +25,10 @@ export const viewSuppliersInPage = async (page: number, searchString: string | n
     } catch (error) {
         throw parseError(error);
     }
+};
+
+export const searchSuppliers = async (searchString: string): Promise<Supplier[]> => {
+    return viewSuppliersInPage(1, searchString, "all");
 };
 
 export const countActiveSuppliers = async (searchString: string, typeFilter: string): Promise<number> => {
@@ -103,7 +108,7 @@ export const createSupplierType = async (type: string): Promise<SupplierType> =>
 export const deleteSupplierType = async (type: SupplierTypeCount): Promise<SupplierType> => {
     const jsonBody = {
         id: type.id,
-        type: type.type, 
+        type: type.type,
     } // enforce the argument to be of SupplierType, which is expected by supplier-service
     try {
         const response = await supplierApi.post<ApiResponse<{ message: string; data: SupplierType }>>(
@@ -174,6 +179,20 @@ export const uploadSupplierImage = async (file: File): Promise<string> => {
             throw new Error("No image URL returned from server");
         }
         return body.imageUrl;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const getSuppliersByIdsService = async (
+    ids: string[],
+): Promise<OrderRelatedSupplierDetails[]> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<OrderRelatedSupplierDetails[]>>(
+            ENDPOINTS.supplier.getSuppliersByIds(ids),
+        );
+
+        return response.data.data!;
     } catch (error) {
         throw parseError(error);
     }

@@ -3,6 +3,7 @@ import {
   changePassword,
   createAdminInvitation,
   getMyProfile,
+  getUserById,
   listUsers,
   resendEmailChangeOtp,
   startEmailChange,
@@ -32,4 +33,5 @@ userRouter.post(
 userRouter.get("/", authorize(Role.ADMIN), listUsers);
 userRouter.patch("/:userId/role", authorize(Role.ADMIN), updateUserRole);
 
+userRouter.get("/:userId", getUserById);
 export default userRouter;

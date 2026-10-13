@@ -63,3 +63,10 @@ export function parseInput<T>(schema: z.ZodSchema<T>, body: unknown): T {
         );
     }
 }
+
+export const supplierIdsQuerySchema = z.object({
+    ids: z.preprocess(
+        (value) => (Array.isArray(value) ? value : value === undefined ? [] : [value]),
+        z.array(z.string().trim().min(1)).min(1).max(100),
+    ),
+});

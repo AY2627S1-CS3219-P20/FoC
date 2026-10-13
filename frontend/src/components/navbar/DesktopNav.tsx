@@ -7,13 +7,13 @@ interface DesktopNavProps {
 
 const DesktopNav = ({ links }: DesktopNavProps) => {
     return (
-        <nav className="hidden items-center space-x-8 md:flex">
+        <nav className="hidden items-center gap-3 lg:gap-6 md:flex">
             {links.map(({ label, href }) => (
                 <NavLink
                     key={href}
                     to={href}
                     className={({ isActive }) =>
-                        `text-sm font-medium text-center ${isActive
+                        `w-fit text-sm font-medium text-center ${isActive
                             ? "text-zinc-800"
                             : "text-zinc-500 hover:text-zinc-700"
                         }`

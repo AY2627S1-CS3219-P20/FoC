@@ -25,6 +25,16 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
         indigo: 'bg-indigo-900 text-white hover:bg-indigo-800 focus-visible:ring-indigo-400',
         linkIndigo: 'text-indigo-500 underline-offset-4 underline cursor-pointer hover:text-indigo-700 focus-visible:ring-indigo-400',
+        input:
+          'border-border bg-transparent hover:bg-background hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
+        teal: 'bg-teal-200 text-teal-900 hover:bg-teal-300 focus-visible:ring-teal-400',
+        sky: 'bg-sky-200 text-sky-900 hover:bg-sky-300 focus-visible:ring-sky-400',
+        yellow: 'bg-yellow-200 text-yellow-900 hover:bg-yellow-300 focus-visible:ring-yellow-400',
+        indigo200: 'bg-indigo-200 text-indigo-900 hover:bg-indigo-300 focus-visible:ring-indigo-400',
+        green: 'bg-green-200 text-green-900 hover:bg-green-300 focus-visible:ring-green-400',
+        orange: 'bg-orange-200 text-orange-900 hover:bg-orange-300 focus-visible:ring-orange-400',
+        red: 'bg-red-200 text-red-900 hover:bg-red-300 focus-visible:ring-red-400',
+        gray: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-400',
       },
       size: {
         default: 'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
@@ -65,4 +75,4 @@ function Button({
   );
 }
 
-export { Button, buttonVariants };
+export { Button, buttonVariants, type ButtonProps };

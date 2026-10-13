@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { authorize } from "../middleware/authorize.middleware.js";
+import { Role } from "../types/auth.types.js";
+import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
 
@@ -13,8 +16,9 @@ orderRouter.use(authenticate);
 // Get all orders with OPEN status
 // orderRouter.get("/");
 
-// Orders created by the authenticated requester
-// orderRouter.get("/me/requester");
+// All requests made by the authenticated requester
+// Can be filtered by status, sorted by createdAt or expiryAt, and paginated
+orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHistory);
 
 // Orders accepted by the authenticated courier
 // orderRouter.get("/me/courier");

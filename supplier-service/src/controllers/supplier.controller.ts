@@ -14,6 +14,7 @@ import {
     createSupplierSchema,
     parseInput,
     updateSupplierSchema,
+    supplierIdsQuerySchema,
 } from "../schemas/supplier.schema.js";
 import {
     countForEachType,
@@ -26,6 +27,8 @@ import {
     fetchActiveSuppliers,
     fetchAllSuppliers,
     updateSupplier as updateSupplierService,
+    getSupplierByIdService,
+    getSuppliersByIdsService,
 } from "../services/supplier.service.js";
 
 export async function countAllActiveSuppliers(req: Request, res: Response) {
@@ -221,4 +224,42 @@ export async function serveAsset(req: Request, res: Response) {
     res.setHeader("Content-Type", getContentType(filename));
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.sendFile(safePath);
+}
+
+export async function getSupplierById(req: Request, res: Response) {
+    const supplierId = req.params.supplierId;
+
+    if (typeof supplierId !== "string" || !supplierId) {
+        throw new AppError("Supplier id is required", 400);
+    }
+
+    const supplier = await getSupplierByIdService(supplierId);
+
+    if (!supplier) {
+        throw new AppError("Supplier not found", 404, "SUPPLIER_NOT_FOUND");
+    }
+
+    res.status(200).json({
+        success: true,
+        message: "Supplier fetched successfully",
+        data: supplier,
+    });
+}
+
+export async function getSuppliersByIds(req: Request, res: Response) {
+    const parsedQuery = supplierIdsQuerySchema.safeParse(req.query);
+
+    if (!parsedQuery.success) {
+        throw new AppError(
+            parsedQuery.error.issues.at(0)?.message ?? "Invalid supplier IDs",
+            400,
+        );
+    }
+
+    const suppliers = await getSuppliersByIdsService(parsedQuery.data.ids);
+
+    res.status(200).json({
+        message: "Suppliers retrieved successfully",
+        data: suppliers,
+    });
 }
