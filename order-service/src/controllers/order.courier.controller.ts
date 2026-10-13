@@ -2,7 +2,14 @@ import type { Request, Response } from "express";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
 import { getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
-import { acceptOpenOrder, completePickedUpOrder, dropAcceptedOrder, getAllOpenOrders, pickUpAcceptedOrder } from "../services/order.courier.service.js";
+import { 
+    acceptOpenOrder, 
+    completePickedUpOrder, 
+    dropAcceptedOrder, 
+    getAllOpenOrders, 
+    getCourierAcceptanceHistory, 
+    pickUpAcceptedOrder 
+} from "../services/order.courier.service.js";
 
 export async function getOpenOrders(req: AuthRequest, res: Response) {
     const courierId = req.user!.userId;
@@ -79,6 +86,25 @@ export async function dropOrder(req: AuthRequest, res: Response) {
         data: {
             message: `Order ${updatedOrder.id} dropped by courier ${courierId}`,
             data: updatedOrder,
+        },
+    });
+}
+
+export async function getCourierOrderHistory(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const query = req.query;
+
+    const request = getOpenOrdersSchema.safeParse(query);
+    if (!request.success) {
+        throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
+    }
+    const orders = await getCourierAcceptanceHistory(courierId, request.data);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `${orders.length} orders previously accepted by courier ${courierId} retrieved`,
+            data: orders,
         },
     });
 }

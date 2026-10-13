@@ -2,7 +2,13 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { acceptOrder, completeOrder, dropOrder, getOpenOrders, pickUpOrder } from "../controllers/order.courier.controller.js";
+import { acceptOrder, 
+    completeOrder, 
+    dropOrder, 
+    getCourierOrderHistory, 
+    getOpenOrders, 
+    pickUpOrder 
+} from "../controllers/order.courier.controller.js";
 import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
@@ -22,7 +28,7 @@ orderRouter.get("", authorize(Role.STUDENT), getOpenOrders);
 orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHistory);
 
 // Orders accepted by the authenticated courier
-// orderRouter.get("/me/courier");
+orderRouter.get("/me/courier", authorize(Role.STUDENT), getCourierOrderHistory);
 
 // Update a specific order by ID
 // orderRouter.patch("/:orderId");

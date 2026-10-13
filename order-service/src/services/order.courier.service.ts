@@ -1,6 +1,6 @@
 import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
-import type { GetOpenOrdersInput } from "../schemas/order.courier.schema.js";
+import type { GetCourierOrderHistoryInput, GetOpenOrdersInput } from "../schemas/order.courier.schema.js";
 import { OrderStatus } from "../generated/prisma/client.js";
 
 // order lifecycle statuses
@@ -363,4 +363,22 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
     });
 
     return result;
+}
+
+export async function getCourierAcceptanceHistory(courierId: string, input: GetCourierOrderHistoryInput) {
+    const page: number = input.page;
+    const sortOrder = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
+
+    const orders = await prisma.order.findMany({
+        where: { courierId: courierId }, // enforce full string match
+        orderBy: { expiryAt: sortOrder }, 
+        take: LIMIT, 
+        skip: LIMIT * (page - 1),
+    });
+
+    if (!orders || orders.length == 0) {
+        throw new AppError(`No records found for page ${page}`, 400);
+    }
+
+    return orders;
 }
