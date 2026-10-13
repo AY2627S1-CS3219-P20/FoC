@@ -33,6 +33,7 @@ model CreditAccount {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   transactions CreditTransaction[]
+  reservations CreditReservation[]
 
   @@index([userId])
 }
@@ -51,8 +52,52 @@ model CreditTransaction {
   orderId        String?               @db.Uuid
   idempotencyKey String                @unique
 
+  reservationId String? @db.Uuid
+  reservation CreditReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
   account CreditAccount @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
+  @@unique([reservationId, accountId, type])
   @@index([accountId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([accountId, type, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+
+enum ReservationStatus {
+  RESERVED
+  TRANSFERRED
+  RELEASED
+  REFUNDED
+  ABORTED
+}
+
+enum SettlementReason {
+  RECEIVED
+  CANCELED
+  EXPIRED
+  FAILED
+  CREATION_ABORTED
+}
+
+model CreditReservation {
+  id String @id @db.Uuid
+  orderId String @db.Uuid
+  requesterId String @db.Uuid
+  amount Int
+  status ReservationStatus @default(RESERVED)
+  courierId String? @db.Uuid
+  settlementEventId String? @unique @db.Uuid
+  settlementReason SettlementReason?
+  // Preserve the complete validated envelope to detect altered replays.
+  settlementPayload Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  settledAt DateTime? @db.Timestamptz(6)
+  // Abort tombstones may precede account provisioning.
+  accountId String? @db.Uuid
+  account CreditAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  transactions CreditTransaction[]
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
 }
