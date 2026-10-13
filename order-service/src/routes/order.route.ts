@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { acceptOrder, getOpenOrders, pickUpOrder } from "../controllers/order.courier.controller.js";
+import { acceptOrder, completeOrder, getOpenOrders, pickUpOrder } from "../controllers/order.courier.controller.js";
 import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
@@ -53,6 +53,6 @@ orderRouter.post("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
 orderRouter.post("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
 
 // Mark an order as completed (by courier)
-// orderRouter.post("/:orderId/completion");
+orderRouter.post("/:orderId/completion", authorize(Role.STUDENT), completeOrder);;
 
 export default orderRouter;

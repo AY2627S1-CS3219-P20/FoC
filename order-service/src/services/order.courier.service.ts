@@ -121,7 +121,7 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
 
         // disallow action if order is no longer open (F3.1.3)
         if (order.status !== STATUS.OPEN) {
-            throw new AppError(`Order ${orderId} cannot be accepted`, 400);
+            throw new AppError(`Order ${orderId} is not in the OPEN status and cannot be accepted`, 400);
         }
 
         // disallow action if requester is trying to accept their own order (F3.1.1)
@@ -193,7 +193,7 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
 
         // check that order is still in the ACCEPTED status (F4.1.2)
         if (order.status !== STATUS.ACCEPTED) {
-            throw new AppError(`Order ${orderId} cannot be marked as picked up`, 400);
+            throw new AppError(`Order ${orderId} is not in the ACCEPTED status and cannot be marked as picked up`, 400);
         }
 
         // update order status to PICKED_UP (F4.2); updatedAt column is automatically updated by Prisma (F4.2.1)
@@ -204,7 +204,73 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
             data: {
                 status: newStatus,
                 version: order.version + 1,
-                pickedUpAt: now // record time when order was accepted (F4.2.1s)
+                pickedUpAt: now // record time when order was accepted (F4.2.1)
+            }
+        });
+
+         // check if update was successful
+        if (!updatedOrder || updatedOrder.status != newStatus) {
+            throw new AppError(`Status update for order ${order.id} has failed`, 500);
+        }
+
+        // update the order status history
+        const transactionRecord = await tx.orderStatusHistory.create({
+            data: {
+                orderId: updatedOrder.id,
+                fromStatus: oldStatus,
+                toStatus: newStatus, 
+                changedBy: courierId
+            }
+        });
+
+        // check if transaction record was successfully logged
+        if (!transactionRecord) {
+            throw new AppError(`Unable to record status update for order ${updatedOrder.id}`, 500);
+        }
+
+        return updatedOrder;
+    });
+
+    return result;
+}
+
+export async function completePickedUpOrder(courierId: string, orderId: string) {
+    const oldStatus: OrderStatus = STATUS.PICKED_UP;
+    const newStatus: OrderStatus = STATUS.COMPLETED;
+
+    const result = await prisma.$transaction(async (tx) => {
+        const now: Date = new Date();
+
+        const order = await tx.order.findUnique({
+            where: {
+                id: orderId,
+            }
+        });
+
+        // order id does not exist
+        if (!order) {
+            throw new AppError(`Order ${orderId} does not exist`, 404);
+        }
+
+        // check that the user trying to mark the order as COMPLETED is listed as the courier of the order (F5.1.1)
+        if (order.courierId !== courierId) {
+            throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
+        }
+
+        // check that order is still in the PICKED_UP status (F5.1.2)
+        if (order.status !== STATUS.PICKED_UP) {
+            throw new AppError(`Order ${orderId} cannot be marked as picked up`, 400);
+        }
+
+        // update order status to PICKED_UP (F5.2); updatedAt column is automatically updated by Prisma (F5.2.1)
+        const updatedOrder = await tx.order.update({
+            where: {
+                id: order.id,
+            }, 
+            data: {
+                status: newStatus,
+                version: order.version + 1,
+                completedAt: now // record time when order was accepted (F5.2.1)
             }
         });
 
