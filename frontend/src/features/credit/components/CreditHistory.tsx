@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { creditKeys } from "../credit.keys";
 import { transactionLabels } from "../credit.presentation";
@@ -17,8 +18,6 @@ interface HistoryView {
     type?: CreditTransactionType;
     cursors: (string | undefined)[];
 }
-
-const selectClassName = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-indigo-600 sm:w-auto";
 
 const CreditHistory = ({ userId }: { userId: string }) => {
     const queryClient = useQueryClient();
@@ -45,36 +44,40 @@ const CreditHistory = ({ userId }: { userId: string }) => {
     return (
         <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                <label className="min-w-0">
-                    <span className="sr-only">Sort by timestamp</span>
-                    <select
-                        className={selectClassName}
-                        value={view.sort}
-                        onChange={event => setView(current => ({
-                            ...current, sort: event.target.value as CreditTransactionSort, cursors: [undefined],
-                        }))}
-                    >
-                        <option value="desc">Sort: Newest first</option>
-                        <option value="asc">Sort: Oldest first</option>
-                    </select>
-                </label>
-                <label className="min-w-0">
-                    <span className="sr-only">Transaction type</span>
-                    <select
-                        className={selectClassName}
-                        value={view.type ?? ""}
-                        onChange={event => setView(current => ({
-                            ...current,
-                            type: event.target.value === "" ? undefined : event.target.value as CreditTransactionType,
-                            cursors: [undefined],
-                        }))}
-                    >
-                        <option value="">Type: All transactions</option>
+                <Select
+                    value={view.sort}
+                    onValueChange={value => {
+                        if (value === null) return;
+                        setView(current => ({ ...current, sort: value, cursors: [undefined] }));
+                    }}
+                >
+                    <SelectTrigger aria-label="Sort by timestamp" className="w-full bg-white sm:w-48">
+                        <SelectValue>Sort: {view.sort === "desc" ? "Newest first" : "Oldest first"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                        <SelectItem value="desc">Newest first</SelectItem>
+                        <SelectItem value="asc">Oldest first</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select<CreditTransactionType | "ALL">
+                    value={view.type ?? "ALL"}
+                    onValueChange={value => {
+                        if (value === null) return;
+                        setView(current => ({
+                            ...current, type: value === "ALL" ? undefined : value, cursors: [undefined],
+                        }));
+                    }}
+                >
+                    <SelectTrigger aria-label="Transaction type" className="w-full bg-white sm:w-72">
+                        <SelectValue>Type: {view.type ? transactionLabels[view.type] : "All transactions"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                        <SelectItem value="ALL">All transactions</SelectItem>
                         {CREDIT_TRANSACTION_TYPES.map(type => (
-                            <option key={type} value={type}>Type: {transactionLabels[type]}</option>
+                            <SelectItem key={type} value={type}>{transactionLabels[type]}</SelectItem>
                         ))}
-                    </select>
-                </label>
+                    </SelectContent>
+                </Select>
                 <Button variant="outline" size="lg" className="sm:ml-auto" disabled={busy} onClick={restart}>
                     Refresh history
                 </Button>
