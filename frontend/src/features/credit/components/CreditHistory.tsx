@@ -80,11 +80,13 @@ const CreditHistory = ({ userId }: { userId: string }) => {
                 </Button>
             </div>
 
-            <div role="status" aria-live="polite" className="text-sm text-slate-600">
-                {query.fetchStatus === "paused" ? "Waiting for a connection…" : query.isFetching ? (
-                    <span className="inline-flex items-center gap-2"><Spinner />Loading transactions…</span>
-                ) : page ? `Page ${view.cursors.length} · ${page.items.length} transactions` : null}
-            </div>
+            {busy && (
+                <div role="status" aria-live="polite" className="text-sm text-slate-600">
+                    {query.fetchStatus === "paused" ? "Waiting for a connection…" : (
+                        <span className="inline-flex items-center gap-2"><Spinner />Loading transactions…</span>
+                    )}
+                </div>
+            )}
 
             {query.isError && (
                 <div role="alert" className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm">
@@ -121,15 +123,20 @@ const CreditHistory = ({ userId }: { userId: string }) => {
             )}
 
             {(page || !firstPage) && (
-                <nav aria-label="Transaction pages" className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
-                    <Button variant="outline" disabled={firstPage || busy} onClick={() => setView(current => ({
-                        ...current, cursors: current.cursors.slice(0, -1),
-                    }))}>Previous</Button>
-                    <span className="text-sm text-slate-600">Page {view.cursors.length}</span>
-                    <Button variant="outline" disabled={busy || query.isError || !page?.nextCursor} onClick={() => {
-                        const nextCursor = page?.nextCursor;
-                        if (nextCursor) setView(current => ({ ...current, cursors: [...current.cursors, nextCursor] }));
-                    }}>Next</Button>
+                <nav aria-label="Transaction pages" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                    <span className="text-sm text-slate-600">
+                        Page {view.cursors.length}
+                        {page && ` · Showing ${page.items.length} ${page.items.length === 1 ? "transaction" : "transactions"}`}
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                        <Button variant="outline" disabled={firstPage || busy} onClick={() => setView(current => ({
+                            ...current, cursors: current.cursors.slice(0, -1),
+                        }))}>Previous</Button>
+                        <Button variant="outline" disabled={busy || query.isError || !page?.nextCursor} onClick={() => {
+                            const nextCursor = page?.nextCursor;
+                            if (nextCursor) setView(current => ({ ...current, cursors: [...current.cursors, nextCursor] }));
+                        }}>Next</Button>
+                    </div>
                 </nav>
             )}
         </div>
