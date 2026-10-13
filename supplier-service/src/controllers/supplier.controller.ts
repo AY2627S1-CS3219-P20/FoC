@@ -29,6 +29,7 @@ import {
     updateSupplier as updateSupplierService,
     getSupplierByIdService,
     getSuppliersByIdsService,
+    getAllActiveSuppliersService,
 } from "../services/supplier.service.js";
 
 export async function countAllActiveSuppliers(req: Request, res: Response) {
@@ -260,6 +261,15 @@ export async function getSuppliersByIds(req: Request, res: Response) {
 
     res.status(200).json({
         message: "Suppliers retrieved successfully",
+        data: suppliers,
+    });
+}
+
+export async function getAllActiveSuppliers(req: Request, res: Response) {
+    const suppliers = await getAllActiveSuppliersService();
+
+    res.status(200).json({
+        message: "Active suppliers retrieved successfully",
         data: suppliers,
     });
 }
