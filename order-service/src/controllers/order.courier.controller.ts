@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
 import { getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
-import { getAllOpenOrders } from "../services/order.courier.service.js";
+import { acceptOpenOrder, getAllOpenOrders } from "../services/order.courier.service.js";
 
 export async function getOpenOrders(req: AuthRequest, res: Response) {
     const courierId = req.user!.userId;
@@ -19,6 +19,21 @@ export async function getOpenOrders(req: AuthRequest, res: Response) {
         data: {
             message: `All orders on page ${request.data.page} retrieved`,
             data: orders,
+        },
+    });
+}
+
+export async function acceptOrder(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const orderId = req.params.orderId as string; // can safely typecast to a single string since this is a route parameter
+
+    const updatedOrder = await acceptOpenOrder(courierId, orderId);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `Order ${updatedOrder.id} accepted by courier ${updatedOrder.courierId}`,
+            data: updatedOrder,
         },
     });
 }
