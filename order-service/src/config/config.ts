@@ -25,6 +25,8 @@ const config = {
     port: getEnvNumber("PORT"),
     databaseUrl: getEnv("DATABASE_URL"),
     frontendUrl: getEnv("FRONTEND_URL"),
+    supplierServiceUrl: getEnv("SUPPLIER_SERVICE_URL"),
+    creditServiceUrl: getEnv("CREDIT_SERVICE_URL"),
     jwtPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH"),
 };
 

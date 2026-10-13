@@ -7,6 +7,8 @@ export const DEFAULT_ERRORS: Record<number, string> = {
     422: "UNPROCESSABLE_ENTITY",
     429: "TOO_MANY_REQUESTS",
     500: "INTERNAL_SERVER_ERROR",
+    502: "BAD_GATEWAY",
+    504: "GATEWAY_TIMEOUT",
 };
 
 export class AppError extends Error {
