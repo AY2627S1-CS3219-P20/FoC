@@ -17,11 +17,17 @@ const TransactionType = ({ transaction }: { transaction: CreditTransaction }) =>
     </>
 );
 
+const BalanceDelta = ({ value }: { value: number }) => (
+    <span className={value > 0 ? "text-green-700" : value < 0 ? "text-red-700" : "text-slate-600"}>
+        {formatCreditDelta(value)}
+    </span>
+);
+
 const Amount = ({ transaction }: { transaction: CreditTransaction }) => (
     <div className="tabular-nums">
         <p className="font-medium text-slate-900">{formatCredits(transaction.amount)} credits</p>
-        <p className="mt-1 text-xs text-slate-600">Available {formatCreditDelta(transaction.availableDelta)}</p>
-        <p className="text-xs text-slate-600">Reserved {formatCreditDelta(transaction.reservedDelta)}</p>
+        <p className="mt-1 text-xs text-slate-600">Available <BalanceDelta value={transaction.availableDelta} /></p>
+        <p className="text-xs text-slate-600">Reserved <BalanceDelta value={transaction.reservedDelta} /></p>
     </div>
 );
 
@@ -39,7 +45,7 @@ const CreditTransactionList = ({ items }: { items: CreditTransaction[] }) => (
                 <tr>
                     <th scope="col" className="w-1/4 p-4 font-medium">Date and time</th>
                     <th scope="col" className="w-1/4 p-4 font-medium">Type</th>
-                    <th scope="col" className="w-1/4 p-4 font-medium">Amount / balance effect</th>
+                    <th scope="col" className="w-1/4 p-4 font-medium">Amount</th>
                     <th scope="col" className="w-1/4 p-4 font-medium">Associated errand (order ID)</th>
                 </tr>
             </thead>
@@ -61,7 +67,7 @@ const CreditTransactionList = ({ items }: { items: CreditTransaction[] }) => (
                     <p className="mt-2 text-xs text-slate-600"><Timestamp value={transaction.createdAt} /></p>
                     <dl className="mt-4 space-y-3 text-sm">
                         <div>
-                            <dt className="mb-1 text-xs text-slate-500">Amount / balance effect</dt>
+                            <dt className="mb-1 text-xs text-slate-500">Amount</dt>
                             <dd><Amount transaction={transaction} /></dd>
                         </div>
                         <div>

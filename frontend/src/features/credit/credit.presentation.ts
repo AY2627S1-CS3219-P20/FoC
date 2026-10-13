@@ -19,7 +19,7 @@ const numberFormatter = new Intl.NumberFormat();
 const deltaFormatter = new Intl.NumberFormat(undefined, { signDisplay: "exceptZero" });
 const timestampFormatter = new Intl.DateTimeFormat(undefined, {
     year: "numeric", month: "short", day: "numeric",
-    hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short",
+    hour: "numeric", minute: "2-digit",
 });
 
 export const formatCredits = (value: number) => numberFormatter.format(value);
