@@ -44,15 +44,15 @@ orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHisto
 // orderRouter.post("/:orderId/renewal");
 
 // Accept an order (by courier)
-orderRouter.post("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
+orderRouter.put("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
 
 // Drop acceptance (by courier)
 // orderRouter.delete("/:orderId/acceptance");
 
 // Mark an order as picked up (by courier)
-orderRouter.post("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
+orderRouter.put("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
 
 // Mark an order as completed (by courier)
-orderRouter.post("/:orderId/completion", authorize(Role.STUDENT), completeOrder);;
+orderRouter.put("/:orderId/completion", authorize(Role.STUDENT), completeOrder);;
 
 export default orderRouter;
