@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { authorize } from "../middleware/authorize.middleware.js";
+import { Role } from "../types/auth.types.js";
+import { getOpenOrders } from "../controllers/order.courier.controller.js";
 
 const orderRouter = Router();
 
@@ -10,8 +13,8 @@ orderRouter.use(authenticate);
 // Create a new order
 // orderRouter.post("/");
 
-// Get all orders with OPEN status
-// orderRouter.get("/");
+// Get all orders with OPEN status 
+orderRouter.get("", authorize(Role.STUDENT), getOpenOrders);
 
 // Orders created by the authenticated requester
 // orderRouter.get("/me/requester");
