@@ -1,0 +1,110 @@
+import type { Request, Response } from "express";
+import { AppError } from "../errors/errors.js";
+import type { AuthRequest } from "../types/auth.types.js";
+import { getCourierOrderHistorySchema, getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
+import { 
+    acceptOpenOrder, 
+    completePickedUpOrder, 
+    dropAcceptedOrder, 
+    getAllOpenOrders, 
+    getCourierAcceptanceHistory, 
+    pickUpAcceptedOrder 
+} from "../services/order.courier.service.js";
+
+export async function getOpenOrders(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const query = req.query;
+
+    const request = getOpenOrdersSchema.safeParse(query);
+    if (!request.success) {
+        throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
+    }
+    const orders = await getAllOpenOrders(courierId, request.data);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `${orders.length} orders on page ${request.data.page} retrieved`,
+            data: orders,
+        },
+    });
+}
+
+export async function acceptOrder(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const orderId = req.params.orderId as string; // can safely typecast to a single string since this is a route parameter
+
+    const updatedOrder = await acceptOpenOrder(courierId, orderId);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `Order ${updatedOrder.id} accepted by courier ${updatedOrder.courierId}`,
+            data: updatedOrder,
+        },
+    });
+}
+
+export async function pickUpOrder(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const orderId = req.params.orderId as string; // can safely typecast to a single string since this is a route parameter
+
+    const updatedOrder = await pickUpAcceptedOrder(courierId, orderId);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `Order ${updatedOrder.id} picked up by courier ${updatedOrder.courierId}`,
+            data: updatedOrder,
+        },
+    });
+}
+
+export async function completeOrder(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const orderId = req.params.orderId as string; // can safely typecast to a single string since this is a route parameter
+
+    const updatedOrder = await completePickedUpOrder(courierId, orderId);
+    
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `Order ${updatedOrder.id} completed by courier ${updatedOrder.courierId}`,
+            data: updatedOrder,
+        },
+    });
+}
+
+export async function dropOrder(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const orderId = req.params.orderId as string; // can safely typecast to a single string since this is a route parameter
+
+    const updatedOrder = await dropAcceptedOrder(courierId, orderId);
+    
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `Order ${updatedOrder.id} dropped by courier ${courierId}`,
+            data: updatedOrder,
+        },
+    });
+}
+
+export async function getCourierOrderHistory(req: AuthRequest, res: Response) {
+    const courierId = req.user!.userId;
+    const query = req.query;
+
+    const request = getCourierOrderHistorySchema.safeParse(query);
+    if (!request.success) {
+        throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
+    }
+    const orders = await getCourierAcceptanceHistory(courierId, request.data);
+
+    return res.status(200).json({
+        success: true,
+        data: {
+            message: `${orders.length} orders previously accepted by courier ${courierId} retrieved`,
+            data: orders,
+        },
+    });
+}

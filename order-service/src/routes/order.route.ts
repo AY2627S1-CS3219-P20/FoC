@@ -2,6 +2,13 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
+import { acceptOrder, 
+    completeOrder, 
+    dropOrder, 
+    getCourierOrderHistory, 
+    getOpenOrders, 
+    pickUpOrder 
+} from "../controllers/order.courier.controller.js";
 import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
@@ -13,15 +20,15 @@ orderRouter.use(authenticate);
 // Create a new order
 // orderRouter.post("/");
 
-// Get all orders with OPEN status
-// orderRouter.get("/");
+// Get all orders with OPEN status 
+orderRouter.get("", authorize(Role.STUDENT), getOpenOrders);
 
 // All requests made by the authenticated requester
 // Can be filtered by status, sorted by createdAt or expiryAt, and paginated
 orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHistory);
 
 // Orders accepted by the authenticated courier
-// orderRouter.get("/me/courier");
+orderRouter.get("/me/courier", authorize(Role.STUDENT), getCourierOrderHistory);
 
 // Update a specific order by ID
 // orderRouter.patch("/:orderId");
@@ -43,15 +50,15 @@ orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHisto
 // orderRouter.post("/:orderId/renewal");
 
 // Accept an order (by courier)
-// orderRouter.post("/:orderId/acceptance");
+orderRouter.put("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
 
 // Drop acceptance (by courier)
-// orderRouter.delete("/:orderId/acceptance");
+orderRouter.delete("/:orderId/acceptance", authorize(Role.STUDENT), dropOrder);
 
 // Mark an order as picked up (by courier)
-// orderRouter.post("/:orderId/pickup");
+orderRouter.put("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
 
 // Mark an order as completed (by courier)
-// orderRouter.post("/:orderId/completion");
+orderRouter.put("/:orderId/completion", authorize(Role.STUDENT), completeOrder);;
 
 export default orderRouter;
