@@ -5,14 +5,14 @@ import { getOpenOrdersSchema } from "../schemas/order.courier.schema.js";
 import { getAllOpenOrders } from "../services/order.courier.service.js";
 
 export async function getOpenOrders(req: AuthRequest, res: Response) {
-    const requesterId = req.user!.userId;
+    const courierId = req.user!.userId;
     const query = req.query;
 
     const request = getOpenOrdersSchema.safeParse(query);
     if (!request.success) {
         throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
     }
-    const orders = await getAllOpenOrders(requesterId, request.data);
+    const orders = await getAllOpenOrders(courierId, request.data);
 
     return res.status(200).json({
         success: true,

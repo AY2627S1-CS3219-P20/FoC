@@ -31,7 +31,7 @@ export async function updateExpiredOrders() {
     return ordersUpdated; 
 }
 
-export async function getAllOpenOrders(requesterId: string, input: GetOpenOrdersInput) {
+export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersInput) {
     const page: number = input.page;
     const sortBy: string = input.sortBy; // default set to sorting by expiry time
     const sortOrder: string = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
@@ -50,7 +50,7 @@ export async function getAllOpenOrders(requesterId: string, input: GetOpenOrders
             }, 
             status: STATUS.OPEN, 
             requesterId: { 
-                not: requesterId 
+                not: courierId
             }
         },
         orderBy: { [sortBy]: sortOrder }, 
