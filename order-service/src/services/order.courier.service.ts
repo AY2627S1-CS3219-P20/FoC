@@ -106,37 +106,37 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
     const oldStatus: OrderStatus = STATUS.OPEN;
     const newStatus: OrderStatus = STATUS.ACCEPTED;
 
+    const now: Date = new Date();
+    const order = await prisma.order.findUnique({
+        where: {
+            id: orderId,
+        }
+    });
+
+    // order id does not exist
+    if (!order) {
+        throw new AppError(`Order ${orderId} does not exist`, 404);
+    }
+
+    // order has expired
+    if (order.expiryAt <= now || order.status === STATUS.EXPIRED) {
+        if (order.status === STATUS.OPEN) {
+            await updateExpiredOrders(); // update the row to expired, if it is still open
+        }
+        throw new AppError(`Order ${orderId} has expired`, 400);
+    }
+
+    // disallow action if order is no longer open (F3.1.3)
+    if (order.status !== STATUS.OPEN) {
+        throw new AppError(`Order ${orderId} is not in the OPEN status and cannot be accepted`, 400);
+    }
+
+    // disallow action if requester is trying to accept their own order (F3.1.1)
+    if (order.requesterId === courierId) {
+        throw new AppError(`Requester ${courierId} cannot accept their own order ${orderId}`, 403);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-        const now: Date = new Date();
-        const order = await tx.order.findUnique({
-            where: {
-                id: orderId,
-            }
-        });
-
-        // order id does not exist
-        if (!order) {
-            throw new AppError(`Order ${orderId} does not exist`, 404);
-        }
-
-        // order has expired
-        if (order.expiryAt <= now || order.status === STATUS.EXPIRED) {
-            if (order.status === STATUS.OPEN) {
-                await updateExpiredOrders(); // update the row to expired, if it is still open
-            }
-            throw new AppError(`Order ${orderId} has expired`, 400);
-        }
-
-        // disallow action if order is no longer open (F3.1.3)
-        if (order.status !== STATUS.OPEN) {
-            throw new AppError(`Order ${orderId} is not in the OPEN status and cannot be accepted`, 400);
-        }
-
-        // disallow action if requester is trying to accept their own order (F3.1.1)
-        if (order.requesterId === courierId) {
-            throw new AppError(`Requester ${courierId} cannot accept their own order ${orderId}`, 403);
-        }
-
         // update order status to ACCEPTED (F3.2.1); updatedAt column is automatically updated by Prisma (F3.2.2)
         const updatedOrder = await tx.order.update({
             where: {
@@ -180,30 +180,30 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
     const newStatus: OrderStatus = STATUS.PICKED_UP;
 
+    const now: Date = new Date();
+
+    const order = await prisma.order.findUnique({
+        where: {
+            id: orderId,
+        }
+    });
+
+    // order id does not exist
+    if (!order) {
+        throw new AppError(`Order ${orderId} does not exist`, 404);
+    }
+
+    // check that the user trying to mark the order as PICKED_UP is listed as the courier of the order (F4.1.1)
+    if (order.courierId !== courierId) {
+        throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
+    }
+
+    // check that order is still in the ACCEPTED status (F4.1.2)
+    if (order.status !== STATUS.ACCEPTED) {
+        throw new AppError(`Order ${orderId} is not in the ACCEPTED status and cannot be marked as picked up`, 400);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-        const now: Date = new Date();
-
-        const order = await tx.order.findUnique({
-            where: {
-                id: orderId,
-            }
-        });
-
-        // order id does not exist
-        if (!order) {
-            throw new AppError(`Order ${orderId} does not exist`, 404);
-        }
-
-        // check that the user trying to mark the order as PICKED_UP is listed as the courier of the order (F4.1.1)
-        if (order.courierId !== courierId) {
-            throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
-        }
-
-        // check that order is still in the ACCEPTED status (F4.1.2)
-        if (order.status !== STATUS.ACCEPTED) {
-            throw new AppError(`Order ${orderId} is not in the ACCEPTED status and cannot be marked as picked up`, 400);
-        }
-
         // update order status to PICKED_UP (F4.2); updatedAt column is automatically updated by Prisma (F4.2.1)
         const updatedOrder = await tx.order.update({
             where: {
@@ -246,30 +246,30 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
     const oldStatus: OrderStatus = STATUS.PICKED_UP;
     const newStatus: OrderStatus = STATUS.COMPLETED;
 
+    const now: Date = new Date();
+
+    const order = await prisma.order.findUnique({
+        where: {
+            id: orderId,
+        }
+    });
+
+    // order id does not exist
+    if (!order) {
+        throw new AppError(`Order ${orderId} does not exist`, 404);
+    }
+
+    // check that the user trying to mark the order as COMPLETED is listed as the courier of the order (F5.1.1)
+    if (order.courierId !== courierId) {
+        throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
+    }
+
+    // check that order is still in the PICKED_UP status (F5.1.2)
+    if (order.status !== STATUS.PICKED_UP) {
+        throw new AppError(`Order ${orderId} cannot be marked as picked up`, 400);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-        const now: Date = new Date();
-
-        const order = await tx.order.findUnique({
-            where: {
-                id: orderId,
-            }
-        });
-
-        // order id does not exist
-        if (!order) {
-            throw new AppError(`Order ${orderId} does not exist`, 404);
-        }
-
-        // check that the user trying to mark the order as COMPLETED is listed as the courier of the order (F5.1.1)
-        if (order.courierId !== courierId) {
-            throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
-        }
-
-        // check that order is still in the PICKED_UP status (F5.1.2)
-        if (order.status !== STATUS.PICKED_UP) {
-            throw new AppError(`Order ${orderId} cannot be marked as picked up`, 400);
-        }
-
         // update order status to PICKED_UP (F5.2); updatedAt column is automatically updated by Prisma (F5.2.1)
         const updatedOrder = await tx.order.update({
             where: {
@@ -312,28 +312,28 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
     const newStatus: OrderStatus = STATUS.OPEN;
 
+    const order = await prisma.order.findUnique({
+        where: {
+            id: orderId,
+        }
+    });
+
+    // order id does not exist
+    if (!order) {
+        throw new AppError(`Order ${orderId} does not exist`, 404);
+    }
+
+    // check that the user trying to drop the order is listed as the courier of the order 
+    if (order.courierId !== courierId) {
+        throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
+    }
+
+    // check that order is still in the ACCEPTED status (F7.1.1)
+    if (order.status !== STATUS.ACCEPTED) {
+        throw new AppError(`Order ${orderId} is not in the ACCEPTED status and cannot be marked as picked up`, 400);
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-        const order = await tx.order.findUnique({
-            where: {
-                id: orderId,
-            }
-        });
-
-        // order id does not exist
-        if (!order) {
-            throw new AppError(`Order ${orderId} does not exist`, 404);
-        }
-
-        // check that the user trying to drop the order is listed as the courier of the order 
-        if (order.courierId !== courierId) {
-            throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
-        }
-
-        // check that order is still in the ACCEPTED status (F7.1.1)
-        if (order.status !== STATUS.ACCEPTED) {
-            throw new AppError(`Order ${orderId} is not in the ACCEPTED status and cannot be marked as picked up`, 400);
-        }
-
         // update order status to OPEN (F7.2)
         const updatedOrder = await tx.order.update({
             where: {
