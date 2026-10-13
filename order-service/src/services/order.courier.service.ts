@@ -12,7 +12,7 @@ const LIMIT: number = 15;
 // lazy update
 export async function updateExpiredOrders() {
     // this function finds all orders of the OPEN status, and checks if the current time is past the expiry time
-    // for all orders that are expired, perform a prisma transaction to update the status
+    // for all orders that are expired, perform a prisma transaction to update the status (F8.1.1)
     const now: Date = new Date();
     console.log(now);
     // update database
@@ -271,6 +271,71 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
                 status: newStatus,
                 version: order.version + 1,
                 completedAt: now // record time when order was accepted (F5.2.1)
+            }
+        });
+
+         // check if update was successful
+        if (!updatedOrder || updatedOrder.status != newStatus) {
+            throw new AppError(`Status update for order ${order.id} has failed`, 500);
+        }
+
+        // update the order status history
+        const transactionRecord = await tx.orderStatusHistory.create({
+            data: {
+                orderId: updatedOrder.id,
+                fromStatus: oldStatus,
+                toStatus: newStatus, 
+                changedBy: courierId
+            }
+        });
+
+        // check if transaction record was successfully logged
+        if (!transactionRecord) {
+            throw new AppError(`Unable to record status update for order ${updatedOrder.id}`, 500);
+        }
+
+        return updatedOrder;
+    });
+
+    return result;
+}
+
+export async function dropAcceptedOrder(courierId: string, orderId: string) {
+    const oldStatus: OrderStatus = STATUS.ACCEPTED;
+    const newStatus: OrderStatus = STATUS.OPEN;
+
+    const result = await prisma.$transaction(async (tx) => {
+        const order = await tx.order.findUnique({
+            where: {
+                id: orderId,
+            }
+        });
+
+        // order id does not exist
+        if (!order) {
+            throw new AppError(`Order ${orderId} does not exist`, 404);
+        }
+
+        // check that the user trying to drop the order is listed as the courier of the order 
+        if (order.courierId !== courierId) {
+            throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
+        }
+
+        // check that order is still in the ACCEPTED status (F7.1.1)
+        if (order.status !== STATUS.ACCEPTED) {
+            throw new AppError(`Order ${orderId} is not in the ACCEPTED status and cannot be marked as picked up`, 400);
+        }
+
+        // update order status to OPEN (F7.2)
+        const updatedOrder = await tx.order.update({
+            where: {
+                id: order.id,
+            }, 
+            data: {
+                courierId: null, // remove courier (F7.2)
+                status: newStatus, // change to OPEN status (F7.2.1)
+                version: order.version + 1,
+                acceptedAt: null, // reset acceptedAt timestamp
             }
         });
 

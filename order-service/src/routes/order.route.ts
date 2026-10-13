@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { acceptOrder, completeOrder, getOpenOrders, pickUpOrder } from "../controllers/order.courier.controller.js";
+import { acceptOrder, completeOrder, dropOrder, getOpenOrders, pickUpOrder } from "../controllers/order.courier.controller.js";
 import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
@@ -47,7 +47,7 @@ orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHisto
 orderRouter.put("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
 
 // Drop acceptance (by courier)
-// orderRouter.delete("/:orderId/acceptance");
+orderRouter.delete("/:orderId/acceptance", authorize(Role.STUDENT), dropOrder);
 
 // Mark an order as picked up (by courier)
 orderRouter.put("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
