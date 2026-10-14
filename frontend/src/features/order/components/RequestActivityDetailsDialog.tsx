@@ -9,7 +9,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -17,6 +17,8 @@ import SupplierSelect from "./SupplierSelect";
 import DateTimePicker from "./DateTimePicker";
 import type { Order, ViewerRole } from "../types/order.types";
 import { useOrderRelatedUserDetails } from "../hooks/useOrderRelatedUserDetails";
+import { createRequestSchema } from "../schemas/create-request.schema";
+import useUpdateRequest from "../hooks/useUpdateRequest";
 
 type RequestActivityDetailsDialogProps = {
     order: Order;
@@ -65,18 +67,25 @@ const RequestActivityDetailsDialog = ({
         viewerRole === "requester" ? "Courier" : "Requester";
     const relatedPerson = relatedDetailsQuery.data;
 
+    const { updateRequest, isPending } = useUpdateRequest();
+
     const form = useForm({
         defaultValues: {
             name: order.name,
-            description: order.description ?? "",
+            description: order.description,
             pickupSupplierId: order.pickupSupplierId,
             deliverySupplierId: order.deliverySupplierId,
             offeredCredits: String(order.offeredCredits),
             expiryAt: format(new Date(order.expiryAt), "yyyy-MM-dd'T'HH:mm"),
             remarks: order.remarks ?? "",
         },
-        validators: {},
-        onSubmit: async () => {
+        validators: {
+            onSubmit: createRequestSchema
+        },
+        onSubmit: async ({ value }) => {
+            const payload = createRequestSchema.parse(value);
+
+            await updateRequest({ orderId: order.id, expectedVersion: order.version, payload });
             setIsEditing(false);
         },
     });
@@ -154,150 +163,165 @@ const RequestActivityDetailsDialog = ({
                         </div>
                     ) : (
                         <FieldGroup>
-                            <form.Field name="name">
-                                {(field) => (
-                                    <Field>
-                                        <FieldLabel htmlFor={field.name}>
-                                            Request name
-                                        </FieldLabel>
-                                        <Input
-                                            id={field.name}
-                                            name={field.name}
-                                            value={field.state.value}
-                                            disabled={!isEditing}
-                                            onBlur={field.handleBlur}
-                                            onChange={(event) =>
-                                                field.handleChange(event.target.value)
-                                            }
-                                        />
-                                    </Field>
-                                )}
-                            </form.Field>
-
-                            <form.Field name="description">
-                                {(field) => (
-                                    <Field>
-                                        <FieldLabel htmlFor={field.name}>
-                                            Description
-                                        </FieldLabel>
-                                        <Textarea
-                                            id={field.name}
-                                            name={field.name}
-                                            value={field.state.value}
-                                            disabled={!isEditing}
-                                            onBlur={field.handleBlur}
-                                            onChange={(event) =>
-                                                field.handleChange(event.target.value)
-                                            }
-                                        />
-                                    </Field>
-                                )}
-                            </form.Field>
-
-                            <div className="flex w-full flex-col gap-4 md:flex-row">
-                                <form.Field name="pickupSupplierId">
-                                    {(field) => (
-                                        <Field className="min-w-0 flex-1">
-                                            <FieldLabel>
-                                                Pickup location
-                                            </FieldLabel>
-                                            <SupplierSelect
-                                                value={field.state.value}
-                                                onChange={field.handleChange}
-                                                disabled={!isEditing}
-                                                displayName={
-                                                    isSuppliersLoading
-                                                        ? "Loading pickup location…"
-                                                        : pickupSupplierName ?? "Pickup location unavailable"
-                                                }
-                                                placeholder="Select pickup location"
-                                            />
-                                        </Field>
-                                    )}
-                                </form.Field>
-
-                                <form.Field name="deliverySupplierId">
-                                    {(field) => (
-                                        <Field className="min-w-0 flex-1">
-                                            <FieldLabel>
-                                                Delivery location
-                                            </FieldLabel>
-                                            <SupplierSelect
-                                                value={field.state.value}
-                                                onChange={field.handleChange}
-                                                disabled={!isEditing}
-                                                displayName={
-                                                    isSuppliersLoading
-                                                        ? "Loading delivery location…"
-                                                        : deliverySupplierName ?? "Delivery location unavailable"
-                                                }
-                                                placeholder="Select delivery location"
-                                            />
-                                        </Field>
-                                    )}
-                                </form.Field>
-                            </div>
-
-                            <div className="flex w-full flex-col gap-4 md:flex-row">
-                                <form.Field name="offeredCredits">
-                                    {(field) => (
-                                        <Field className="min-w-0 flex-1">
-                                            <FieldLabel htmlFor={field.name}>
-                                                Offered credits
-                                            </FieldLabel>
+                            <form.Field
+                                name="name"
+                                children={field => {
+                                    const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                    return (
+                                        <Field data-invalid={isInvalid}>
+                                            <FieldLabel htmlFor={field.name}>Request Name</FieldLabel>
                                             <Input
                                                 id={field.name}
                                                 name={field.name}
-                                                type="number"
                                                 value={field.state.value}
-                                                disabled={!isEditing}
                                                 onBlur={field.handleBlur}
-                                                onChange={(event) =>
-                                                    field.handleChange(
-                                                        event.target.value,
-                                                    )
-                                                }
+                                                onChange={e => field.handleChange(e.target.value)}
+                                                aria-invalid={isInvalid}
+                                                disabled={!isEditing}
                                             />
+                                            {isInvalid && <FieldError errors={field.state.meta.errors} />}
                                         </Field>
-                                    )}
-                                </form.Field>
+                                    );
+                                }}
+                            />
+                            <form.Field
+                                name="description"
+                                children={field => {
+                                    const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                    return (
+                                        <Field data-invalid={isInvalid}>
+                                            <FieldLabel htmlFor={field.name}>Description</FieldLabel>
+                                            <Textarea
+                                                id={field.name}
+                                                name={field.name}
+                                                value={field.state.value}
+                                                onBlur={field.handleBlur}
+                                                onChange={e => field.handleChange(e.target.value)}
+                                                aria-invalid={isInvalid}
+                                                disabled={!isEditing}
+                                            />
+                                            {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                                        </Field>
+                                    );
+                                }}
+                            />
 
-                                <form.Field name="expiryAt">
-                                    {(field) => (
-                                        <Field className="min-w-0 flex-1">
-                                            <FieldLabel>
-                                                Expiry date and time
-                                            </FieldLabel>
-                                            <DateTimePicker
-                                                value={field.state.value}
-                                                onChange={field.handleChange}
-                                                onBlur={field.handleBlur}
-                                                disabled={!isEditing}
-                                            />
-                                        </Field>
-                                    )}
-                                </form.Field>
+                            <div className="flex w-full flex-col gap-4 md:flex-row">
+                                <form.Field
+                                    name="pickupSupplierId"
+                                    children={field => {
+                                        const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                        return (
+                                            <Field data-invalid={isInvalid} className="min-w-0 flex-1">
+                                                <FieldLabel htmlFor={field.name}>Pickup Location</FieldLabel>
+                                                <SupplierSelect
+                                                    value={field.state.value}
+                                                    isInvalid={isInvalid}
+                                                    onChange={field.handleChange}
+                                                    placeholder="Select pickup location"
+                                                    displayName={
+                                                        isSuppliersLoading
+                                                            ? "Loading pickup location…"
+                                                            : pickupSupplierName ?? "Pickup location unavailable"
+                                                    }
+                                                    disabled={!isEditing}
+                                                />
+                                                {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
+                                            </Field>
+                                        );
+                                    }}
+                                />
+                                <form.Field
+                                    name="deliverySupplierId"
+                                    children={field => {
+                                        const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                        return (
+                                            <Field data-invalid={isInvalid} className="min-w-0 flex-1">
+                                                <FieldLabel htmlFor={field.name}>Delivery Location</FieldLabel>
+                                                <SupplierSelect
+                                                    value={field.state.value}
+                                                    isInvalid={isInvalid}
+                                                    onChange={field.handleChange}
+                                                    placeholder="Select delivery location"
+                                                    displayName={
+                                                        isSuppliersLoading
+                                                            ? "Loading delivery location…"
+                                                            : deliverySupplierName ?? "Delivery location unavailable"
+                                                    }
+                                                    disabled={!isEditing}
+                                                />
+                                                {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
+                                            </Field>
+                                        );
+                                    }}
+                                />
                             </div>
 
-                            <form.Field name="remarks">
-                                {(field) => (
-                                    <Field>
-                                        <FieldLabel htmlFor={field.name}>
-                                            Remarks
-                                        </FieldLabel>
-                                        <Textarea
-                                            id={field.name}
-                                            name={field.name}
-                                            value={field.state.value}
-                                            disabled={!isEditing}
-                                            onBlur={field.handleBlur}
-                                            onChange={(event) =>
-                                                field.handleChange(event.target.value)
-                                            }
-                                        />
-                                    </Field>
-                                )}
-                            </form.Field>
+                            <div className="flex w-full flex-col gap-4 md:flex-row">
+                                <form.Field
+                                    name="offeredCredits"
+                                    children={field => {
+                                        const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                        return (
+                                            <Field data-invalid={isInvalid}>
+                                                <FieldLabel htmlFor={field.name}>Offered Credits</FieldLabel>
+                                                <Input
+                                                    id={field.name}
+                                                    name={field.name}
+                                                    value={field.state.value}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={e => field.handleChange(e.target.value.trim())}
+                                                    aria-invalid={isInvalid}
+                                                    type="number"
+                                                    disabled={true}
+                                                />
+                                                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                                            </Field>
+                                        );
+                                    }}
+                                />
+                                <form.Field
+                                    name="expiryAt"
+                                    children={field => {
+                                        const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+
+                                        return (
+                                            <Field data-invalid={isInvalid}>
+                                                <FieldLabel htmlFor={field.name}>Expiry Date and Time</FieldLabel>
+                                                <DateTimePicker
+                                                    value={field.state.value}
+                                                    isInvalid={isInvalid}
+                                                    onChange={field.handleChange}
+                                                    onBlur={field.handleBlur}
+                                                    disabled={!isEditing}
+                                                />
+                                                {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
+                                            </Field>
+                                        );
+                                    }}
+                                />
+                            </div>
+                            <form.Field
+                                name="remarks"
+                                children={field => {
+                                    const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                    return (
+                                        <Field data-invalid={isInvalid}>
+                                            <FieldLabel htmlFor={field.name}>Remarks</FieldLabel>
+                                            <Textarea
+                                                id={field.name}
+                                                name={field.name}
+                                                value={field.state.value}
+                                                onBlur={field.handleBlur}
+                                                onChange={e => field.handleChange(e.target.value)}
+                                                aria-invalid={isInvalid}
+                                                disabled={!isEditing}
+                                            />
+                                            {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                                        </Field>
+                                    );
+                                }}
+                            />
                         </FieldGroup>
                     )}
 
@@ -336,7 +360,7 @@ const RequestActivityDetailsDialog = ({
                                     >
                                         Cancel
                                     </Button>
-                                    <Button type="submit" variant="indigo">
+                                    <Button type="submit" variant="indigo" isLoading={isPending}>
                                         Save changes
                                     </Button>
                                 </>

@@ -1,3 +1,5 @@
+import type { CreateRequestFormData } from "../schemas/create-request.schema";
+
 export const ORDER_STATUSES = [
     "OPEN",
     "ACCEPTED",
@@ -24,6 +26,8 @@ export interface Order {
     offeredCredits: number;
     status: OrderStatus;
     remarks: string | null;
+
+    version: number;
 
     expiryAt: string;
     createdAt: string;
@@ -77,3 +81,9 @@ export type ViewerRole = "requester" | "courier";
 export type SortBy = "createdAt" | "expiryAt";
 
 export type SortOrder = "asc" | "desc";
+
+export type UpdateRequestPayload = {
+    orderId: string;
+    expectedVersion: number;
+    payload: CreateRequestFormData;
+}

@@ -31,6 +31,7 @@ import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import SupplierForm from "@/features/supplier/components/SupplierForm";
 import SupplierModal from "@/features/supplier/components/SupplierModal";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { allActiveSuppliersQueryKey } from "@/features/order/hooks/useAllActiveSuppliers";
 
 interface OpeningHourRow {
     day: SupplierDay;
@@ -115,6 +116,7 @@ const ManageSuppliersPage = () => {
     const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: ["admin-suppliers"], exact: false });
         queryClient.invalidateQueries({ queryKey: ["admin-suppliers-total-pages"] });
+        queryClient.invalidateQueries({ queryKey: allActiveSuppliersQueryKey });
     };
 
     const goToPage = (page: number) => {

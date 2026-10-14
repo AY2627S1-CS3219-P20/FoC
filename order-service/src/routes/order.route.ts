@@ -9,7 +9,7 @@ import { acceptOrder,
     getOpenOrders, 
     pickUpOrder 
 } from "../controllers/order.courier.controller.js";
-import { getRequesterOrderHistory } from "../controllers/order.requester.controller.js";
+import { getRequesterOrderHistory, updateRequest } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
 
@@ -31,7 +31,7 @@ orderRouter.get("/me/requester", authorize(Role.STUDENT), getRequesterOrderHisto
 orderRouter.get("/me/courier", authorize(Role.STUDENT), getCourierOrderHistory);
 
 // Update a specific order by ID
-// orderRouter.patch("/:orderId");
+orderRouter.patch("/:orderId", authorize(Role.STUDENT), updateRequest);
 
 // Get a specific order by ID
 // orderRouter.get("/:orderId");

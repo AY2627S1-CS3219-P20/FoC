@@ -53,8 +53,8 @@ model Order {
   remarks String? @db.Text
 
   // Lifecycle 
-  status         OrderStatus @default(OPEN)
-  expiryAt       DateTime    @db.Timestamptz(6)
+  status   OrderStatus @default(OPEN)
+  expiryAt DateTime    @db.Timestamptz(6)
 
   // Optimistic concurrency control
   version Int @default(1)
@@ -81,16 +81,12 @@ model Order {
 
   // Browse open orders
   @@index([status, expiryAt])
-  // Sort by offered credits
-  @@index([status, offeredCredits])
-  // Filter by pickup location
-  @@index([status, pickupSupplierId, expiryAt])
-  // Filter by delivery location
-  @@index([status, deliverySupplierId, expiryAt])
-  // Requester history
-  @@index([requesterId, createdAt])
-  // Courier history
-  @@index([courierId, createdAt])
+  // Requester history for status and createdAt
+  @@index([requesterId, status, createdAt])
+  @@index([requesterId, status, expiryAt])
+  // Courier history for status and createdAt
+  @@index([courierId, status, createdAt])
+  @@index([courierId, status, expiryAt])
 }
 
 model OrderStatusHistory {

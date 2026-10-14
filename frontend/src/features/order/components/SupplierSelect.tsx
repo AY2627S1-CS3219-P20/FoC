@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,10 +16,9 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 
-import { searchSuppliers } from "@/api/supplierApi";
 import type { Supplier } from "@/types/api.types";
-import type { ParsedError } from "@/utils/errorHandler";
 import { cn } from "cn";
+import { useAllActiveSuppliers } from "../hooks/useAllActiveSuppliers";
 
 interface SupplierSelectProps {
     value: string;
@@ -43,18 +41,24 @@ const SupplierSelect = ({
     const [search, setSearch] = useState("");
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
-    const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["suppliers", "select", search],
-        queryFn: () => searchSuppliers(search),
-        enabled: open,
-    });
-
+    // Fetch all active suppliers
+    const suppliersQuery = useAllActiveSuppliers();
     const suppliers = suppliersQuery.data ?? [];
 
+    // Search suppliers based on the search input
+    const normalizedSearch = search.trim().toLocaleLowerCase();
+    const filteredSuppliers = suppliers.filter((supplier) =>
+        supplier.name
+            .toLocaleLowerCase()
+            .includes(normalizedSearch),
+    );
+
+    // Determine the selected supplier's name to display in the button
     const selectedName =
         selectedSupplier?.id === value
             ? selectedSupplier.name
             : displayName;
+
 
     const handleSelect = (supplier: Supplier) => {
         onChange(supplier.id);
@@ -104,20 +108,24 @@ const SupplierSelect = ({
                         value={search}
                         onValueChange={setSearch}
                     />
-                    <div className="px-3 py-2 text-xs text-muted-foreground border-b text-wrap">
-                        Search to find more suppliers. Showing up to 15 results.
-                    </div>
+
                     <CommandList className="max-h-[calc(40vh-100px)] overflow-y-auto">
                         {suppliersQuery.isLoading && (
                             <CommandEmpty>Loading suppliers...</CommandEmpty>
                         )}
 
-                        {!suppliersQuery.isLoading && suppliers.length === 0 && (
-                            <CommandEmpty>No suppliers found.</CommandEmpty>
+                        {suppliersQuery.isError && (
+                            <CommandEmpty>Could not load suppliers.</CommandEmpty>
                         )}
 
+                        {!suppliersQuery.isLoading &&
+                            !suppliersQuery.isError &&
+                            filteredSuppliers.length === 0 && (
+                                <CommandEmpty>No suppliers found.</CommandEmpty>
+                            )}
+
                         <CommandGroup>
-                            {suppliers.map((supplier) => (
+                            {filteredSuppliers.map((supplier) => (
                                 <CommandItem
                                     key={supplier.id}
                                     value={supplier.name}

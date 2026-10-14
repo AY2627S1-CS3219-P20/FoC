@@ -17,6 +17,7 @@ import {
     getAllSupplierTypes,
     getSupplierById,
     getSuppliersByIds,
+    getAllActiveSuppliers,
 } from "../controllers/supplier.controller.js";
 import { upload } from "../libs/upload.js";
 import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
@@ -59,6 +60,9 @@ supplierRouter.patch("/:id/deactivate", authorize(Role.ADMIN), deactivateSupplie
 
 
 // ------------------- For order service ------------------- 
+// Get all suppliers that are active
+supplierRouter.get("/active", getAllActiveSuppliers);
+
 // Get suppliers by a list of IDs
 supplierRouter.get("/by-ids", getSuppliersByIds);
 

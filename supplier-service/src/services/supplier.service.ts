@@ -390,3 +390,13 @@ export async function getSuppliersByIdsService(ids: string[]) {
         },
     });
 }
+
+export async function getAllActiveSuppliersService() {
+    return prisma.supplier.findMany({
+        where: {
+            status: STATUS.ACTIVATED,
+        },
+        include: { openingHours: true },
+        orderBy: { name: "asc" },
+    });
+}
