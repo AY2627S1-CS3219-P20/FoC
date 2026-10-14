@@ -63,6 +63,24 @@ export type RequesterOrderHistoryResponse = {
     };
 };
 
+export type CourierOrderHistoryParams = {
+    page: number;
+    limit: number;
+    status?: OrderStatus;
+    sortBy: SortBy;
+    sortOrder: SortOrder;
+};
+
+export type CourierOrderHistoryResponse = {
+    orders: Order[];
+    pagination: {
+        limit: number;
+        page: number;
+        totalCount: number;
+        totalPages: number;
+    };
+};
+
 export type OrderRelatedUserDetails = {
     userId: string;
     username: string;
@@ -78,7 +96,7 @@ export type OrderRelatedSupplierDetails = {
 
 export type ViewerRole = "requester" | "courier";
 
-export type SortBy = "createdAt" | "expiryAt";
+export type SortBy = "createdAt" | "expiryAt" | "acceptedAt" | "offeredCredits";
 
 export type SortOrder = "asc" | "desc";
 

@@ -98,13 +98,11 @@ export async function getCourierOrderHistory(req: AuthRequest, res: Response) {
     if (!request.success) {
         throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
     }
-    const orders = await getCourierAcceptanceHistory(courierId, request.data);
+    const result = await getCourierAcceptanceHistory(courierId, request.data);
 
     return res.status(200).json({
         success: true,
-        data: {
-            message: `${orders.length} orders previously accepted by courier ${courierId} retrieved`,
-            data: orders,
-        },
+        message: `${result.orders.length} orders previously accepted by courier ${courierId} retrieved`,
+        data: result,
     });
 }

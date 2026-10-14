@@ -13,8 +13,9 @@ export const getOpenOrdersSchema = z.object({
 
 export const getCourierOrderHistorySchema = z.object({
     page: z.coerce.number().int().positive(),
+    sortBy: z.enum(["acceptedAt", "expiryAt"]).default("acceptedAt"),
     status: z.enum(orderStatuses).optional(),
-    sortOrder: z.enum(['asc', 'desc']).default('asc') // only can sort by expiryAt
+    sortOrder: z.enum(['asc', 'desc']).default('desc') 
 });
 
 export type GetOpenOrdersInput = z.infer<typeof getOpenOrdersSchema>;

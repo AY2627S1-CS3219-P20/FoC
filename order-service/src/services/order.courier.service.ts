@@ -375,6 +375,7 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
 
 export async function getCourierAcceptanceHistory(courierId: string, input: GetCourierOrderHistoryInput) {
     const page: number = input.page;
+    const sortBy: string = input.sortBy; // default set to sorting by accepted time
     const sortOrder = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
     const status: OrderStatus | undefined = input.status; 
 
@@ -383,14 +384,31 @@ export async function getCourierAcceptanceHistory(courierId: string, input: GetC
             courierId: courierId, // enforce full string match
             ...(status ? { status: status } : {}), // If status is provided, include it in the where clause; otherwise, don't filter by status 
         }, 
-        orderBy: { expiryAt: sortOrder }, 
+        orderBy: { [sortBy]: sortOrder }, 
         take: LIMIT, 
         skip: LIMIT * (page - 1),
     });
 
-    if (!orders || orders.length == 0) {
+    const totalCount = await prisma.order.count({
+        where: { 
+            courierId: courierId, // enforce full string match
+            ...(status ? { status: status } : {}), // If status is provided, include it in the where clause; otherwise, don't filter by status 
+        }
+    });
+
+    console.log(totalCount)
+
+    if (!orders) {
         throw new AppError(`No records found for page ${page}`, 400);
     }
 
-    return orders;
+    return {
+        orders,
+        pagination: {
+            limit: LIMIT,
+            page: page,
+            totalCount: totalCount,
+            totalPages: Math.ceil(totalCount / LIMIT),
+        }
+    };
 }
