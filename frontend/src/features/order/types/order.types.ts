@@ -6,7 +6,7 @@ export const ORDER_STATUSES = [
     "PICKED_UP",
     "COMPLETED",
     "RECEIVED",
-    "CANCELLED",
+    "CANCELED",
     "FAILED",
     "EXPIRED",
 ] as const;
