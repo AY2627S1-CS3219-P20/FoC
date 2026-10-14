@@ -19,12 +19,14 @@ import type { Order, ViewerRole } from "../types/order.types";
 import { useOrderRelatedUserDetails } from "../hooks/useOrderRelatedUserDetails";
 import { createRequestSchema } from "../schemas/create-request.schema";
 import useUpdateRequest from "../hooks/useUpdateRequest";
+import useAcceptRequest from "../hooks/useAcceptRequest";
 
 type RequestActivityDetailsDialogProps = {
     order: Order;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     canEdit: boolean;
+    canAccept: boolean;
     viewerRole: ViewerRole;
     pickupSupplierName?: string;
     deliverySupplierName?: string;
@@ -49,6 +51,7 @@ const RequestActivityDetailsDialog = ({
     open,
     onOpenChange,
     canEdit,
+    canAccept,
     viewerRole,
     pickupSupplierName,
     deliverySupplierName,
@@ -68,6 +71,8 @@ const RequestActivityDetailsDialog = ({
     const relatedPerson = relatedDetailsQuery.data;
 
     const { updateRequest, isPending } = useUpdateRequest();
+    const { acceptRequest, isPending: isAccepting } = useAcceptRequest();
+
 
     const form = useForm({
         defaultValues: {
@@ -374,6 +379,20 @@ const RequestActivityDetailsDialog = ({
                                 </Button>
                             )}
 
+                        </div>
+                    )}
+
+                    {canAccept && (
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="submit"
+                                variant="indigo"
+                                isLoading={isAccepting}
+                                disabled={isAccepting}
+                                onClick={() => acceptRequest(order.id)}
+                            >
+                                Accept
+                            </Button>
                         </div>
                     )}
                 </form>

@@ -160,7 +160,9 @@ const HomePage = () => {
                                 <RequestActivityCard
                                     key={order.id}
                                     order={order}
-                                    viewerRole="requester"
+                                    viewerRole="courier"
+                                    isEditable={false}
+                                    isAcceptable={true}
                                     pickupSupplierName={supplierNameById.get(order.pickupSupplierId)}
                                     deliverySupplierName={supplierNameById.get(order.deliverySupplierId)}
                                     isSuppliersLoading={isSuppliersLoading}

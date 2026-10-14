@@ -1,5 +1,11 @@
 import { ENDPOINTS } from "@/api/endpoints";
-import type { CourierOrderHistoryParams, CourierOrderHistoryResponse, OpenOrdersQueryParams, OpenOrdersQueryResponse } from "../types/order.types";
+import type { 
+    CourierOrderHistoryParams, 
+    CourierOrderHistoryResponse, 
+    OpenOrdersQueryParams, 
+    OpenOrdersQueryResponse,
+    Order
+} from "../types/order.types";
 import { parseError } from "@/utils/errorHandler";
 import type { ApiResponse } from "@/types/api.types";
 import orderApi from "@/api/orderApi";
@@ -25,6 +31,21 @@ export const getOpenRequestsService = async (
         throw parseError(error);
     }
 };
+
+export const acceptRequestService = async (
+    orderId: string,
+): Promise<Order> => {
+    try {
+        const response = await orderApi.put<ApiResponse<Order>>(
+            `${ENDPOINTS.order.acceptOrder}`.replace(":orderId", orderId)
+        );
+        console.log(response);
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+}
 
 export const getCourierOrderHistoryService = async (
     params: CourierOrderHistoryParams,

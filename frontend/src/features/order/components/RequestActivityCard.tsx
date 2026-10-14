@@ -21,6 +21,7 @@ const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
 type RequestActivityCardProps = {
     order: Order;
     isEditable?: boolean;
+    isAcceptable?: boolean;
     viewerRole: ViewerRole;
     pickupSupplierName?: string;
     deliverySupplierName?: string;
@@ -28,10 +29,11 @@ type RequestActivityCardProps = {
 }
 
 const RequestActivityCard = ({
-    order, isEditable, viewerRole,
+    order, isEditable, isAcceptable, viewerRole,
     pickupSupplierName, deliverySupplierName, isSuppliersLoading
 }: RequestActivityCardProps) => {
     const canEdit = isEditable ?? !order.courierId;
+    const canAccept = isAcceptable ?? false;
     const [open, setOpen] = useState(false);
 
     return (
@@ -112,6 +114,7 @@ const RequestActivityCard = ({
                 open={open}
                 onOpenChange={setOpen}
                 canEdit={canEdit}
+                canAccept={canAccept}
                 viewerRole={viewerRole}
                 pickupSupplierName={pickupSupplierName}
                 deliverySupplierName={deliverySupplierName}

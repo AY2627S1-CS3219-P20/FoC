@@ -56,6 +56,7 @@ export const ENDPOINTS = {
 
     order: {
         getOpenOrders: `${BASE_ORDER}`,
+        acceptOrder: `${BASE_ORDER}/:orderId/acceptance`,
         getRequesterOrderHistory: `${BASE_ORDER}/me/requester`,
         getCourierOrderHistory: `${BASE_ORDER}/me/courier`,
         updateRequest: (orderId: string) => `${BASE_ORDER}/${orderId}`,
