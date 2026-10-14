@@ -27,6 +27,7 @@ interface SupplierSelectProps {
     placeholder?: string;
     disabled?: boolean;
     displayName?: string;
+    className?: string;
 }
 
 const SupplierSelect = ({
@@ -36,6 +37,7 @@ const SupplierSelect = ({
     placeholder = "Select supplier",
     disabled = false,
     displayName,
+    className,
 }: SupplierSelectProps) => {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
@@ -84,7 +86,7 @@ const SupplierSelect = ({
                         aria-invalid={isInvalid}
                         className={cn(
                             "w-full min-w-0 justify-between text-left font-normal",
-                            !selectedName && "text-muted-foreground",
+                            !selectedName && "text-muted-foreground", className
                         )}
                     >
                         <span className="min-w-0 flex-1 truncate text-left">

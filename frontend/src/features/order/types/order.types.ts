@@ -63,6 +63,25 @@ export type RequesterOrderHistoryResponse = {
     };
 };
 
+export type OpenOrdersQueryParams = {
+    page: number;
+    limit: number;
+    sortBy: SortBy;
+    sortOrder: SortOrder;
+    filterLocation?: string; // the string passed in here should be the supplierId
+    searchString?: string;
+};
+
+export type OpenOrdersQueryResponse = {
+    orders: Order[];
+    pagination: {
+        limit: number;
+        page: number;
+        totalCount: number;
+        totalPages: number;
+    };
+};
+
 export type CourierOrderHistoryParams = {
     page: number;
     limit: number;

@@ -7,7 +7,7 @@ import { useSuppliersByIds } from "@/features/order/hooks/useSuppliersByIds";
 import { ORDER_STATUSES, type OrderStatus, type SortBy, type SortOrder } from "@/features/order/types/order.types";
 import { useState } from "react";
 
-const PAGE_SIZE = 15;
+const LIMIT = 15;
 
 const CourierActivityPage = () => {
     const [page, setPage] = useState(1);
@@ -17,7 +17,7 @@ const CourierActivityPage = () => {
 
     const courierOrderHistoryQuery = useCourierOrderHistory({
         page: page,
-        limit: PAGE_SIZE,
+        limit: LIMIT,
         sortBy: sortBy,
         sortOrder: sortOrder,
         ...(selectedStatus !== "ALL" && { status: selectedStatus }),
