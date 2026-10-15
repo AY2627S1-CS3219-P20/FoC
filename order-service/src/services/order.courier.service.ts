@@ -11,8 +11,8 @@ const LIMIT: number = 15;
 
 // lazy update
 export async function updateExpiredOrders() {
-    // this function finds all orders of the OPEN status, and checks if the current time is past the expiry time
-    // for all orders that are expired, perform a prisma transaction to update the status (F8.1.1)
+    // this function finds all orders that have not yet advanced to the RECEIVED status, and checks if the current time is past the 
+    // expiry time for all orders that are expired, perform a prisma transaction to update the status (F8.1.1)
     const now: Date = new Date();
     console.log(now);
     // update database
@@ -20,7 +20,7 @@ export async function updateExpiredOrders() {
         // update rows in the Order table
         const ordersUpdated = await tx.order.updateManyAndReturn({
             where: {
-                status: STATUS.OPEN, // still open 
+                status: { notIn: [STATUS.RECEIVED, STATUS.CANCELED, STATUS.FAILED, STATUS.EXPIRED] },
                 expiryAt: {
                     lte: now, // currently past the expired time (expiry time <= current time), need to update
                 }
@@ -207,6 +207,9 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
 }
 
 export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
+    // ensure that the status of orders are updated
+    await updateExpiredOrders();
+
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
     const newStatus: OrderStatus = STATUS.PICKED_UP;
 
@@ -273,6 +276,9 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
 }
 
 export async function completePickedUpOrder(courierId: string, orderId: string) {
+    // ensure that the status of orders are updated
+    await updateExpiredOrders();
+
     const oldStatus: OrderStatus = STATUS.PICKED_UP;
     const newStatus: OrderStatus = STATUS.COMPLETED;
 
@@ -339,6 +345,9 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
 }
 
 export async function dropAcceptedOrder(courierId: string, orderId: string) {
+    // ensure that the status of orders are updated
+    await updateExpiredOrders();
+
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
     const newStatus: OrderStatus = STATUS.OPEN;
 
@@ -404,6 +413,9 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
 }
 
 export async function getCourierAcceptanceHistory(courierId: string, input: GetCourierOrderHistoryInput) {
+    // ensure that the status of orders are updated
+    await updateExpiredOrders();
+
     const page: number = input.page;
     const sortBy: string = input.sortBy; // default set to sorting by accepted time
     const sortOrder = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
