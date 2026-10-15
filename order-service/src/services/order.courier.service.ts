@@ -92,11 +92,41 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
         skip: LIMIT * (page - 1),
     });
 
-    if (!orders || orders.length == 0) {
+    const totalCount = await prisma.order.count({
+        where: { 
+            name: {
+                contains: searchString, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            }, 
+            // as long as delivery/pickup supplier id matches, record will be included in the results
+            ...(filterLocation
+            ? {
+                OR: [
+                    { deliverySupplierId: filterLocation },
+                    { pickupSupplierId: filterLocation },
+                ],
+            }
+            : {}),
+            status: STATUS.OPEN, 
+            requesterId: { 
+                not: courierId
+            }
+        }
+    });
+
+    if (!orders) {
         throw new AppError("No records found for this page", 400);
     }
 
-    return orders;
+    return {
+        orders,
+        pagination: {
+            limit: LIMIT,
+            page: page,
+            totalCount: totalCount,
+            totalPages: Math.ceil(totalCount / LIMIT),
+        }
+    };
 }
 
 export async function acceptOpenOrder(courierId: string, orderId: string) {
@@ -395,8 +425,6 @@ export async function getCourierAcceptanceHistory(courierId: string, input: GetC
             ...(status ? { status: status } : {}), // If status is provided, include it in the where clause; otherwise, don't filter by status 
         }
     });
-
-    console.log(totalCount)
 
     if (!orders) {
         throw new AppError(`No records found for page ${page}`, 400);

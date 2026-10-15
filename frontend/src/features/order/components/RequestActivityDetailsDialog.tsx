@@ -73,7 +73,6 @@ const RequestActivityDetailsDialog = ({
     const { updateRequest, isPending } = useUpdateRequest();
     const { acceptRequest, isPending: isAccepting } = useAcceptRequest();
 
-
     const form = useForm({
         defaultValues: {
             name: order.name,

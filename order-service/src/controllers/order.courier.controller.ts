@@ -19,14 +19,12 @@ export async function getOpenOrders(req: AuthRequest, res: Response) {
     if (!request.success) {
         throw new AppError(request.error.issues.at(0)?.message || "Invalid query", 400);
     }
-    const orders = await getAllOpenOrders(courierId, request.data);
+    const result = await getAllOpenOrders(courierId, request.data);
 
     return res.status(200).json({
         success: true,
-        data: {
-            message: `${orders.length} orders on page ${request.data.page} retrieved`,
-            data: orders,
-        },
+        message: `${result.orders.length} orders on page ${request.data.page} retrieved`,
+        data: result,
     });
 }
 
@@ -38,10 +36,8 @@ export async function acceptOrder(req: AuthRequest, res: Response) {
 
     return res.status(200).json({
         success: true,
-        data: {
-            message: `Order ${updatedOrder.id} accepted by courier ${updatedOrder.courierId}`,
-            data: updatedOrder,
-        },
+        message: `Order ${updatedOrder.id} accepted by courier ${updatedOrder.courierId}`,
+        data: updatedOrder,
     });
 }
 
@@ -53,10 +49,8 @@ export async function pickUpOrder(req: AuthRequest, res: Response) {
 
     return res.status(200).json({
         success: true,
-        data: {
-            message: `Order ${updatedOrder.id} picked up by courier ${updatedOrder.courierId}`,
-            data: updatedOrder,
-        },
+        message: `Order ${updatedOrder.id} picked up by courier ${updatedOrder.courierId}`,
+        data: updatedOrder,
     });
 }
 
@@ -68,10 +62,8 @@ export async function completeOrder(req: AuthRequest, res: Response) {
     
     return res.status(200).json({
         success: true,
-        data: {
-            message: `Order ${updatedOrder.id} completed by courier ${updatedOrder.courierId}`,
-            data: updatedOrder,
-        },
+        message: `Order ${updatedOrder.id} completed by courier ${updatedOrder.courierId}`,
+        data: updatedOrder,
     });
 }
 
@@ -83,10 +75,8 @@ export async function dropOrder(req: AuthRequest, res: Response) {
     
     return res.status(200).json({
         success: true,
-        data: {
-            message: `Order ${updatedOrder.id} dropped by courier ${courierId}`,
-            data: updatedOrder,
-        },
+        message: `Order ${updatedOrder.id} dropped by courier ${courierId}`,
+        data: updatedOrder,
     });
 }
 

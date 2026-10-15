@@ -27,8 +27,6 @@ const CourierActivityPage = () => {
     const requests = requestsData?.orders ?? [];
     const totalPages = requestsData?.pagination.totalPages ?? 0;
 
-    console.log(totalPages)
-
     // Collect unique supplier IDs from the requests to fetch their details
     const supplierIds = [
         ...new Set(
@@ -139,7 +137,7 @@ const CourierActivityPage = () => {
                                 <RequestActivityCard
                                     key={order.id}
                                     order={order}
-                                    viewerRole="requester"
+                                    viewerRole="courier"
                                     pickupSupplierName={supplierNameById.get(order.pickupSupplierId)}
                                     deliverySupplierName={supplierNameById.get(order.deliverySupplierId)}
                                     isSuppliersLoading={isSuppliersLoading}

@@ -39,7 +39,48 @@ export const acceptRequestService = async (
         const response = await orderApi.put<ApiResponse<Order>>(
             `${ENDPOINTS.order.acceptOrder}`.replace(":orderId", orderId)
         );
-        console.log(response);
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+}
+
+export const pickUpRequestService = async (
+    orderId: string,
+): Promise<Order> => {
+    try {
+        const response = await orderApi.put<ApiResponse<Order>>(
+            `${ENDPOINTS.order.pickUpOrder}`.replace(":orderId", orderId)
+        );
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+}
+
+export const completeRequestService = async (
+    orderId: string,
+): Promise<Order> => {
+    try {
+        const response = await orderApi.put<ApiResponse<Order>>(
+            `${ENDPOINTS.order.completeOrder}`.replace(":orderId", orderId)
+        );
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+}
+
+export const dropRequestService = async (
+    orderId: string,
+): Promise<Order> => {
+    try {
+        const response = await orderApi.delete<ApiResponse<Order>>(
+            `${ENDPOINTS.order.acceptOrder}`.replace(":orderId", orderId)
+        );
 
         return response.data.data!;
     } catch (error) {

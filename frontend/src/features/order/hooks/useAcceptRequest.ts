@@ -14,7 +14,7 @@ export function useAcceptRequest() {
             await queryClient.invalidateQueries({
                 queryKey: courierOrderQueryKeys.all,
             });
-            toast.success("Request accepted");
+            toast.success("Request accepted and listed under Courier Activity");
         },
         onError: (error) => {
             toast.error(error.message);
