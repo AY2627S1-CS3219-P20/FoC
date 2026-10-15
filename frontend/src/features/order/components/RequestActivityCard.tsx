@@ -1,10 +1,11 @@
 import { Card } from "@/components/ui/card";
-import type { Order, OrderStatus, ViewerRole } from "../types/order.types";
-import { AlarmClockIcon, CoinsIcon, FlagIcon, MapPinIcon } from "lucide-react";
+import { type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
+import { AlarmClockIcon, CoinsIcon, FlagIcon, MapPinIcon, PencilIcon } from "lucide-react";
 import { format } from "date-fns";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { useState } from "react";
 import RequestActivityDetailsDialog from "./RequestActivityDetailsDialog";
+import StatusUpdateDialog from "./StatusUpdateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
@@ -13,7 +14,7 @@ const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
     PICKED_UP: "yellow",
     COMPLETED: "indigo200",
     RECEIVED: "green",
-    CANCELLED: "gray",
+    CANCELED: "gray",
     FAILED: "red",
     EXPIRED: "orange",
 };
@@ -21,6 +22,7 @@ const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
 type RequestActivityCardProps = {
     order: Order;
     isEditable?: boolean;
+    isAcceptable?: boolean;
     viewerRole: ViewerRole;
     pickupSupplierName?: string;
     deliverySupplierName?: string;
@@ -28,11 +30,19 @@ type RequestActivityCardProps = {
 }
 
 const RequestActivityCard = ({
-    order, isEditable, viewerRole,
+    order, isEditable, isAcceptable, viewerRole,
     pickupSupplierName, deliverySupplierName, isSuppliersLoading
 }: RequestActivityCardProps) => {
     const canEdit = isEditable ?? !order.courierId;
+    const canAccept = isAcceptable ?? false;
     const [open, setOpen] = useState(false);
+    const editableStatuses: Partial<Record<OrderStatus, ViewerRole>> = {
+        "ACCEPTED": "courier",
+        "PICKED_UP": "courier", 
+        "COMPLETED": "requester"
+    };
+    const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
+    const [openStatusUpdateDialog, setOpenStatusUpdateDialog] = useState(false);
 
     return (
         <>
@@ -94,16 +104,31 @@ const RequestActivityCard = ({
                             {order.offeredCredits}
                         </span>
                     </div>
-                    <Button
-                        type="button"
-                        variant={statusVariant[order.status]}
-                        size="sm"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                        }}
-                    >
-                        {order.status}
-                    </Button>
+                    {canEditStatus ? (
+                        <Button
+                            type="button"
+                            variant={statusVariant[order.status]}
+                            size="sm"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenStatusUpdateDialog(true);
+                            }}
+                        >
+                            <PencilIcon className="size-4 shrink-0 text-slate-500" />
+                            {order.status}
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            variant={statusVariant[order.status]}
+                            size="sm"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                            }}
+                        >
+                            {order.status}
+                        </Button>
+                    )}
                 </div>
             </Card>
 
@@ -112,10 +137,17 @@ const RequestActivityCard = ({
                 open={open}
                 onOpenChange={setOpen}
                 canEdit={canEdit}
+                canAccept={canAccept}
                 viewerRole={viewerRole}
                 pickupSupplierName={pickupSupplierName}
                 deliverySupplierName={deliverySupplierName}
                 isSuppliersLoading={isSuppliersLoading}
+            />
+
+            <StatusUpdateDialog
+                order={order}
+                open={openStatusUpdateDialog}
+                onOpenChange={setOpenStatusUpdateDialog}
             />
 
         </>

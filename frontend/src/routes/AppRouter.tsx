@@ -18,6 +18,7 @@ import ProfilePage from '@/pages/ProfilePage';
 import AdminActivationPage from '@/pages/AdminActivationPage';
 import CreditsPage from '@/pages/CreditsPage';
 import RequesterActivtyPage from '@/pages/RequesterActivityPage';
+import CourierActivityPage from '@/pages/CourierActivityPage';
 
 const AppRouter = () => {
     return (
@@ -50,6 +51,7 @@ const AppRouter = () => {
 
                                 <Route element={<RoleRoute allowedRoles={[ROLES.STUDENT]} />}>
                                     <Route path={ROUTES.REQUESTER_ACTIVITY} element={<RequesterActivtyPage />} />
+                                    <Route path={ROUTES.COURIER_ACTIVITY} element={<CourierActivityPage />} />
                                 </Route>
                             </Route>
                         </Route>

@@ -6,7 +6,7 @@ export const ORDER_STATUSES = [
     "PICKED_UP",
     "COMPLETED",
     "RECEIVED",
-    "CANCELLED",
+    "CANCELED",
     "FAILED",
     "EXPIRED",
 ] as const;
@@ -63,6 +63,43 @@ export type RequesterOrderHistoryResponse = {
     };
 };
 
+export type OpenOrdersQueryParams = {
+    page: number;
+    limit: number;
+    sortBy: SortBy;
+    sortOrder: SortOrder;
+    filterLocation?: string; // the string passed in here should be the supplierId
+    searchString?: string;
+};
+
+export type OpenOrdersQueryResponse = {
+    orders: Order[];
+    pagination: {
+        limit: number;
+        page: number;
+        totalCount: number;
+        totalPages: number;
+    };
+};
+
+export type CourierOrderHistoryParams = {
+    page: number;
+    limit: number;
+    status?: OrderStatus;
+    sortBy: SortBy;
+    sortOrder: SortOrder;
+};
+
+export type CourierOrderHistoryResponse = {
+    orders: Order[];
+    pagination: {
+        limit: number;
+        page: number;
+        totalCount: number;
+        totalPages: number;
+    };
+};
+
 export type OrderRelatedUserDetails = {
     userId: string;
     username: string;
@@ -78,7 +115,7 @@ export type OrderRelatedSupplierDetails = {
 
 export type ViewerRole = "requester" | "courier";
 
-export type SortBy = "createdAt" | "expiryAt";
+export type SortBy = "createdAt" | "expiryAt" | "acceptedAt" | "offeredCredits";
 
 export type SortOrder = "asc" | "desc";
 
