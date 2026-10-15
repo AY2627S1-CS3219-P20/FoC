@@ -3,6 +3,7 @@ import type { Order } from "../types/order.types";
 import type { ParsedError } from "@/utils/errorHandler";
 import { dropRequestService } from "../services/order.courier.service";
 import { courierOrderQueryKeys } from "./courierOrderQueryKeys";
+import { requesterOrderHistoryQueryKeys } from "./useRequesterOrderHistory";
 import { toast } from "react-toastify";
 
 export function useDropRequest() {
@@ -11,9 +12,14 @@ export function useDropRequest() {
     const { mutateAsync, isPending, isSuccess, isError } = useMutation<Order, ParsedError, string>({
         mutationFn: (orderId) => dropRequestService(orderId),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({
-                queryKey: courierOrderQueryKeys.all,
-            });
+            await Promise.all([
+                queryClient.invalidateQueries({
+                    queryKey: courierOrderQueryKeys.all,
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: requesterOrderHistoryQueryKeys.all,
+                })
+            ]);
             toast.success("Request dropped");
         },
         onError: (error) => {
