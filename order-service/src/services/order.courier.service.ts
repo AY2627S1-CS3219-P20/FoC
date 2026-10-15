@@ -2,60 +2,13 @@ import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
 import type { GetCourierOrderHistoryInput, GetOpenOrdersInput } from "../schemas/order.courier.schema.js";
 import { OrderStatus } from "../generated/prisma/client.js";
+import { updateExpiredOrders } from "../utils/order.utils.js";
 
 // order lifecycle statuses
 const STATUS = OrderStatus;
 
 // page limit (max 15 orders per page)
 const LIMIT: number = 15;
-
-// lazy update
-export async function updateExpiredOrders() {
-    // this function finds all orders that have not yet advanced to the RECEIVED status, and checks if the current time is past the 
-    // expiry time for all orders that are expired, perform a prisma transaction to update the status (F8.1.1)
-    const now: Date = new Date();
-    console.log(now);
-    // update database
-    const result = await prisma.$transaction(async (tx) => {
-        // update rows in the Order table
-        const ordersUpdated = await tx.order.updateManyAndReturn({
-            where: {
-                status: { notIn: [STATUS.RECEIVED, STATUS.CANCELED, STATUS.FAILED, STATUS.EXPIRED] },
-                expiryAt: {
-                    lte: now, // currently past the expired time (expiry time <= current time), need to update
-                }
-            }, 
-            data: {
-                status: STATUS.EXPIRED, // change to expired status
-                version: { increment: 1 }, // increment version number
-                expiredAt: now // set the expiredAt timestamp to the time that we marked the order as expired
-            }
-        })
-
-        console.log(`${ordersUpdated.length} open orders updated to expired`)
-
-        // update OrderStatusHistory table
-        for (const order of ordersUpdated) {
-            const transactionRecord = await tx.orderStatusHistory.create({
-                data: {
-                    orderId: order.id,
-                    fromStatus: STATUS.OPEN,
-                    toStatus: STATUS.EXPIRED, 
-                    changedBy: null // indicate system update with null
-                }
-            });
-
-            // check if transaction record was successfully logged
-            if (!transactionRecord) {
-                throw new AppError(`Unable to record status update for order ${order.id}`, 500);
-            }
-        }
-
-        return ordersUpdated;
-    });
-
-    return result; 
-}
 
 export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersInput) {
     const page: number = input.page;
@@ -64,7 +17,7 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
     const filterLocation = input.filterLocation ?? null; // supplier id we want to filter by
     const searchString: string = input.searchString ?? "";
 
-    // ensure that the status of orders are updated
+    // ensure that the status of orders are updated, lazy update
     await updateExpiredOrders();
     
     const orders = await prisma.order.findMany({
@@ -130,7 +83,7 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
 }
 
 export async function acceptOpenOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated
+    // ensure that the status of orders are updated, lazy update
     await updateExpiredOrders();
 
     const oldStatus: OrderStatus = STATUS.OPEN;
@@ -207,7 +160,7 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
 }
 
 export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated
+    // ensure that the status of orders are updated, lazy update
     await updateExpiredOrders();
 
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
@@ -276,7 +229,7 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
 }
 
 export async function completePickedUpOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated
+    // ensure that the status of orders are updated, lazy update
     await updateExpiredOrders();
 
     const oldStatus: OrderStatus = STATUS.PICKED_UP;
@@ -345,7 +298,7 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
 }
 
 export async function dropAcceptedOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated
+    // ensure that the status of orders are updated, lazy update
     await updateExpiredOrders();
 
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
@@ -413,7 +366,7 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
 }
 
 export async function getCourierAcceptanceHistory(courierId: string, input: GetCourierOrderHistoryInput) {
-    // ensure that the status of orders are updated
+    // ensure that the status of orders are updated, lazy update
     await updateExpiredOrders();
 
     const page: number = input.page;
