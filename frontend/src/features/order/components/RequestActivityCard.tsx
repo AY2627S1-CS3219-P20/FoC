@@ -7,6 +7,8 @@ import { useState } from "react";
 import RequestActivityDetailsDialog from "./RequestActivityDetailsDialog";
 import StatusUpdateDialog from "./StatusUpdateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import useAuth from "@/hooks/useAuth";
+import { ROLES } from "@/features/auth/types/auth.types";
 
 const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
     OPEN: "teal",
@@ -43,6 +45,9 @@ const RequestActivityCard = ({
     };
     const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
     const [openStatusUpdateDialog, setOpenStatusUpdateDialog] = useState(false);
+
+    const { user, isAuthenticated } = useAuth();
+    const userRole = user?.role;
 
     return (
         <>
@@ -137,7 +142,7 @@ const RequestActivityCard = ({
                 open={open}
                 onOpenChange={setOpen}
                 canEdit={canEdit}
-                canAccept={canAccept}
+                canAccept={canAccept && userRole == ROLES.STUDENT}
                 viewerRole={viewerRole}
                 pickupSupplierName={pickupSupplierName}
                 deliverySupplierName={deliverySupplierName}
