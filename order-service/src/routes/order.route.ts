@@ -21,7 +21,7 @@ orderRouter.use(authenticate);
 // orderRouter.post("/");
 
 // Get all orders with OPEN status 
-orderRouter.get("", authorize(Role.STUDENT), getOpenOrders);
+orderRouter.get("", getOpenOrders);
 
 // All requests made by the authenticated requester
 // Can be filtered by status, sorted by createdAt or expiryAt, and paginated
