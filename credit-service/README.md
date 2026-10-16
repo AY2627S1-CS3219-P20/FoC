@@ -601,32 +601,27 @@ Publish persistent JSON, require successful routing, and wait for broker confirm
 ```json
 {
   "eventId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6490",
-  "eventVersion": 1,
   "eventType": "ORDER_RECEIVED",
-  "occurredAt": "2026-10-12T00:00:00.000Z",
   "orderId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6482",
-  "orderVersion": 7,
   "reservationId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6481",
   "requesterId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6483",
   "courierId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6484",
-  "amount": 10,
-  "orderName": "Lunch"
+  "amount": 10
 }
 ```
 
 All fields are required for receipt. For cancellation, expiry or failure, use the matching eventType and **omit courierId**. Extra fields are rejected.
+
+Settlement events no longer include eventVersion, orderVersion, orderName or occurredAt. Old-format messages are rejected, and removing those fields from a replay will not match a previously stored old-format settlementPayload.
 
 Validation rules:
 
 - Maximum body size: 64 KiB.
 - UUIDs are converted to lowercase.
 - amount must be a positive PostgreSQL Int.
-- orderVersion must be an integer from 0 through 2,147,483,647.
-- occurredAt must be an ISO datetime with a timezone.
-- orderName must contain 1 to 255 characters.
 - Requester and courier must be different users.
 
-Credit stores the complete validated event. An identical repeat is safe, but a repeat with changed fields is rejected, including changes to orderVersion, occurredAt or orderName.
+Credit stores the complete validated event. An identical repeat is safe, but a repeat with changed fields is rejected, including changes to eventId, eventType, courierId or amount.
 
 ### Receipt: pay the courier (F5)
 
