@@ -31,25 +31,23 @@ export const createSupplierSchema = z.object({
 
 export const updateSupplierSchema = createSupplierSchema.partial();
 
-export const supplierSchema = z.object({
-    page: z.coerce.number().int().positive(),
-});
-
-export const filterSearchSupplierSchema = z.object({
+export const getSupplierSchema = z.object({
+    page: z.coerce.number().int().positive().optional(), // optional page, if null then no pagination is required
     searchString: z.string().nullable().optional(),
-    typeFilter: z.string().nullable().optional(),
+    typeFilter: z.string().nullable().optional(), // filter by supplier type
 })
 
-export const typeSchema = z.object({
-    type: z.string().toUpperCase() // ensure all types are saved in upper case
+export const supplierIdsQuerySchema = z.object({
+    ids: z.preprocess(
+        (value) => (Array.isArray(value) ? value : value === undefined ? [] : [value]),
+        z.array(z.string().trim().min(1)).min(1).max(100),
+    ),
 });
 
 export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>;
 export type OpeningHoursInput = z.infer<typeof openingHoursSchema>;
-export type ViewSupplierInput = z.infer<typeof supplierSchema>;
-export type FilterAndSortSupplierInput = z.infer<typeof filterSearchSupplierSchema>;
-export type TypeInput = z.infer<typeof typeSchema>;
+export type GetSupplierInput = z.infer<typeof getSupplierSchema>;
 
 export function parseInput<T>(schema: z.ZodSchema<T>, body: unknown): T {
     try {
@@ -63,10 +61,3 @@ export function parseInput<T>(schema: z.ZodSchema<T>, body: unknown): T {
         );
     }
 }
-
-export const supplierIdsQuerySchema = z.object({
-    ids: z.preprocess(
-        (value) => (Array.isArray(value) ? value : value === undefined ? [] : [value]),
-        z.array(z.string().trim().min(1)).min(1).max(100),
-    ),
-});
