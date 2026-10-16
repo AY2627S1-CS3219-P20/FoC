@@ -24,7 +24,25 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
         await admin.query(`SET search_path TO "${schema}"`);
         for (const name of (await readdir(new URL("../prisma/migrations/", import.meta.url))).sort()) {
             if (name === "migration_lock.toml") continue;
-            await admin.query(await readFile(new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url), "utf8"));
+            const sql = await readFile(new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url), "utf8");
+            if (name === "20261017000000_allow_multiple_order_reservations") {
+                await t.test("upgrade preserves an existing hold and permits another for the same order", async () => {
+                    const orderId = randomUUID();
+                    const requesterId = randomUUID();
+                    const insert = `INSERT INTO "CreditReservation" ("id", "orderId", "requesterId", "amount", "updatedAt") VALUES ($1, $2, $3, 10, CURRENT_TIMESTAMP) RETURNING *`;
+                    const first = await admin.query(insert, [randomUUID(), orderId, requesterId]);
+                    await assert.rejects(admin.query(insert, [randomUUID(), orderId, requesterId]),
+                        (error: any) => error.code === "23505" && error.constraint === "CreditReservation_one_active_order");
+                    await admin.query(sql);
+                    const preserved = await admin.query(`SELECT * FROM "CreditReservation" WHERE "id" = $1`, [first.rows[0].id]);
+                    assert.deepEqual(preserved.rows, first.rows);
+                    await admin.query(insert, [randomUUID(), orderId, requesterId]);
+                    const holds = await admin.query(`SELECT "id" FROM "CreditReservation" WHERE "orderId" = $1 AND "status" = 'RESERVED'`, [orderId]);
+                    assert.equal(holds.rowCount, 2);
+                });
+            } else {
+                await admin.query(sql);
+            }
         }
         const input = (requesterId = randomUUID(), amount = 10) => ({ orderId: randomUUID(), requesterId, amount });
         const reservationFor = (request: ReturnType<typeof input>) => prisma.creditReservation.findFirstOrThrow({ where: { orderId: request.orderId } });

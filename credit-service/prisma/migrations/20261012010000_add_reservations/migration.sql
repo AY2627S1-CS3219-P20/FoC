@@ -9,6 +9,7 @@ CREATE TABLE "CreditReservation" (
  "settledAt" TIMESTAMPTZ(6), "accountId" UUID,
  CONSTRAINT "CreditReservation_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "CreditAccount"("id") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
+CREATE UNIQUE INDEX "CreditReservation_one_active_order" ON "CreditReservation"("orderId") WHERE "status" = 'RESERVED';
 CREATE INDEX "CreditReservation_orderId_createdAt_idx" ON "CreditReservation"("orderId", "createdAt");
 CREATE INDEX "CreditReservation_status_createdAt_idx" ON "CreditReservation"("status", "createdAt");
 ALTER TABLE "CreditTransaction" ADD COLUMN "reservationId" UUID;

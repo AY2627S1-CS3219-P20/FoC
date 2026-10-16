@@ -573,10 +573,6 @@ Reservation, balance and ledger changes are saved in the same transaction. Abort
 
 Run `npm run db:deploy` and `npm run db:generate` before starting the updated service.
 
-On a fresh database, `20261012010000_add_reservations` allows multiple active reservations per order. It has no unique index limiting an order to one active hold.
-
-If a local or staging database already applied an older version of this migration, its schema and migration history need to be reconciled before deployment. Editing the migration file does not update an existing database.
-
 Update callers at the same time as this deployment: leave out the old `reservationId` field when reserving, then save Credit's returned `data.id`. Lookup, abort and settlement still use that ID. The Order Service caller is not implemented yet.
 
 ## F5 to F7: receipt, release and failure settlement
