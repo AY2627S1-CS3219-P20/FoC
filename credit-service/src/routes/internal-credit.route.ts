@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import express, { Router, type ErrorRequestHandler } from "express";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { AppError } from "../errors/errors.js";
-import { reservationSchema, reservationIdSchema } from "../schemas/reservation.schema.js";
+import { abortReservationSchema, reservationIdSchema } from "../schemas/reservation.schema.js";
 import { reserveCredits, abortReservation, getReservation } from "../services/reservation.service.js";
 
 export function createInternalCreditRouter(prisma: PrismaClient, getToken: () => string | undefined) {
@@ -22,14 +22,14 @@ export function createInternalCreditRouter(prisma: PrismaClient, getToken: () =>
     router.use(parseError);
     router.post("/reservations", async (req, res) => {
         const result = await reserveCredits(prisma, req.body);
-        res.status(result.created ? 201 : 200).json({ success: true, data: result.reservation });
+        res.status(201).json({ success: true, data: result.reservation });
     });
     router.get("/reservations/:reservationId", async (req, res) => {
         res.json({ success: true, data: await getReservation(prisma, req.params.reservationId) });
     });
     router.post("/reservations/:reservationId/abort", async (req, res) => {
         const id = reservationIdSchema.safeParse(req.params.reservationId);
-        const input = reservationSchema.safeParse(req.body);
+        const input = abortReservationSchema.safeParse(req.body);
         if (!id.success || !input.success || id.data !== input.data.reservationId) throw new AppError("Invalid reservation", 400);
         const result = await abortReservation(prisma, input.data);
         res.status(200).json({ success: true, data: result.reservation });

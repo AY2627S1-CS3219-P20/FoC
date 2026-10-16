@@ -18,6 +18,7 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
     const admin = new pg.Client({ connectionString });
     await admin.connect();
     await admin.query(`CREATE SCHEMA "${schema}"`);
+    const legacyId = randomUUID();
     const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString, options: `-c search_path=${schema}` }, { schema }) });
     try {
         await admin.query(`SET search_path TO "${schema}"`);
@@ -25,17 +26,24 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             if (name === "migration_lock.toml") continue;
             await admin.query(await readFile(new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url), "utf8"));
         }
-        const input = (requesterId = randomUUID(), amount = 10) => ({ reservationId: randomUUID(), orderId: randomUUID(), requesterId, amount });
+        const input = (requesterId = randomUUID(), amount = 10) => ({ orderId: randomUUID(), requesterId, amount });
+        const reservationFor = (request: ReturnType<typeof input>) => prisma.creditReservation.findFirstOrThrow({ where: { orderId: request.orderId } });
         const errorStatus = (status: number) => (e: unknown) => e instanceof AppError && e.statusCode === status;
-        await t.test("reserve, identical replay, conflicts and unchanged F1/F2/F3", async () => {
+        await t.test("historical abort tombstones remain readable", async () => {
+            await admin.query(`INSERT INTO "CreditReservation" ("id", "orderId", "requesterId", "amount", "status", "updatedAt") VALUES ($1, $2, $3, 10, 'ABORTED', CURRENT_TIMESTAMP)`, [legacyId, randomUUID(), randomUUID()]);
+            const legacy = await getReservation(prisma, legacyId);
+            assert.equal(legacy.status, "ABORTED");
+        });
+        await t.test("reserve generates IDs, rejects caller IDs and preserves F1/F2/F3", async () => {
             const request = input();
             await grantInitialCredits(prisma, request.requesterId);
-            assert.equal((await reserveCredits(prisma, request)).created, true);
-            const retry = await reserveCredits(prisma, { ...request, requesterId: request.requesterId.toUpperCase() });
-            assert.equal(retry.created, false);
-            assert.equal(retry.reservation.status, "RESERVED");
-            await assert.rejects(reserveCredits(prisma, { ...request, amount: 11 }), errorStatus(409));
-            await assert.rejects(reserveCredits(prisma, { ...request, reservationId: randomUUID() }), errorStatus(409));
+            const first = await reserveCredits(prisma, { ...request, requesterId: request.requesterId.toUpperCase() });
+            assert.equal(first.created, true);
+            assert.match(first.reservation.id, /^[0-9a-f-]{36}$/);
+            assert.equal(first.reservation.status, "RESERVED");
+            assert.equal("idempotencyKey" in first.reservation, false);
+            await assert.rejects(reserveCredits(prisma, { ...request, reservationId: randomUUID() }), errorStatus(400));
+            await assert.rejects(reserveCredits(prisma, { ...request, idempotencyKey: randomUUID() }), errorStatus(400));
             await assert.rejects(reserveCredits(prisma, input(request.requesterId, 45)), errorStatus(409));
             await assert.rejects(reserveCredits(prisma, input()), errorStatus(404));
             const balance = await getCreditBalance(prisma, request.requesterId);
@@ -47,14 +55,15 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             assert.ok(history.status === "READY");
             assert.deepEqual(history.items.map(row => [row.type, row.availableDelta, row.reservedDelta]), [["INITIAL_ALLOCATION", 50, 0], ["RESERVATION", -10, 10]]);
         });
-        await t.test("concurrent duplicate calls create one hold and ledger row", async () => {
+        await t.test("identical concurrent calls create separate holds with generated IDs", async () => {
             const request = input();
             await grantInitialCredits(prisma, request.requesterId);
             const results = await Promise.all(Array.from({ length: 3 }, () => reserveCredits(prisma, request)));
-            assert.equal(results.filter(result => result.created).length, 1);
-            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: request.reservationId } }), 1);
+            assert.equal(results.filter(result => result.created).length, 3);
+            assert.equal(new Set(results.map(result => result.reservation.id)).size, 3);
+            assert.equal(await prisma.creditTransaction.count({ where: { orderId: request.orderId } }), 3);
         });
-        await t.test("concurrent holds cannot overdraw or duplicate an active order", async () => {
+        await t.test("concurrent holds cannot overdraw; same order permits multiple active reservations", async () => {
             const request = input(undefined, 30);
             await grantInitialCredits(prisma, request.requesterId);
             const results = await Promise.allSettled([reserveCredits(prisma, request), reserveCredits(prisma, input(request.requesterId, 30))]);
@@ -64,8 +73,31 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             assert.equal(account.reservedCredits, 30);
             const another = input();
             await grantInitialCredits(prisma, another.requesterId);
-            const sameOrder = await Promise.allSettled([reserveCredits(prisma, another), reserveCredits(prisma, { ...another, reservationId: randomUUID() })]);
-            assert.equal(sameOrder.filter(result => result.status === "fulfilled").length, 1);
+            const sameOrder = await Promise.allSettled([reserveCredits(prisma, another), reserveCredits(prisma, another)]);
+            assert.equal(sameOrder.filter(result => result.status === "fulfilled").length, 2);
+            const holds = await prisma.creditReservation.findMany({ where: { orderId: another.orderId } });
+            assert.equal(holds.length, 2);
+            assert.notEqual(holds[0]!.id, holds[1]!.id);
+            assert.ok(holds.every(hold => hold.status === "RESERVED"));
+            await abortReservation(prisma, { ...another, reservationId: holds[0]!.id });
+            assert.equal(await prisma.creditReservation.count({ where: { orderId: another.orderId, status: "RESERVED" } }), 1);
+            const remaining = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: another.requesterId } });
+            assert.deepEqual([remaining.availableCredits, remaining.reservedCredits], [40, 10]);
+        });
+        await t.test("reserve and abort balance overflow leave state unchanged", async () => {
+            const request = input();
+            await grantInitialCredits(prisma, request.requesterId);
+            await prisma.creditAccount.update({ where: { userId: request.requesterId }, data: { reservedCredits: 2_147_483_647 } });
+            await assert.rejects(reserveCredits(prisma, request), errorStatus(409));
+            assert.equal(await prisma.creditReservation.count({ where: { orderId: request.orderId } }), 0);
+            await prisma.creditAccount.update({ where: { userId: request.requesterId }, data: { reservedCredits: 0 } });
+            const { reservation } = await reserveCredits(prisma, request);
+            await prisma.creditAccount.update({ where: { userId: request.requesterId }, data: { availableCredits: 2_147_483_647 } });
+            await assert.rejects(abortReservation(prisma, { ...request, reservationId: (await reservationFor(request)).id }), errorStatus(409));
+            assert.equal((await getReservation(prisma, reservation.id)).status, "RESERVED");
+            const account = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
+            assert.deepEqual([account.availableCredits, account.reservedCredits], [2_147_483_647, 10]);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: reservation.id } }), 1);
         });
         await t.test("ledger failure rolls back hold and balances", async () => {
             const request = input();
@@ -74,48 +106,44 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             await admin.query(`CREATE TRIGGER fail_reservation_ledger BEFORE INSERT ON "CreditTransaction" FOR EACH ROW EXECUTE FUNCTION fail_reservation_ledger()`);
             try { await assert.rejects(reserveCredits(prisma, request), /injected ledger failure/); }
             finally { await admin.query(`DROP TRIGGER fail_reservation_ledger ON "CreditTransaction"`); }
-            assert.equal(await prisma.creditReservation.count({ where: { id: request.reservationId } }), 0);
+            assert.equal(await prisma.creditReservation.count({ where: { orderId: request.orderId } }), 0);
             const account = await prisma.creditAccount.findUniqueOrThrow({ where: { id: grant.account.id } });
             assert.equal(account.availableCredits, 50);
             assert.equal(account.reservedCredits, 0);
         });
-        await t.test("funded abort refunds once; unfunded tombstone blocks late reserve", async () => {
+        await t.test("funded abort refunds once; missing reservation returns 404", async () => {
             const request = input();
             await grantInitialCredits(prisma, request.requesterId);
             await reserveCredits(prisma, request);
             await admin.query(`CREATE FUNCTION fail_abort_ledger() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."type" = 'RELEASE' THEN RAISE EXCEPTION 'injected ledger uniqueness failure' USING ERRCODE = '23505'; END IF; RETURN NEW; END $$`);
             await admin.query(`CREATE TRIGGER fail_abort_ledger BEFORE INSERT ON "CreditTransaction" FOR EACH ROW EXECUTE FUNCTION fail_abort_ledger()`);
             try {
-                await assert.rejects(abortReservation(prisma, request), (error: any) => error.code === "P2002");
-                assert.equal((await getReservation(prisma, request.reservationId)).status, "RESERVED");
+                await assert.rejects(abortReservation(prisma, { ...request, reservationId: (await reservationFor(request)).id }), (error: any) => error.code === "P2002");
+                assert.equal((await getReservation(prisma, (await reservationFor(request)).id)).status, "RESERVED");
                 const held = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
                 assert.equal(held.availableCredits, 40);
                 assert.equal(held.reservedCredits, 10);
             } finally { await admin.query(`DROP TRIGGER fail_abort_ledger ON "CreditTransaction"`); }
-            await Promise.all([abortReservation(prisma, request), abortReservation(prisma, request)]);
-            assert.equal((await getReservation(prisma, request.reservationId)).status, "ABORTED");
+            await Promise.all([abortReservation(prisma, { ...request, reservationId: (await reservationFor(request)).id }), abortReservation(prisma, { ...request, reservationId: (await reservationFor(request)).id })]);
+            assert.equal((await getReservation(prisma, (await reservationFor(request)).id)).status, "ABORTED");
             const account = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
             assert.equal(account.availableCredits, 50);
             assert.equal(account.reservedCredits, 0);
-            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: request.reservationId, type: "RELEASE" } }), 1);
-            const absent = input();
-            await abortReservation(prisma, absent);
-            assert.equal((await reserveCredits(prisma, absent)).reservation.status, "ABORTED");
-            assert.equal(await prisma.creditAccount.count({ where: { userId: absent.requesterId } }), 0);
-            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: absent.reservationId } }), 0);
+            assert.equal(await prisma.creditTransaction.count({ where: { reservationId: (await reservationFor(request)).id, type: "RELEASE" } }), 1);
+            await assert.rejects(abortReservation(prisma, { ...request, reservationId: randomUUID() }), errorStatus(404));
         });
-        await t.test("reserve/abort race always finishes ABORTED without held funds", async () => {
-            for (let i = 0; i < 5; i++) {
-                const request = input();
-                await grantInitialCredits(prisma, request.requesterId);
-                await Promise.all([reserveCredits(prisma, request), abortReservation(prisma, request)]);
-                assert.equal((await getReservation(prisma, request.reservationId)).status, "ABORTED");
-                const account = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
-                assert.equal(account.availableCredits, 50);
-                assert.equal(account.reservedCredits, 0);
+        await t.test("abort rejects mismatched reservation details without releasing credits", async () => {
+            const request = input();
+            await grantInitialCredits(prisma, request.requesterId);
+            const { reservation } = await reserveCredits(prisma, request);
+            for (const change of [{ orderId: randomUUID() }, { requesterId: randomUUID() }, { amount: 11 }]) {
+                await assert.rejects(abortReservation(prisma, { ...request, reservationId: reservation.id, ...change }), errorStatus(409));
             }
+            assert.equal((await getReservation(prisma, reservation.id)).status, "RESERVED");
+            const account = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
+            assert.deepEqual([account.availableCredits, account.reservedCredits], [40, 10]);
         });
-        await t.test("HTTP reserve/replay/lookup/abort return committed states", async () => {
+        await t.test("HTTP reserve creates a new hold per call; lookup and abort use returned ID", async () => {
             const request = input();
             await grantInitialCredits(prisma, request.requesterId);
             const app = express();
@@ -128,12 +156,18 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             const url = `http://127.0.0.1:${address.port}/internal/credits/reservations`;
             const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { authorization: "Bearer test-token", "Content-Type": "application/json" }, body: JSON.stringify(body) });
             try {
-                assert.equal((await post(url, request)).status, 201);
-                assert.equal((await post(url, request)).status, 200);
-                const lookup = await fetch(`${url}/${request.reservationId}`, { headers: { authorization: "Bearer test-token" } });
+                const created = await post(url, request);
+                assert.equal(created.status, 201);
+                const reservationId = (await created.json()).data.id;
+                assert.ok(reservationId);
+                assert.equal((await post(url, { ...request, reservationId: randomUUID() })).status, 400);
+                const second = await post(url, request);
+                assert.equal(second.status, 201);
+                assert.notEqual((await second.json()).data.id, reservationId);
+                const lookup = await fetch(`${url}/${reservationId}`, { headers: { authorization: "Bearer test-token" } });
                 assert.equal(lookup.status, 200);
                 assert.equal((await lookup.json()).data.status, "RESERVED");
-                const aborted = await post(`${url}/${request.reservationId}/abort`, request);
+                const aborted = await post(`${url}/${reservationId}/abort`, { ...request, reservationId });
                 assert.equal(aborted.status, 200);
                 assert.equal((await aborted.json()).data.status, "ABORTED");
             } finally {

@@ -1,8 +1,15 @@
 # Credit service
 
-Credit-service provides PostgreSQL/Prisma credit storage, an idempotent initial-grant function, and RabbitMQ delivery from the user-service transactional outbox. Current balances live in `CreditAccount`; an append-only `CreditTransaction` ledger records changes. This is not full event sourcing.
+Credit-service manages student credits using PostgreSQL and Prisma. It stores current balances in `CreditAccount` and records each change in `CreditTransaction`. These transaction records can only be added, never edited or deleted. Current balances are stored directly; this is not full event sourcing.
 
-Authenticated, student-only read APIs expose current balances and transaction history for the navbar and transaction-history UI. F4 reservation and creation-abort recovery APIs are implemented for trusted Order Service calls. F5 receipt transfer, F6 cancellation/expiry release and F7 failure refund are implemented through the order-settlement consumer. Order producers and full workflow integration remain pending.
+The service supports:
+
+- Giving a newly registered student their initial credits once, even if RabbitMQ delivers the registration event more than once. User-service saves the event in its outbox as part of registration.
+- Letting authenticated students read their balance and transaction history for the navbar and history page.
+- Holding credits for an order and returning a hold when order creation is abandoned (F4). These APIs are for trusted Order Service calls.
+- Processing order events to pay a courier after receipt (F5), release a hold after cancellation or expiry (F6), or refund a hold after failure (F7).
+
+Order Service still needs the code that calls Credit and publishes order events. The complete workflow across both services has not been verified.
 
 ## Setup
 
@@ -26,7 +33,7 @@ If `.env` does not already exist, copy `.env.example` to `.env`. Configure:
 | `ORDER_CREDIT_SERVICE_TOKEN` | Shared secret for internal Order → Credit requests. Missing configuration denies all internal requests. |
 | `JWT_PUBLIC_KEY_PATH` | Path to the PEM public key matching user-service's RS256 signing key. Relative paths resolve from the process working directory. |
 
-The Prisma CLI needs `DATABASE_URL`. The application and shared Prisma-client module load the full application configuration; starting the HTTP server also reads the JWT public-key file. Keep credentials and key files out of Git.
+The Prisma CLI needs `DATABASE_URL`. The application and shared Prisma-client module load all application settings. Starting the HTTP server also reads the JWT public-key file. Keep credentials and key files out of Git.
 
 Apply the checked-in migrations, generate the client, and build:
 
@@ -36,7 +43,11 @@ npm run db:generate
 npm run build
 ```
 
-Start development with `npm run dev`, or run the compiled application with `npm start`. The registration consumer starts in the background after HTTP begins listening and reconnects during broker outages. `GET /credits` reports HTTP liveness, not broker connectivity or successful provisioning. Authenticated read endpoints are available under `/api/credits/me`; no public grant endpoint is exposed.
+Start development with `npm run dev`, or run the compiled application with `npm start`.
+
+The registration consumer starts after the HTTP server begins listening. It reconnects if RabbitMQ becomes unavailable. `GET /credits` only confirms that the HTTP server is running; it does not check RabbitMQ or whether students have received credits.
+
+Authenticated read endpoints are under `/api/credits/me`. There is no public endpoint for granting credits.
 
 ## RabbitMQ and service startup
 
@@ -51,9 +62,16 @@ docker compose logs --tail=50 rabbitmq
 
 If macOS reports `docker: command not found` and Docker Desktop installed its CLI under `~/.docker/bin`, run `export PATH="$HOME/.docker/bin:$PATH"` in your terminal. Add that export to `~/.zshrc` to keep it for new shells.
 
-Compose downloads `rabbitmq:4.2-management`, binds AMQP port `5672` and management port `15672` to localhost, and stores broker data in a named volume. The management UI is at <http://localhost:15672>; development defaults are `foc` / `foc-local-only`. Override these using `RABBITMQ_USER` and `RABBITMQ_PASSWORD` in the **root** `.env`. These initialize a fresh broker volume; changing them later does not update existing broker users.
+Compose downloads `rabbitmq:4.2-management` and stores broker data in a named volume. Both ports are bound to localhost:
 
-Set `RABBITMQ_URL` in **both service directories'** `.env` files to matching credentials. URL-encode special characters in credentials. Services running on your host use `localhost`; a future containerized service on the same Compose network uses hostname `rabbitmq`. Root `.env` values are not automatically loaded by host service processes.
+- AMQP: `5672`
+- Management UI: `15672`, at <http://localhost:15672>
+
+The development login is `foc` / `foc-local-only`. Override it using `RABBITMQ_USER` and `RABBITMQ_PASSWORD` in the **root** `.env`. These settings create users when the broker volume is first initialized. Changing them later does not update existing broker users.
+
+Set `RABBITMQ_URL` in **both service directories'** `.env` files using the same credentials. URL-encode any special characters in the credentials.
+
+Services running on your host use `localhost`. A future service running in a container on the same Compose network would use `rabbitmq`. Host service processes do not automatically load the root `.env`.
 
 Apply migrations and generate clients in each service before startup:
 
@@ -62,13 +80,19 @@ Apply migrations and generate clients in each service before startup:
 (cd credit-service && npm ci && npm run db:deploy && npm run db:generate && npm run build)
 ```
 
-Run `npm start` from each service directory in separate terminals, or use `npm run dev`. The user-service publisher and credit-service consumer run inside their existing processes; there are no separate worker commands. Each connection declares the complete topology before processing, so either service may start first. Broker downtime does not block HTTP startup. Stop services with Ctrl+C; their shutdown handlers finish in-flight work where possible, with a 15-second shutdown deadline.
+Run `npm start` from each service directory in separate terminals, or use `npm run dev`. The user-service publisher and credit-service consumer run inside those processes; you do not need separate worker commands.
 
-Use `docker compose stop rabbitmq` to stop the broker and `docker compose start rabbitmq` to restart it. The volume survives these commands and ordinary `docker compose down`. **`docker compose down -v` deletes broker data.** This single-node local setup supports restart persistence, not high availability or recovery from permanent volume loss.
+Either service can start first. Each connection sets up the required exchanges, queues and bindings before processing messages. The HTTP servers can start while RabbitMQ is down.
+
+Stop services with Ctrl+C. They try to finish work already in progress before a 15-second shutdown deadline.
+
+Use `docker compose stop rabbitmq` to stop the broker and `docker compose start rabbitmq` to restart it. These commands and ordinary `docker compose down` preserve the volume. **`docker compose down -v` deletes broker data.**
+
+This local setup uses one broker node. Data survives restarts, but the setup does not provide high availability or recovery from permanent volume loss.
 
 ## Registration delivery contract
 
-This is an event carried in an AMQP message, not a request to set a configurable balance:
+User-service sends this registration event in an AMQP message. The initial credit amount is fixed by Credit; the event does not choose it.
 
 ```json
 {
@@ -81,7 +105,9 @@ This is an event carried in an AMQP message, not a request to set a configurable
 }
 ```
 
-The consumer requires exactly these fields, valid UUIDs, a UTC ISO timestamp ending in `Z`, and AMQP `messageId` equal to `eventId`. Email, passwords, and grant amounts are absent. Broker publishers are trusted to report verified student registrations; this consumer does not query user-service for eligibility. Restrict broker publishing credentials accordingly.
+The consumer requires exactly these fields. UUIDs must be valid, the timestamp must be UTC ISO format ending in `Z`, and AMQP `messageId` must equal `eventId`. Do not include email, passwords or grant amounts.
+
+Credit trusts the publisher to report verified student registrations. It does not ask user-service to check eligibility, so restrict who can publish to the broker.
 
 | Component | Declaration |
 | --- | --- |
@@ -90,13 +116,21 @@ The consumer requires exactly these fields, valid UUIDs, a UTC ISO timestamp end
 | Retry queue | `credit.user-registered.retry.v1`, 10-second TTL, dead-letter route back to the registration exchange/key |
 | Dead-letter queue | `credit.user-registered.dead.v1`, no TTL |
 
-All three queues are durable quorum queues, with `reject-publish` overflow and automatic delivery-count limits disabled. The retry queue explicitly uses at-least-once dead-lettering. Retry/dead-letter publications address queue names through the default exchange. Both services maintain identical topology declarations in `src/libs/rabbitmq.ts`; update both together when changing the contract.
+All three queues are durable quorum queues. They use `reject-publish` when full and disable automatic delivery-count limits. The retry queue uses at-least-once dead-lettering, which can deliver the same message more than once. Retry and dead-letter messages are sent to queue names through the default exchange.
 
-Publishers use persistent messages, mandatory routing, and publisher confirms, with a 10-second confirmation timeout. A confirm alone is not successful routing if the message was returned. Publication confirmation means the broker accepted the message, not that credits have been granted.
+Both services define the same exchanges, queues and bindings in `src/libs/rabbitmq.ts`. Update both files together when changing the contract.
 
-The consumer processes one delivery at a time (`prefetch: 1`). It acknowledges only after the grant function resolves, including duplicate-grant success. Transient database connection failures, timeouts, and transaction conflicts receive five delayed retries after the first attempt: up to six application processing attempts. `x-retry-count` starts at zero and increments on each scheduled retry. The 10-second TTL is a minimum waiting period; outages or backlog can delay delivery further.
+Publishers send persistent messages, require successful routing, and wait up to 10 seconds for broker confirmation. A returned message still counts as a routing failure, even if the broker also confirms it. Confirmation means RabbitMQ accepted the message; it does not mean Credit has granted the credits yet.
 
-Malformed/unsupported events, invalid retry metadata, permanent failures (including `CREDIT_ACCOUNT_INCONSISTENT`), and retry exhaustion go to the dead-letter queue. Every application retry or dead-letter transfer must be confirmed before the original is acknowledged. Failed forwarding leaves the original unacknowledged and triggers reconnection. Reconnect backoff is capped at 60 seconds. Lost confirmations/acknowledgments can cause extra deliveries beyond the scheduled retry count; The initial-grant function’s idempotency prevents additional grants.
+The consumer processes one message at a time (`prefetch: 1`). It acknowledges the message only after the grant function succeeds, including when the grant already exists.
+
+Temporary database connection failures, timeouts and transaction conflicts get up to five delayed retries after the first attempt, for six processing attempts in total. `x-retry-count` starts at zero and increases with each scheduled retry. The retry queue waits at least 10 seconds; outages or a backlog can make the wait longer.
+
+Invalid or unsupported events, invalid retry metadata, permanent failures (including `CREDIT_ACCOUNT_INCONSISTENT`), and messages that use up their retries go to the dead-letter queue for investigation.
+
+The consumer waits for confirmation before acknowledging a message moved to a retry or dead-letter queue. If forwarding fails, it leaves the original unacknowledged and reconnects. The wait between reconnect attempts grows to at most 60 seconds.
+
+Lost confirmations or acknowledgments can cause extra deliveries beyond the scheduled retry count. The initial-grant function prevents these deliveries from granting credits again.
 
 ## Inspecting and redriving dead letters
 
@@ -106,7 +140,9 @@ From the repository root, inspect ready and unacknowledged messages without cons
 docker compose exec rabbitmq rabbitmqctl list_queues -p / name messages_ready messages_unacknowledged consumers
 ```
 
-Look for `credit.user-registered.dead.v1`. The management UI also shows these counts and queue arguments. Consumer logs include event ID/user ID when valid, attempt, outcome, and a bounded failure reason. Do not use an acknowledging "get messages" operation merely to inspect messages. For unpublished outbox counts and age, see [user-service operations](../user-service/README.md#credit-provisioning-outbox).
+Look for `credit.user-registered.dead.v1`. The management UI also shows message counts and queue settings. Consumer logs include valid event and user IDs, the attempt, the outcome, and a failure reason with a length limit.
+
+When inspecting messages, avoid a "get messages" operation that acknowledges and removes them. For counts and ages of unpublished outbox events, see [user-service operations](../user-service/README.md#credit-provisioning-outbox).
 
 After resolving the original failure, stop credit-service while keeping RabbitMQ running, then from `credit-service`:
 
@@ -120,17 +156,32 @@ For a compiled deployment:
 npm run redrive:prod -- --limit 10
 ```
 
-Only `RABBITMQ_URL` is required by this standalone command; it does not initialize Prisma or the HTTP server. Restart credit-service after redrive. Pausing the consumer avoids repeatedly processing a still-failing event that returns to the dead-letter queue during the same run. Run one redrive command at a time.
+Redrive means sending a dead-letter message back for another processing attempt. The command only needs `RABBITMQ_URL`; it does not start Prisma or the HTTP server.
 
-The command processes oldest available dead letters, bounded by the requested positive integer and the initial ready count. It preserves exact event bytes, event ID, occurrence time, and message ID; resets `x-retry-count` to zero; increments `x-redrive-count`; and sets `x-redriven-at`. It retains failure/death headers for diagnosis but does not copy message expiration or AMQP user identity. Each dead letter is acknowledged only after confirmed republication to the registration route.
+Restart credit-service afterward. Keeping its consumer paused during redrive prevents a still-failing event from returning to the dead-letter queue and being picked up again in the same run. Run one redrive command at a time.
 
-A broker failure stops the command with exit code 1, leaving the current unacknowledged message available again when the connection closes. Invalid event bodies/identities or invalid redrive counts also stop the command without removing that message. Investigate them separately; this tool does not rewrite events or repair accounts. A crash after forwarding but before acknowledgment may leave a duplicate; the grant remains idempotent. Redrive success means republished, not successfully granted. `npm run redrive -- --help` displays usage without contacting the broker.
+The command processes the oldest available dead letters. It stops at the requested positive limit or the number of ready messages counted at startup, whichever is smaller.
+
+For each message, it:
+
+- Preserves the exact event bytes, event ID, occurrence time and message ID.
+- Resets `x-retry-count` to zero, increments `x-redrive-count`, and sets `x-redriven-at`.
+- Keeps failure and death headers for diagnosis, but drops message expiration and AMQP user identity.
+- Acknowledges the dead letter only after RabbitMQ confirms republication to the registration route.
+
+A broker failure stops the command with exit code 1. The current unacknowledged message becomes available again when the connection closes. Invalid event bodies, identities or redrive counts also stop the command without removing the message. Investigate these separately; redrive does not rewrite events or repair accounts.
+
+A crash after forwarding but before acknowledgment can create a duplicate delivery. The grant function still prevents a second grant. A successful redrive means the message was republished; Credit may not have processed it yet.
+
+`npm run redrive -- --help` displays usage without contacting the broker.
 
 ## Migration contract
 
 Deploy `20261012000000_add_credit_transaction_ledger` before using the grant function. `npm run db:deploy` applies pending migrations, including the original account migration on a fresh database. Client generation is a separate step.
 
-The ledger migration runs in a transaction. It adds constraints, the transaction enum/table, indexes, and append-only enforcement without creating accounts, changing balances, or granting credits to existing users. Existing negative balances cause migration failure; investigate and explicitly remediate invalid data rather than silently resetting balances or granting credits. Follow Prisma's failed-migration recovery process before retrying a failed deployment.
+The ledger migration runs in a transaction. It adds constraints, the transaction enum and table, indexes, and rules that prevent editing or deleting ledger entries. It does not create accounts, change balances or grant credits to existing users.
+
+If existing balances are negative, the migration fails. Investigate and correct that data explicitly. Do not silently reset balances or grant credits to work around the failure. Follow Prisma's failed-migration recovery process before retrying deployment.
 
 Database invariants:
 
@@ -141,7 +192,11 @@ Database invariants:
 - A PostgreSQL trigger rejects ledger `UPDATE`, `DELETE`, and `TRUNCATE` statements. Corrections require new entries; no correction workflow is implemented.
 - The local account foreign key uses `ON DELETE RESTRICT ON UPDATE RESTRICT`. Ledger records cannot be cascaded away with an account.
 
-Checks, the partial unique index, and the trigger/function are maintained in migration SQL. Preserve them when creating future migrations; Prisma schema declarations alone do not describe all these invariants. Use `npm run db:migrate -- --name <change_name>` only to author migrations against a development database, and review the generated SQL. Use the checked-in migrations for deployment rather than substituting `prisma db push`. `npm run db:reset` destroys database data and is not an upgrade procedure.
+Migration SQL defines the checks, partial unique index, and trigger/function. Preserve these in future migrations; the Prisma schema does not describe all of them.
+
+- Use `npm run db:migrate -- --name <change_name>` to create migrations against a development database, then review the SQL.
+- Deploy using the checked-in migrations. Do not substitute `prisma db push`.
+- `npm run db:reset` destroys database data. Do not use it to upgrade a database.
 
 `CreditAccount.userId` and nullable `CreditTransaction.orderId` are external UUID references owned by user-service and order-service. They have no cross-service foreign keys or joins. Account and transaction IDs are local UUIDs, and transaction timestamps use `TIMESTAMPTZ(6)`.
 
@@ -181,7 +236,9 @@ On first provisioning, one database transaction creates:
 | Account | `availableCredits: 50`, `reservedCredits: 0` |
 | Initial transaction | `type: INITIAL_ALLOCATION`, `amount: 50`, `availableDelta: 50`, `reservedDelta: 0`, `orderId: null` |
 
-Both writes commit together or roll back together. A successful first call returns `created: true`. Repeated or concurrent duplicate calls return the existing account and original grant with `created: false`, after any failed account-creation transaction has rolled back. They do not add credits or reset balances, even if later activity has changed those balances.
+Both writes succeed together or are rolled back together. The first successful call returns `created: true`.
+
+Repeated calls, including simultaneous calls for the same user, return the existing account and original grant with `created: false`. Any failed account-creation transaction is rolled back first. These calls do not add credits or reset balances, even if later activity has changed the balance.
 
 An existing account must have exactly one initial-allocation record matching the deterministic key, amount, deltas, and null order ID. The function does not repair an account lacking that record or having an incompatible record.
 
@@ -191,25 +248,27 @@ An existing account must have exactly one initial-allocation record matching the
 | Missing or incompatible grant on an existing account | `AppError` with code `CREDIT_ACCOUNT_INCONSISTENT`, status `500`; investigate without automatic repair. |
 | Other database/transaction failure | Error propagates. Writes in the failed provisioning transaction roll back. |
 
-These statuses are error metadata, not a public HTTP grant API. A connection failure can leave the caller uncertain whether a commit succeeded; retrying with the same user ID is safe.
+These statuses describe errors from the function; there is no public HTTP grant API. If a connection fails, the caller may not know whether the transaction committed. Retrying with the same user ID is safe.
 
 ## Access and provisioning boundaries
 
-- Call the internal function only for newly verified students. It does not query user-service or verify role/verification state itself. Do not run it over all existing users as a migration or startup backfill.
-- User-service commits user creation and its provisioning outbox event together. Registration succeeds while credit provisioning is pending; an absent account must not be mistaken for a successfully provisioned zero balance.
-- Acknowledge delivery after the function resolves, including `created: false`. If acknowledgment is lost after commit, redelivery is safe. Retry transient database failures; route invalid IDs and `CREDIT_ACCOUNT_INCONSISTENT` failures for investigation rather than repeatedly granting or resetting credits.
-- Balance/history endpoints enforce student-only access; admins cannot read balances or history. Promotion to admin preserves existing credit records. Authorization uses the role in the verified JWT; these endpoints do not query user-service or revoke already-issued student tokens on promotion.
-- Future balance changes and their transaction entries must commit atomically. Display available and reserved balances separately: available credits are already spendable, so do not subtract reserved credits again.
+- Call the internal function only for newly verified students. The caller must check eligibility; the function does not query user-service or check role and verification state. Do not use it to give all existing users credits during a migration or startup.
+- User-service saves the new user and its provisioning outbox event in the same transaction. Registration can succeed before Credit creates the account. A missing account means provisioning is pending, not that the student has a zero balance.
+- Acknowledge delivery after the function succeeds, including `created: false`. Redelivery after a lost acknowledgment is safe. Retry temporary database failures. Investigate invalid IDs and `CREDIT_ACCOUNT_INCONSISTENT` errors instead of granting again or resetting balances.
+- Only students can read balances and history. Promoting a student to admin keeps their credit records. Access checks use the role in the verified JWT; they do not query user-service or revoke existing student tokens after promotion.
+- Save each balance change and its transaction entries together. Show available and reserved balances separately. Available credits are already spendable, so do not subtract reserved credits again.
 
 ## Credit read API contract
 
 Both endpoints require `Authorization: Bearer <access-token>`. Tokens must verify using RS256 and contain a UUID `userId`, a string `email`, and a recognized role. Only `STUDENT` is authorized; valid `ADMIN` tokens receive 403, including when an account exists from before promotion.
 
-The account is selected exclusively from the verified JWT user ID. There is no account/user ID route parameter or query parameter. Neither endpoint reads an identity from the request body. Send GET requests without bodies. Reads never create accounts, grant credits, or change the ledger.
+Both endpoints select the account using only the verified JWT user ID. They do not accept account or user IDs in the path, query or body. Send GET requests without bodies.
+
+Reading a balance or history never creates an account, grants credits or changes the ledger.
 
 ### Exact response types
 
-The following are the JSON wire types for frontend consumers. Backend response definitions live in `src/types/credit.types.ts`; the transaction-type values come from the Prisma enum.
+Frontend consumers receive these JSON types. Backend definitions are in `src/types/credit.types.ts`; transaction-type values come from the Prisma enum.
 
 ```ts
 type CreditTransactionType =
@@ -264,7 +323,12 @@ type CreditErrorResponse = {
 };
 ```
 
-READY responses use HTTP 200; PROVISIONING responses use HTTP 202. Errors use the error envelope without `data`. All fields shown in each response variant are required. IDs are UUID strings; timestamps are UTC ISO strings serialized with milliseconds and a trailing `Z`. Balances are non-negative integers, transaction amounts are positive integers, and deltas are signed integers. `orderId` is always present, including when `null`. Account IDs, user IDs, and idempotency keys are not returned as item fields.
+- READY responses use HTTP 200. PROVISIONING responses use HTTP 202.
+- Errors contain the error fields shown above and no `data` field.
+- Every field shown for a response type is required. `orderId` is always included, even when `null`.
+- IDs are UUID strings. Timestamps are UTC ISO strings with milliseconds and a trailing `Z`.
+- Balances are non-negative integers. Transaction amounts are positive integers; deltas can be positive, negative or zero.
+- Transaction items do not expose account IDs, user IDs or idempotency keys.
 
 ### Balance endpoint
 
@@ -302,9 +366,11 @@ When an account lookup succeeds but no account exists, either endpoint returns H
 }
 ```
 
-This response has no numeric balances, timestamps, items, or cursor. Treat it as pending, not as a zero balance or empty transaction history. Axios treats 202 as success: inspect `response.data.data.status` before reading READY fields. A database failure returns an error instead of this response.
+This response means the account is missing. It contains no numeric balances, timestamps, items or cursor. Do not display it as a zero balance or empty history. A database failure returns an error instead.
 
-An absent legacy account also produces PROVISIONING; reads do not backfill it, and the response does not guarantee eventual provisioning. No polling interval or completion deadline is supplied by the API. Provide a refresh/retry action without treating repeated 202 responses as completed provisioning.
+Axios treats 202 as success. Check `response.data.data.status` before reading READY fields.
+
+An older user without a credit account also gets PROVISIONING. Reading the endpoint does not create the account, and the response does not guarantee that an account will eventually be created. The API supplies no polling interval or completion deadline. Offer a refresh/retry action; repeated 202 responses still mean provisioning is incomplete.
 
 ### Transaction-history endpoint
 
@@ -320,9 +386,11 @@ Authorization: Bearer <access-token>
 | `limit` | Digits representing an integer from 1 through 100 | `20` |
 | `cursor` | Nonempty opaque token returned by the API, at most 1,024 characters | First page |
 
-Unknown parameters, repeated parameters/arrays, empty values, invalid enum values, and invalid limits return 400. Limits containing signs, spaces, decimal points, or exponent notation are invalid. Do not send `type=ALL`, `cursor=null`, or empty strings to represent omission.
+Invalid query parameters return 400. This includes unknown or repeated parameters, arrays, empty values, unsupported enum values, and invalid limits. Limits must contain digits only, with no signs, spaces, decimal points or exponent notation.
 
-History is restricted to the authenticated student's account, including when filtering. Initial allocation, reservation and creation-abort release write to this same ledger. F5 receipt transfers write `TRANSFER_SENT` and `TRANSFER_RECEIVED` rows. F6 cancellation/expiry writes `RELEASE` rows. F7 failure writes `REFUND` rows.
+Leave optional parameters out when unused. Do not send `type=ALL`, `cursor=null`, or empty strings.
+
+History only includes the authenticated student's account, even when filters are used. All credit operations write to the same ledger: initial allocation, reservation, release after abandoned creation, F5 receipt transfers (`TRANSFER_SENT` and `TRANSFER_RECEIVED`), F6 cancellation/expiry (`RELEASE`), and F7 failure (`REFUND`).
 
 HTTP 200 example with one transaction and no further page:
 
@@ -356,15 +424,21 @@ An existing account with no matching transactions returns HTTP 200:
 }
 ```
 
-`amount` is a positive magnitude; use `availableDelta` and `reservedDelta` when displaying signed changes to each balance.
+`amount` is always positive. Use `availableDelta` and `reservedDelta` to show whether each balance increased or decreased.
 
 ### Sorting and pagination
 
-The API explicitly orders by `createdAt DESC, id DESC` by default and `createdAt ASC, id ASC` for `sort=asc`. Preserve the returned order in the UI: PostgreSQL timestamps retain microseconds, which the serialized timestamps cannot fully represent. Transaction ID is the tie-breaker for equal stored timestamps.
+The default order is `createdAt DESC, id DESC`. With `sort=asc`, it is `createdAt ASC, id ASC`. The transaction ID breaks ties when stored timestamps are equal.
 
-Each page contains at most `limit` items. `nextCursor` is a string only when a further row was found; it is `null` at the end. Cursors are scoped to the account, type filter (including no filter), and sort direction. They must refer to an existing transaction within that scope. Malformed or incompatible cursors return 400. Treat tokens as opaque; do not decode, edit, or construct them in the frontend. The server independently enforces account access regardless of cursor content.
+Keep the API's order in the UI. PostgreSQL stores microseconds, but response timestamps do not include that full precision. Sorting the response again can change the intended order.
 
-Keep type and sort unchanged between pages; changing either resets the list and cursor. Changing `limit` is allowed. Query syntax and cursor structure are validated before account lookup; account-dependent cursor checks occur only after an account is found. A structurally valid request for a missing account returns 202.
+Each page has at most `limit` items. If another row exists, `nextCursor` contains a token for the next page. Otherwise it is `null`.
+
+A cursor belongs to one account, type filter (including no filter), and sort direction. It must point to an existing transaction within those settings. Invalid or incompatible cursors return 400. Pass the token back unchanged; do not decode, edit or create cursors in the frontend. The server checks account access separately from cursor content.
+
+Keep type and sort unchanged between pages. Reset the list and cursor when either changes. You may change `limit` between pages.
+
+The server checks query syntax and cursor structure before looking up the account. It checks whether the cursor matches the account only after finding that account. A request with valid syntax and cursor structure returns 202 if the account is missing.
 
 Example consuming a first page and, when available, a second page using the service's Axios client:
 
@@ -393,7 +467,9 @@ if (first.data.data.status === "READY") {
 }
 ```
 
-Pagination reads live data rather than a frozen snapshot. Newly inserted rows before the current cursor are seen by refreshing the first page; rows after it may appear on subsequent pages. Do not infer a total count from page length. Existing indexes on `(accountId, createdAt DESC, id DESC)` and `(accountId, type, createdAt DESC, id DESC)` support these reads; no new migration is required.
+Pages read live data, so new transactions can arrive while the user browses. Refresh the first page to see new rows before the current cursor. New rows after it may appear on later pages. Page length does not tell you the total transaction count.
+
+Existing indexes on `(accountId, createdAt DESC, id DESC)` and `(accountId, type, createdAt DESC, id DESC)` support these reads. No new migration is required.
 
 ### Errors and frontend handling
 
@@ -416,7 +492,11 @@ Example HTTP 400:
 }
 ```
 
-Frontend consumers should hide credit UI for admins and use the existing authentication refresh handling for 401 responses. Do not treat 403 or 500 as provisioning, zero balance, or empty history. On a cursor error, offer a restart from the first page. The transaction-history UI should distinguish READY with no items, PROVISIONING, and request errors; discard stale page responses after the user changes filters or sort.
+- Hide credit UI for admins.
+- Use the existing authentication refresh handling for 401 responses.
+- Show 403 and 500 as errors, not as provisioning, zero balance or empty history.
+- On a cursor error, offer to restart from the first page.
+- Show READY with no items, PROVISIONING, and request errors as separate states. Ignore stale page responses after the user changes filters or sort.
 
 ## Validation
 
@@ -432,48 +512,91 @@ Run input/authentication/retry tests with `npm test`. Run PostgreSQL integration
 CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_test" npm run test:integration
 ```
 
-The integration suite creates a randomly named schema, applies all checked-in migrations there, and drops only that schema afterward. The database role needs schema-creation permission. No integration URL means the database suite is skipped. Use a dedicated test database; do not point tests at production.
+Use a dedicated test database, never production. The database role needs permission to create schemas.
 
-Validated locally: schema/client generation, TypeScript build, three unit/HTTP-auth tests, and nine PostgreSQL subtests covering reservations, duplicate/concurrent requests, insufficient credits, rollback after injected ledger failure, abort races/tombstones, HTTP contracts, adapter connection failure, F1/F2/F3 regressions and existing SQL protections. F5 validation is documented below. Full Order creation/recovery, broker restart drills and browser E2E remain unverified. Credit F5–F7 settlement validation is documented below.
+The suite creates a schema with a random name, applies all checked-in migrations, then drops only that schema. If the integration URL is missing, the database suite is skipped.
+
+Previously reported local checks: Prisma client generation, the TypeScript application build, and PostgreSQL integration tests (30 passed, one live-broker test skipped). The suite covers historical abort tombstones, Credit-generated IDs, repeated and simultaneous holds for the same order, insufficient credits, balance overflow, rollback, repeated aborts, HTTP contracts, and independent settlement of each reservation.
+
+These results do not verify full Order creation/recovery, live-broker behavior for this change, or browser E2E.
 
 ## Internal F4 reservation API
 
-These routes require `Authorization: Bearer <ORDER_CREDIT_SERVICE_TOKEN>`. Student JWTs do not authorize them. Keep `/internal/credits` off public ingress and use HTTPS between deployed services. The token is read from environment at request time; it is never returned or logged.
+These routes require `Authorization: Bearer <ORDER_CREDIT_SERVICE_TOKEN>`. A student JWT cannot access them.
+
+Keep `/internal/credits` private and use HTTPS between deployed services. The service reads the token from the environment for each request and never returns or logs it.
 
 | Method/path | Purpose |
 | --- | --- |
-| `POST /internal/credits/reservations` | Create a hold or return an identical retry's current state. |
-| `GET /internal/credits/reservations/:reservationId` | Recover committed state after a timeout. |
-| `POST /internal/credits/reservations/:reservationId/abort` | Return a creation hold or create an unfunded abort tombstone. |
+| `POST /internal/credits/reservations` | Create a new hold with a Credit-generated ID. |
+| `GET /internal/credits/reservations/:reservationId` | Read a reservation using Credit's returned ID. |
+| `POST /internal/credits/reservations/:reservationId/abort` | Return held credits when order creation is abandoned. |
 
-Both POST bodies contain exactly these immutable fields (abort's body ID must match the path):
+Reserve accepts exactly these fields:
 
 ```json
 {
-  "reservationId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6481",
   "orderId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6482",
   "requesterId": "d0379a4b-657c-4aaf-a2c9-cde57bbb6483",
   "amount": 10
 }
 ```
 
-UUIDs are normalized to lowercase. Amounts must be positive integers at most 2,147,483,647. Responses use `{ success: true, data: <reservation> }`; `data.id` is the supplied reservation ID, and `data.status` is the current committed lifecycle state. New reserve returns 201; identical retry, lookup and abort return 200. Errors use the existing `{ success: false, code, message }` envelope: invalid input 400, invalid/missing service token 401, absent account/reservation 404, insufficient credits/immutable mismatch/active-order conflict/invalid abort lifecycle 409, temporary database unavailability or exhausted serialization retries 503.
+Credit generates the reservation UUID and returns it as `data.id`. Order does not generate it. The reserve API rejects caller-supplied reservation IDs and request keys.
 
-Reservation, conditional balance update and ledger insertion commit together with Serializable isolation and at most three serialization/deadlock attempts. Reservation-insert uniqueness collisions are resolved after rollback and never authorize mismatched inputs. A reserve of 10 from 50 leaves 40 available and 10 reserved; reserve never provisions an account. Funded abort returns credits with one `RELEASE` row. Unfunded abort creates an `ABORTED` tombstone without an account or ledger row; delayed reserve returns that terminal state without holding funds.
+Every successful reserve call creates a new hold and returns 201, even if the same request was already sent. **Retrying after a lost response can create another hold.** Save Credit's returned ID; the current API still requires it for lookup, abort and settlement.
 
-Order must persist the attempt and IDs before calling Credit, reuse them after timeouts, and finalize an order only after observing `RESERVED`. A terminal response is not permission to create an OPEN order. Only a durably fenced ABORTING creation attempt may invoke abort; do not use this endpoint for ordinary cancellation or release holds based on age/timeouts. That Order-side attempt/finalization/recovery workflow is still pending.
+UUIDs are converted to lowercase. Amounts must be integers from 1 through 2,147,483,647. Successful responses use `{ success: true, data: <reservation> }`. Lookup and abort return 200.
 
-## F5–F7 receipt, release and failure settlement
+| HTTP | Meaning |
+| --- | --- |
+| 400 | Invalid request body |
+| 404 | Account or reservation not found |
+| 409 | Insufficient credits or an invalid lifecycle transition |
+| 503 | Temporary database failure |
 
-Credit consumes `ORDER_RECEIVED`, `ORDER_CANCELED`, `ORDER_EXPIRED` and `ORDER_FAILED` v1 on
-`foc.events` / `order.received.v1`, `order.canceled.v1`, `order.expired.v1` and `order.failed.v1`, respectively.
-`ORDER_COMPLETED` does not pay the courier. No browser-facing transfer endpoint exists.
-Order must authorize receipt and commit its guarded status transition and outbox event
-atomically; that Order producer and outbox publisher are still pending.
+To abort, send the same order, requester and amount, plus `reservationId`. The ID must match the path and refer to an existing reservation. Repeating an abort returns the same ABORTED state without returning credits twice.
 
-Publish persistent JSON with publisher confirms and mandatory routing. `messageId`
-must equal the lowercase `eventId` (the original outbox UUID). Retries preserve it and
-all envelope fields:
+A missing reservation returns 404. Abort does not create a placeholder record, also called a tombstone. Only abort when order creation is durably known to be abandoned; use the normal cancellation flow for an existing order.
+
+### Multiple reservations per order
+
+One `orderId` can have several active or historical reservations. Each has its own Credit-generated ID and deducts its own amount from available credits.
+
+For example, starting with 50 credits and creating holds of 10 and 15 leaves 25 available and 25 reserved. Aborting or settling one hold leaves the other hold unchanged.
+
+Credit does not automatically settle all holds for an order. Each settlement event must name one returned `reservationId`, that hold's amount, and a distinct `eventId`.
+
+Reservation, balance and ledger changes are saved in the same transaction. Abort returns the held credits and records one RELEASE transaction. Credit prevents duplicate ledger entries and repeated settlement, but the reserve API has no key for recognizing duplicate requests.
+
+### Migration and caller changes
+
+Run `npm run db:deploy` and `npm run db:generate` before starting the updated service.
+
+On a fresh database, `20261012010000_add_reservations` allows multiple active reservations per order. It has no unique index limiting an order to one active hold.
+
+If a local or staging database already applied an older version of this migration, its schema and migration history need to be reconciled before deployment. Editing the migration file does not update an existing database.
+
+Update callers at the same time as this deployment: leave out the old `reservationId` field when reserving, then save Credit's returned `data.id`. Lookup, abort and settlement still use that ID. The Order Service caller is not implemented yet.
+
+## F5 to F7: receipt, release and failure settlement
+
+Settlement means paying out or returning a reservation. Credit handles these v1 events on `foc.events`:
+
+| Event | Routing key | Result |
+| --- | --- | --- |
+| `ORDER_RECEIVED` | `order.received.v1` | Pay the courier (F5) |
+| `ORDER_CANCELED` | `order.canceled.v1` | Return held credits to the requester (F6) |
+| `ORDER_EXPIRED` | `order.expired.v1` | Return held credits to the requester (F6) |
+| `ORDER_FAILED` | `order.failed.v1` | Refund held credits to the requester (F7) |
+
+`ORDER_COMPLETED` does not pay the courier. There is no browser-facing transfer endpoint.
+
+Order must check receipt permission and save the valid status change and outbox event in one transaction. The Order event producer and outbox publisher are still pending.
+
+### Event format
+
+Publish persistent JSON, require successful routing, and wait for broker confirmation. `messageId` must equal the lowercase `eventId` (the original outbox UUID). Keep that identity and every event field unchanged on retries:
 
 ```json
 {
@@ -491,77 +614,91 @@ all envelope fields:
 }
 ```
 
-All fields are required for receipt; cancellation/expiry/failure use the same envelope with
-their eventType and **omit courierId**. Extra fields are rejected. Maximum body size is 64 KiB.
-UUIDs are normalized to lowercase; amount is a positive PostgreSQL Int;
-orderVersion is an integer from 0 through 2,147,483,647; occurredAt is an ISO datetime
-with timezone; orderName is 1–255 characters. Requester and courier must differ.
-The complete validated envelope is stored to reject altered replays, including
-changes to orderVersion, occurredAt or orderName.
+All fields are required for receipt. For cancellation, expiry or failure, use the matching eventType and **omit courierId**. Extra fields are rejected.
 
-A Serializable transaction checks the exact reservation's order/requester/amount,
-claims RESERVED → TRANSFERRED, deducts the stored amount from requester reserved
-credits, adds it to courier available credits, and writes both ledger rows. It
-stores RECEIVED, courier, event identity, envelope and settledAt together. Existing
-accounts are required; transfers never provision accounts. Insufficient reserved
-balance, account inconsistency, courier Int overflow, a reused event ID on another
-cycle, or a contradictory terminal outcome rolls back unchanged. Identical replay
-is a no-op. At most three local serialization/deadlock attempts run before delayed
-retry. Balances settle asynchronously after Order receipt.
+Validation rules:
 
-F6 claims RESERVED → RELEASED, returns the stored amount from requester reserved
-credits to available credits, and appends one `RELEASE` row with deltas +amount/−amount.
-CANCELED/EXPIRED reason, event identity, full envelope and settledAt commit in the
-same transaction. Available balance overflow or an inconsistent reserved balance
-rolls back. No courier account is required. Identical full-envelope replay is a
-no-op; altered replay, receipt after release, or release after transfer/abort conflicts.
-An old expiry targets only its reservation ID, so it cannot return a renewed hold.
-F7 claims RESERVED → REFUNDED for `ORDER_FAILED`, restores the held amount and
-appends one `REFUND` row with deltas +amount/−amount. FAILED reason, identity, full
-envelope and settledAt commit atomically. It has the same replay and balance guards
-as F6, requires no courier account, and rejects refunds after transfer, release or abort.
-It returns held funds only; it never reclaims credits already paid to a courier.
+- Maximum body size: 64 KiB.
+- UUIDs are converted to lowercase.
+- amount must be a positive PostgreSQL Int.
+- orderVersion must be an integer from 0 through 2,147,483,647.
+- occurredAt must be an ISO datetime with a timezone.
+- orderName must contain 1 to 255 characters.
+- Requester and courier must be different users.
 
-Order must authorize cancellation or expiry and atomically guard OPEN → CANCELED/EXPIRED
-with its version, status history and outbox event. Those producers are still pending;
-Order must likewise guard COMPLETED → FAILED against manual/automatic receipt
-and write its failure outbox event atomically. This Credit implementation does not
-complete Order's lifecycle workflow. Cancellation,
-expiry and failure do not promise immediate credit availability while delivery is pending.
+Credit stores the complete validated event. An identical repeat is safe, but a repeat with changed fields is rejected, including changes to orderVersion, occurredAt or orderName.
 
-The separate durable quorum queues are `credit.order-settlement.v1`,
-`credit.order-settlement.retry.v1` and `credit.order-settlement.dead.v1`. All four
-F5–F7 routes are bound; registration topology is unchanged. The retry queue
-uses a 10-second TTL, reject-publish overflow and at-least-once dead-lettering back
-to the existing receipt route. Confirmed retry forwarding preserves the event's
-original route in `x-settlement-routing-key`; the consumer validates that header
-against eventType for delayed retries. This keeps existing durable queue arguments
-compatible without queue deletion. Redrive publishes on the event's own route.
-Missing account/reservation or exhausted local serialization
-retries get at most five delayed retries (six processing attempts); malformed
-messages and conflicts go directly to the DLQ. Dead letters have no TTL. A database
-outage closes the consumer session and backs off from 1 to 60 seconds without
-incrementing the per-event retry count. Retry/DLQ forwarding requires confirmation
-and successful routing before acknowledging the original. The consumer starts
-alongside registration after HTTP listening, uses prefetch 1, and stops before
-Prisma disconnects. No additional environment variables or migration are needed.
+### Receipt: pay the courier (F5)
 
-Inspect the DLQ, repair the underlying cause, then replay valid original events:
+Credit uses one Serializable transaction, which protects concurrent balance changes, to:
+
+1. Find the exact reservation and check its order, requester and amount.
+2. Change its state from RESERVED to TRANSFERRED.
+3. Move the stored amount from the requester's reserved credits to the courier's available credits.
+4. Write both ledger entries and save RECEIVED, the courier, event identity, full event and settledAt.
+
+Both accounts must already exist; transfers never create accounts. The whole transaction rolls back if the reserved balance is too small, an account is inconsistent, the courier balance would exceed the Int limit, the event ID was used for another reservation cycle, or the reservation already has a different final outcome.
+
+An identical repeat changes nothing. Credit makes at most three local attempts for serialization or deadlock conflicts before using delayed retry. Payment happens asynchronously after Order records receipt.
+
+### Cancellation and expiry: release a hold (F6)
+
+Credit changes RESERVED to RELEASED and moves the stored amount from requester reserved credits back to available credits. It adds one `RELEASE` row with available/reserved deltas +amount/−amount. The CANCELED/EXPIRED reason, event identity, full event and settledAt are saved in the same transaction.
+
+No courier account is needed. If the available balance would overflow or the reserved balance is inconsistent, the transaction rolls back.
+
+Repeating the identical event changes nothing. Credit rejects a changed repeat, receipt after release, or release after transfer or abort. An old expiry event only targets its own reservation ID, so it cannot release a renewed hold.
+
+### Failure: refund a hold (F7)
+
+For `ORDER_FAILED`, Credit changes RESERVED to REFUNDED and returns the held amount to the requester. It adds one `REFUND` row with available/reserved deltas +amount/−amount. The FAILED reason, event identity, full event and settledAt are saved in the same transaction.
+
+The same duplicate-event and balance checks as F6 apply. No courier account is needed. Refunds after transfer, release or abort are rejected. This operation only returns held credits; it cannot reclaim credits already paid to a courier.
+
+### Order Service responsibilities
+
+The Order producers are still pending. Order must:
+
+- Authorize cancellation or expiry, then save OPEN → CANCELED/EXPIRED together with its version, status history and outbox event.
+- Protect COMPLETED → FAILED against competing manual or automatic receipt, then save the failure change and outbox event together.
+
+Credit's consumer does not complete Order's lifecycle workflow. After cancellation, expiry or failure, credits may remain unavailable until the event is delivered and processed.
+
+### Queues and retries
+
+Settlement uses three separate durable quorum queues:
+
+- `credit.order-settlement.v1`: incoming events.
+- `credit.order-settlement.retry.v1`: delayed retries.
+- `credit.order-settlement.dead.v1`: events needing investigation, also called the dead-letter queue or DLQ.
+
+All four F5 to F7 routes are bound. Registration queues and bindings are unchanged.
+
+The retry queue has a 10-second TTL, rejects publishing when full, and uses at-least-once dead-lettering back to the existing receipt route. Retry forwarding waits for confirmation and keeps the original route in `x-settlement-routing-key`. The consumer checks that header against eventType for delayed retries. This preserves the existing durable queue settings without deleting queues. Redrive uses the event's own route.
+
+Missing accounts or reservations, or conflicts that use up the local serialization attempts, get at most five delayed retries: six processing attempts in total. Invalid messages and conflicts go straight to the DLQ. Dead letters have no TTL.
+
+A database outage closes the consumer session. Reconnect waits grow from 1 to 60 seconds without increasing the event's retry count. Before acknowledging an original message, retry/DLQ forwarding must be confirmed and successfully routed.
+
+The settlement consumer starts alongside registration after the HTTP server begins listening. It processes one message at a time (prefetch 1) and stops before Prisma disconnects. Settlement needs no additional environment variables or migration.
+
+### Replay settlement dead letters
+
+Inspect the DLQ and fix the underlying cause first. Then replay valid original events:
 
 ```sh
 npm run redrive:settlement -- --limit 10
 ```
 
-This bounded command preserves body and event/message identity, resets the retry
-count, increments the redrive count, and acknowledges the DLQ delivery only after
-confirmed routing. It closes the channel before the connection to flush DLQ
-acknowledgments. Invalid envelopes stop the run and remain queued. Contradictory
-terminal events need investigation; replay cannot overwrite a settled reservation.
-Never edit balances, replace event IDs, purge queues or delete broker volumes to
-recover held funds. Deployment still requires a private broker, dedicated virtual
-host, restricted publisher/consumer credentials and TLS.
+The command stops at its limit. It preserves the body and event/message identity, resets the retry count, and increments the redrive count. It acknowledges a DLQ message only after confirmed routing, then closes the channel before the connection so pending acknowledgments are sent.
 
-Optional broker integration checks run together with PostgreSQL tests:
+Invalid events stop the run and stay queued. Investigate conflicting final outcomes; replay cannot overwrite an already settled reservation.
+
+Never edit balances, replace event IDs, purge queues or delete broker volumes to recover held funds. Deployed services need a private broker, a dedicated virtual host, restricted publisher/consumer credentials, and TLS.
+
+### Broker integration checks
+
+Run optional broker checks together with PostgreSQL tests:
 
 ```sh
 CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_test" \
@@ -569,36 +706,26 @@ CREDIT_TEST_RABBITMQ_URL="amqp://username:password@localhost:5672/isolated_test_
 npm run test:integration
 ```
 
-Use a fresh dedicated RabbitMQ vhost with topology permissions and no other
-consumers; the suite does not purge existing queues. Remove the test vhost after
-the run. PostgreSQL tests create/drop isolated schemas; existing application data
-and real credentials are untouched. Without test URLs, the corresponding checks
-are skipped.
+Use a fresh, dedicated RabbitMQ vhost with permission to create exchanges, queues and bindings, and no other consumers. The suite does not purge existing queues. Remove the test vhost afterward.
 
-Prior F5 validation: nine F4 PostgreSQL
-subtests and nine F5 PostgreSQL/broker subtests. F5 covers conservation, immutable
-replay, missing-account recovery, concurrency, abort races, rollback after ledger
-failure, overflow and reserved-balance guards, F3 history, lost acknowledgment,
-real delayed retry, DLQ/redrive, mandatory unroutable publication, connection loss
-between commit and acknowledgment, and background-consumer shutdown. Broker restart,
-complete Order/browser workflows and deployed access control remain unverified.
+PostgreSQL tests create and drop isolated schemas. They leave existing application data and real credentials untouched. Checks are skipped when their test URLs are missing.
 
-F6 coverage extends the same isolated suite with cancellation/expiry ledger and F3
-history checks, full-envelope replay conflicts, cross-cycle event ID reuse, balance
-bounds, injected ledger rollback, concurrent receive/cancel/expire/abort, renewal
-fencing, lost acknowledgment, and real F6 routing/retry/DLQ/redrive. No migration or
-new dependency is required.
+### Earlier validation results
 
-F6 validation: TypeScript build and five unit tests passed. The full isolated
-PostgreSQL/RabbitMQ suite passed all 25 tests with no skips (23 subtests plus two
-parent tests); temporary database/role and broker vhost were removed after the run.
+These results were reported for earlier F5, F6 and F7 changes. They do not verify the latest reservation changes against a live broker.
 
-F7 validation: TypeScript build and six unit tests passed; all 28 isolated
-PostgreSQL/RabbitMQ tests passed with no skips (26 subtests plus two parent tests).
-Refund coverage includes exactly-once concurrent replay, complete-envelope conflicts,
-REFUND history/deltas, event-ID reuse, overflow/short reserved balance, post-transfer
-conflicts with another outstanding hold, injected ledger rollback, lost acknowledgment,
-renewed-cycle isolation, competing receive/release/refund/abort, and real failure
-routing/delayed retry/DLQ/redrive. Temporary test database and broker vhost were removed.
-Order failure producers/outbox/recovery, broker restart survival, deployed security
-and browser E2E remain unverified.
+| Change | Reported checks |
+| --- | --- |
+| F5 | Nine F4 PostgreSQL subtests and nine F5 PostgreSQL/broker subtests |
+| F6 | TypeScript build, five unit tests, and all 25 isolated PostgreSQL/RabbitMQ tests with no skips (23 subtests plus two parent tests) |
+| F7 | TypeScript build, six unit tests, and all 28 isolated PostgreSQL/RabbitMQ tests with no skips (26 subtests plus two parent tests) |
+
+F5 coverage includes conservation of credits, rejection of changed repeat events, recovery when an account is missing, concurrent operations, abort races, rollback after ledger failure, overflow and reserved-balance checks, F3 history, lost acknowledgments, real delayed retries, DLQ/redrive, mandatory publishing with no matching route, connection loss between commit and acknowledgment, and background-consumer shutdown.
+
+F6 adds cancellation/expiry ledger and F3 history checks, conflicts on changed repeat events, reuse of event IDs across reservation cycles, balance limits, injected ledger failures, simultaneous receive/cancel/expire/abort operations, protection of renewed holds, lost acknowledgments, and real F6 routing/retry/DLQ/redrive. It needs no migration or new dependency.
+
+F7 adds concurrent repeat delivery that applies the refund once, conflicts on changed repeat events, REFUND history/deltas, event-ID reuse, overflow and insufficient reserved balance, conflicts after transfer while another hold exists, injected ledger failures, lost acknowledgments, protection of renewed holds, competing receive/release/refund/abort operations, and real failure routing/delayed retry/DLQ/redrive.
+
+The temporary database, role and broker vhost were removed after the F6 run. The temporary test database and broker vhost were removed after the F7 run.
+
+Order failure producers, outbox and recovery, full Order/browser workflows, broker restart survival, and deployed access control/security remain unverified.
