@@ -1,6 +1,6 @@
 const BASE_AUTH = "/auth";
 const BASE_USER = "/users";
-const BASE_SUPPLIER = "/supplier";
+const BASE_SUPPLIER = "/suppliers";
 const BASE_CREDIT = "/credits";
 const BASE_ORDER = "/orders";
 
