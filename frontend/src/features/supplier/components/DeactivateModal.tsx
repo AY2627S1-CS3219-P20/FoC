@@ -1,7 +1,7 @@
 import { AlertTriangleIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { Supplier } from "@/types/api.types";
+import type { Supplier } from "../types/supplier.types";
 
 interface DeactivateModalProps {
     supplier: Supplier;

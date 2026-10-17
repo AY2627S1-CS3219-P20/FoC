@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ParsedError } from "@/utils/errorHandler";
-import { getActiveSuppliers, type SuppliersQueryParams, type SuppliersQueryResponse } from "@/api/supplierApi";
+import type { SuppliersQueryParams, SuppliersQueryResponse } from "@/features/supplier/types/supplier.types";
+import { getActiveSuppliers } from "@/features/supplier/services/supplier.service";
 
 export const allActiveSuppliersQueryKey = ["suppliers", "active"] as const;
 

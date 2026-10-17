@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import type { ParsedError } from "@/utils/errorHandler";
-import { getActiveSuppliers, getAllSupplierTypes, type SuppliersQueryParams, type SuppliersQueryResponse } from "@/api/supplierApi";
-import type { Supplier, SupplierType } from "@/types/api.types";
+import { getActiveSuppliers, getAllSupplierTypes, } from "@/features/supplier/services/supplier.service";
+import type { Supplier, SupplierType, SuppliersQueryParams, SuppliersQueryResponse } from "@/features/supplier/types/supplier.types";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from "@/components/ui/pagination";
 import { Field } from '@/components/ui/field';

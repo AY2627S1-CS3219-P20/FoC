@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
-import { uploadSupplierImage } from "@/api/supplierApi";
+import { uploadSupplierImage } from "../services/supplier.service";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 

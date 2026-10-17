@@ -10,10 +10,8 @@ import {
     createSupplier,
     updateSupplier,
     getAllSupplierTypes,
-    deactivateSupplier,
-    type SuppliersQueryParams, 
-    type SuppliersQueryResponse
-} from "@/api/supplierApi";
+    deactivateSupplier
+} from "@/features/supplier/services/supplier.service";
 import {
     Pagination,
     PaginationContent,
@@ -23,7 +21,13 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 import DeactivateModal from "@/features/supplier/components/DeactivateModal";
-import type { Supplier, SupplierDay, CreateSupplierInput, SupplierType } from "@/types/api.types";
+import type { Supplier, 
+    SupplierDay, 
+    CreateSupplierInput, 
+    SupplierType, 
+    SuppliersQueryParams, 
+    SuppliersQueryResponse 
+} from "@/features/supplier/types/supplier.types";
 import type { SupplierFormValues } from "@/features/supplier/schemas/supplier.schema";
 import { Button } from "@/components/ui/button";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
@@ -78,9 +82,7 @@ const ManageSuppliersPage = () => {
         sessionStorage.setItem("searchString", searchString);
         sessionStorage.setItem("typeFilter", typeFilter);
     }, [searchString, typeFilter]);
-
-    const LIMIT = 15; // number of suppliers shown per page; kept in sync with the backend
-
+    
     const suppliersQueryParams: SuppliersQueryParams = {
         page: currentPage,
         searchString: searchString,

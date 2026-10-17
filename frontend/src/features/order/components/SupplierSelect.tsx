@@ -16,7 +16,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 
-import type { Supplier } from "@/types/api.types";
+import type { Supplier } from "@/features/supplier/types/supplier.types";
 import { cn } from "cn";
 import { useAllActiveSuppliers } from "../hooks/useAllActiveSuppliers";
 

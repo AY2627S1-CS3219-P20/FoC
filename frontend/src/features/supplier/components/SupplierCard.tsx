@@ -1,7 +1,7 @@
 import { ClockIcon, LogOutIcon, MapIcon, MapPinIcon, PencilIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { Supplier, SupplierDay } from "@/types/api.types";
+import type { Supplier, SupplierDay } from "../types/supplier.types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import useAuth from "@/hooks/useAuth";
