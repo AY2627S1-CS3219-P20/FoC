@@ -1,9 +1,10 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import express, { Router, type ErrorRequestHandler } from "express";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { createReservationController } from "../controllers/internal-credit.controller.js";
 import { AppError } from "../errors/errors.js";
 import { abortReservationSchema, reservationIdSchema } from "../schemas/reservation.schema.js";
-import { reserveCredits, abortReservation, getReservation } from "../services/reservation.service.js";
+import { abortReservation, getReservation } from "../services/reservation.service.js";
 
 export function createInternalCreditRouter(prisma: PrismaClient, getToken: () => string | undefined) {
     const router = Router();
@@ -20,10 +21,7 @@ export function createInternalCreditRouter(prisma: PrismaClient, getToken: () =>
         next(error?.type === "entity.parse.failed" ? new AppError("Invalid JSON body", 400) : error);
     };
     router.use(parseError);
-    router.post("/reservations", async (req, res) => {
-        const result = await reserveCredits(prisma, req.body);
-        res.status(201).json({ success: true, data: result.reservation });
-    });
+    router.post("/reservations", createReservationController(prisma));
     router.get("/reservations/:reservationId", async (req, res) => {
         res.json({ success: true, data: await getReservation(prisma, req.params.reservationId) });
     });
