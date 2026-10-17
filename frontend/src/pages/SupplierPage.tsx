@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from "@tanstack/react-query";
 import type { ParsedError } from "@/utils/errorHandler";
-import { viewSuppliersInPage, countActiveSuppliers, getAllSupplierTypes } from "@/api/supplierApi";
+import { getActiveSuppliers, getAllSupplierTypes, type SuppliersQueryParams, type SuppliersQueryResponse } from "@/api/supplierApi";
 import type { Supplier, SupplierType } from "@/types/api.types";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from "@/components/ui/pagination";
@@ -12,7 +12,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { SearchIcon } from 'lucide-react';
 
 const SupplierPage = () => {
-    const LIMIT: number = 15;
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = Number(searchParams.get("page")) || 1;
 
@@ -35,15 +34,15 @@ const SupplierPage = () => {
         setTypeFilter(filter.toUpperCase());
     }
 
-    const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["suppliers", currentPage, searchString, typeFilter],
-        queryFn: () => viewSuppliersInPage(currentPage, searchString, typeFilter),
-        refetchOnMount: "always",
-    });
+    const getSuppliersParams: SuppliersQueryParams = {
+        page: currentPage,
+        searchString: searchString, 
+        typeFilter: typeFilter
+    };
 
-    const countActiveSuppliersQuery = useQuery<number, ParsedError>({
-        queryKey: ["count-active-suppliers", searchString, typeFilter],
-        queryFn: () => countActiveSuppliers(searchString, typeFilter),
+    const suppliersQuery = useQuery<SuppliersQueryResponse, ParsedError>({
+        queryKey: ["suppliers", currentPage, searchString, typeFilter],
+        queryFn: () => getActiveSuppliers(getSuppliersParams),
         refetchOnMount: "always",
     });
 
@@ -55,9 +54,8 @@ const SupplierPage = () => {
 
     const suppliersIsLoading = suppliersQuery.isLoading;
     const suppliersIsError = suppliersQuery.isError;
-    const suppliers = suppliersQuery.data ?? [];
-    const activeSupplierCount = countActiveSuppliersQuery.data ?? 0;
-    const totalNumberOfPages = Math.ceil(activeSupplierCount / LIMIT);
+    const suppliers: Supplier[] = suppliersQuery.data?.suppliers ?? [];
+    const totalNumberOfPages: number = suppliersQuery.data?.pagination?.totalPages ?? 0;
 
     const supplierTypesIsLoading = supplierTypesQuery.isLoading;
     const supplierTypesIsError = supplierTypesQuery.isError;

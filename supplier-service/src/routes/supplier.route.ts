@@ -18,8 +18,25 @@ import {
 
 const supplierRouter = Router();
 
+// Get a supplier image based on its file name (no authentication)
+supplierRouter.get("/assets/images/:filename", serveAsset);
+
 // All supplier endpoints require authentication
 supplierRouter.use(authenticate);
+
+
+// --------------------- Supplier Types -----------------------
+// Query supplier types
+supplierRouter.get("/types", getAllSupplierTypes);
+
+// Count the number of suppliers with a specified typeId
+supplierRouter.get("/types/count", authorize(Role.ADMIN), countSuppliersForType);
+
+// Create new supplier type
+supplierRouter.post("/types", authorize(Role.ADMIN), createSupplierType);
+
+// Delete existing supplier type
+supplierRouter.delete("/types/:typeId", authorize(Role.ADMIN), deleteSupplierType);
 
 
 // ------------------------ Suppliers -------------------------
@@ -48,24 +65,7 @@ supplierRouter.patch("/:supplierId/deactivation", authorize(Role.ADMIN), deactiv
 // supplierRouter.patch("/:supplierId/activation", authorize(Role.ADMIN), activateSupplier);
 
 
-// --------------------- Supplier Types -----------------------
-// Query supplier types
-supplierRouter.get("/types", getAllSupplierTypes);
-
-// Count the number of suppliers with a specified typeId
-supplierRouter.get("/:typeId/suppliers/count", countSuppliersForType);
-
-// Create new supplier type
-supplierRouter.post("/types", createSupplierType);
-
-// Delete existing supplier type
-supplierRouter.delete("/types/:typeId", deleteSupplierType);
-
-
-// ------------------------- Assets --------------------------
-// Get a supplier image based on its file name
-supplierRouter.get("/assets/images/:filename", serveAsset);
-
+// ------------------------- Assets -------------------------
 // Upload a new supplier image (by admin)
 supplierRouter.post("/assets/images", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);
 

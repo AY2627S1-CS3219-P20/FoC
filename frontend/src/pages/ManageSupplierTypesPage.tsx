@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import type { ParsedError } from "@/utils/errorHandler";
 import type { SupplierType, SupplierTypeCount } from "@/types/api.types";
-import { countSupplierTypes, deleteSupplierType } from "@/api/supplierApi";
+import { countsForEachSupplierType, deleteSupplierType } from "@/api/supplierApi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, Trash2 } from "lucide-react";
@@ -12,15 +12,15 @@ import CreateSupplierTypeForm from '@/features/supplier/components/CreateSupplie
 const ManageSupplierTypesPage = () => {
     const queryClient = useQueryClient();
 
-    const countSupplierTypesQuery = useQuery<SupplierTypeCount[], ParsedError>({
+    const countsForEachSupplierTypeQuery = useQuery<SupplierTypeCount[], ParsedError>({
         queryKey: ["count-supplier-types"],
-        queryFn: () => countSupplierTypes(),
+        queryFn: () => countsForEachSupplierType(),
         refetchOnMount: "always",
     })
 
-    const supplierTypesIsLoading = countSupplierTypesQuery.isLoading;
-    const supplierTypesIsError = countSupplierTypesQuery.isError;
-    const supplierTypes = countSupplierTypesQuery.data ?? [];
+    const supplierTypesIsLoading = countsForEachSupplierTypeQuery.isLoading;
+    const supplierTypesIsError = countsForEachSupplierTypeQuery.isError;
+    const supplierTypes = countsForEachSupplierTypeQuery.data ?? [];
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -65,7 +65,7 @@ const ManageSupplierTypesPage = () => {
                 )}
 
                 {supplierTypesIsLoading && <p>Loading supplier types...</p>}
-                {supplierTypesIsError && <p>Failed to load supplier types: {countSupplierTypesQuery.error.message}</p>}
+                {supplierTypesIsError && <p>Failed to load supplier types: {countsForEachSupplierTypeQuery.error.message}</p>}
 
                 {!supplierTypesIsLoading && !supplierTypesIsError && supplierTypes.length === 0 && (
                     <p className="text-sm text-muted-foreground">No supplier types yet.</p>

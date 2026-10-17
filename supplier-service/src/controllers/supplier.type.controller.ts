@@ -40,14 +40,9 @@ export async function createSupplierType(req: Request, res: Response) {
 }
 
 export async function deleteSupplierType(req: Request, res: Response) {
-    const request = supplierTypeSchema.safeParse(req.body);
-    if (!request.success) {
-        // we need to make sure this block is not reached, i.e. the request body has a "type" field
-        request.error; // ZodError instance
-        console.log(request.error)
-        throw new AppError("Parameters not input correctly", 400);
-    }
-    const deletedType = await deleteType(request.data.type);
+    const supplierTypeId = req.params.typeId as string;
+
+    const deletedType = await deleteType(supplierTypeId);
 
     return res.status(200).json({
         success: true,

@@ -45,7 +45,7 @@ const SupplierSelect = ({
 
     // Fetch all active suppliers
     const suppliersQuery = useAllActiveSuppliers();
-    const suppliers = suppliersQuery.data ?? [];
+    const suppliers = suppliersQuery.data?.suppliers ?? [];
 
     // Search suppliers based on the search input
     const normalizedSearch = search.trim().toLocaleLowerCase();

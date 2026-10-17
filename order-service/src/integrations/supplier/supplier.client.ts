@@ -15,7 +15,7 @@ export async function verifySupplierExists(
     );
 
     try {
-        await ApiClient.get(`/api/supplier/${supplierId}`);
+        await ApiClient.get(`/api/suppliers/${supplierId}`);
         return true;
     } catch (error) {
         if (axios.isAxiosError(error)) {

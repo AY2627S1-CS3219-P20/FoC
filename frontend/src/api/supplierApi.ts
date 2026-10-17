@@ -10,130 +10,76 @@ export const supplierApi = createApiClient(
     import.meta.env.VITE_SUPPLIER_API_BASE_URL,
 );
 
-export const viewSuppliersInPage = async (page: number, searchString: string | null, typeFilter: string | null): Promise<Supplier[]> => {
-    const requestBody = {
-        searchString: searchString,
-        typeFilter: typeFilter
-    }
-    try {
-        const response = await supplierApi.post<ApiResponse<{ message: string; data: Supplier[] }>>(
-            `${ENDPOINTS.supplier.viewSuppliersInPage(page)}`,
-            { data: requestBody }
-        );
-
-        return response.data.data?.data ?? [];
-    } catch (error) {
-        throw parseError(error);
-    }
+export type SuppliersQueryParams = {
+    page?: number;
+    searchString?: string;
+    typeFilter?: string;
 };
 
-export const searchSuppliers = async (searchString: string): Promise<Supplier[]> => {
-    return viewSuppliersInPage(1, searchString, "all");
-};
-
-export const countActiveSuppliers = async (searchString: string, typeFilter: string): Promise<number> => {
-    const jsonBody = {
-        searchString: searchString,
-        typeFilter: typeFilter
-    }
-    try {
-        const response = await supplierApi.post<ApiResponse<{ message: string; data: number }>>(
-            `${ENDPOINTS.supplier.countActiveSuppliers}`,
-            jsonBody
-        );
-
-        return response.data.data?.data ?? 0;
-    } catch (error) {
-        throw parseError(error);
-    }
-};
-
-export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
-    try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; data: SupplierType[] }>>(
-            `${ENDPOINTS.supplier.getAllSupplierTypes}`,
-        );
-
-        return response.data.data?.data ?? [];
-    } catch (error) {
-        throw parseError(error);
-    }
-};
-
-export const countSuppliersForAdmin = async (searchString: string, typeFilter: string): Promise<number> => {
-    const jsonBody = {
-        searchString: searchString,
-        typeFilter: typeFilter
-    }
-    try {
-        const response = await supplierApi.post<ApiResponse<{ message: string; data: number }>>(
-            `${ENDPOINTS.supplier.countSuppliersForAdmin}`,
-            jsonBody
-        );
-
-        return response.data.data?.data ?? 0;
-    } catch (error) {
-        throw parseError(error);
-    }
-};
-
-export const countSupplierTypes = async (): Promise<SupplierTypeCount[]> => {
-    try {
-        const response = await supplierApi.get<ApiResponse<{ message: string; data: SupplierType[] }>>(
-            `${ENDPOINTS.supplier.countSupplierType}`,
-        );
-
-        return response.data.data?.data ?? [];
-    } catch (error) {
-        throw parseError(error);
+export type SuppliersQueryResponse = {
+    suppliers: Supplier[];
+    paginated: boolean;
+    pagination: {
+        limit?: number;
+        page?: number;
+        totalCount: number;
+        totalPages?: number;
     }
 }
 
-export const createSupplierType = async (type: string): Promise<SupplierType> => {
-    const jsonBody = {
-        type: type,
-    }
+export const getAllSuppliers = async (
+    params: SuppliersQueryParams,
+): Promise<SuppliersQueryResponse> => {
     try {
-        const response = await supplierApi.post<ApiResponse<{ message: string; data: SupplierType }>>(
-            `${ENDPOINTS.supplier.createSupplierType}`,
-            jsonBody
+        const queryParams = new URLSearchParams();
+
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined) {
+                queryParams.set(key, String(value));
+            }
+        });
+
+        const response = await supplierApi.get<ApiResponse<SuppliersQueryResponse>>(
+            `${ENDPOINTS.supplier.getAllSuppliers}?${queryParams.toString()}`
         );
 
-        return response.data.data?.data!; // will always return the newly created supplier type
+        return response.data.data!;
     } catch (error) {
         throw parseError(error);
     }
 };
 
-export const deleteSupplierType = async (type: SupplierTypeCount): Promise<SupplierType> => {
-    const jsonBody = {
-        id: type.id,
-        type: type.type,
-    } // enforce the argument to be of SupplierType, which is expected by supplier-service
+export const getActiveSuppliers = async (
+    params: SuppliersQueryParams,
+): Promise<SuppliersQueryResponse> => {
     try {
-        const response = await supplierApi.post<ApiResponse<{ message: string; data: SupplierType }>>(
-            `${ENDPOINTS.supplier.deleteSupplierType}`,
-            jsonBody
+        const queryParams = new URLSearchParams();
+
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined) {
+                queryParams.set(key, String(value));
+            }
+        });
+
+        const response = await supplierApi.get<ApiResponse<SuppliersQueryResponse>>(
+            `${ENDPOINTS.supplier.getActiveSuppliers}?${queryParams.toString()}`
         );
 
-        return response.data.data?.data!; // will always return the deleted supplier type
+        return response.data.data!;
     } catch (error) {
         throw parseError(error);
     }
 };
 
-export const viewSuppliersForAdmin = async (page: number, searchString: string, typeFilter: string): Promise<Supplier[]> => {
-    const requestBody = {
-        searchString: searchString,
-        typeFilter: typeFilter
-    }
+export const getSuppliersByIdsService = async (
+    ids: string[],
+): Promise<OrderRelatedSupplierDetails[]> => {
     try {
-        const response = await supplierApi.post<ApiResponse<{ message: string; data: Supplier[] }>>(
-            `${ENDPOINTS.supplier.viewSuppliersForAdmin}?page=${page}`,
-            { data: requestBody }
+        const response = await supplierApi.get<ApiResponse<OrderRelatedSupplierDetails[]>>(
+            ENDPOINTS.supplier.getSuppliersByIds(ids),
         );
 
-        return response.data.data?.data ?? [];
+        return response.data.data!;
     } catch (error) {
         throw parseError(error);
     }
@@ -153,9 +99,72 @@ export const createSupplier = async (input: CreateSupplierInput): Promise<Suppli
 
 export const updateSupplier = async (id: string, input: UpdateSupplierInput): Promise<Supplier> => {
     try {
-        const url = ENDPOINTS.supplier.updateSupplier.replace(":id", id);
+        const url = ENDPOINTS.supplier.updateSupplier.replace(":supplierId", id);
         const response = await supplierApi.patch<ApiResponse<Supplier>>(url, input);
         return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const deactivateSupplier = async (id: string): Promise<Supplier> => {
+    try {
+        const url = ENDPOINTS.supplier.deactivateSupplier.replace(":supplierId", id);
+        const response = await supplierApi.patch<ApiResponse<Supplier>>(url);
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+
+export const getAllSupplierTypes = async (): Promise<SupplierType[]> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<SupplierType[]>>(
+            `${ENDPOINTS.supplier.getAllSupplierTypes}`,
+        );
+
+        return response.data.data ?? [];
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const countsForEachSupplierType = async (): Promise<SupplierTypeCount[]> => {
+    try {
+        const response = await supplierApi.get<ApiResponse<SupplierTypeCount[]>>(
+            `${ENDPOINTS.supplier.countsForEachSupplierType}`
+        );
+
+        return response.data.data ?? [];
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const createSupplierType = async (type: string): Promise<SupplierType> => {
+    const jsonBody = {
+        type: type,
+    }
+    try {
+        const response = await supplierApi.post<ApiResponse<SupplierType>>(
+            `${ENDPOINTS.supplier.createSupplierType}`,
+            jsonBody
+        );
+
+        return response.data.data!; // will always return the newly created supplier type
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const deleteSupplierType = async (type: SupplierType): Promise<SupplierType> => {
+    try {
+        const response = await supplierApi.delete<ApiResponse<SupplierType>>(
+            `${ENDPOINTS.supplier.deleteSupplierType}`.replace(":typeId", type.id),
+        );
+
+        return response.data.data!; // will always return the deleted supplier type
     } catch (error) {
         throw parseError(error);
     }
@@ -184,30 +193,5 @@ export const uploadSupplierImage = async (file: File): Promise<string> => {
     }
 };
 
-export const getAllActiveSuppliersService = async (): Promise<Supplier[]> => {
-    try {
-        const response = await supplierApi.get<ApiResponse<Supplier[]>>(
-            ENDPOINTS.supplier.getAllActiveSuppliers
-        );
-
-        return response.data.data! ?? [];
-    } catch (error) {
-        throw parseError(error);
-    }
-}; 
-
-export const getSuppliersByIdsService = async (
-    ids: string[],
-): Promise<OrderRelatedSupplierDetails[]> => {
-    try {
-        const response = await supplierApi.get<ApiResponse<OrderRelatedSupplierDetails[]>>(
-            ENDPOINTS.supplier.getSuppliersByIds(ids),
-        );
-
-        return response.data.data!;
-    } catch (error) {
-        throw parseError(error);
-    }
-};
 
 export default supplierApi;

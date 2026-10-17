@@ -6,13 +6,14 @@ import { toast } from "react-toastify";
 
 import type { ParsedError } from "@/utils/errorHandler";
 import {
-    countSuppliersForAdmin,
-    viewSuppliersForAdmin,
+    getAllSuppliers,
     createSupplier,
     updateSupplier,
     getAllSupplierTypes,
+    deactivateSupplier,
+    type SuppliersQueryParams, 
+    type SuppliersQueryResponse
 } from "@/api/supplierApi";
-import { deactivateSupplier } from "@/api/supplierDeactivateApi";
 import {
     Pagination,
     PaginationContent,
@@ -65,7 +66,7 @@ const buildPayload = (
 
 const ManageSuppliersPage = () => {
     const queryClient = useQueryClient();
-    const [currentPage, setCurrentPage] = useState(1);
+    const [currentPage, setCurrentPage] = useState<number>(1);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [supplierToDeactivate, setSupplierToDeactivate] = useState<Supplier | null>(null);
@@ -80,22 +81,20 @@ const ManageSuppliersPage = () => {
 
     const LIMIT = 15; // number of suppliers shown per page; kept in sync with the backend
 
-    const totalPagesQuery = useQuery<number, ParsedError>({
-        queryKey: ["admin-suppliers-total-pages", searchString, typeFilter],
-        queryFn: () => countSuppliersForAdmin(searchString, typeFilter),
-    });
+    const suppliersQueryParams: SuppliersQueryParams = {
+        page: currentPage,
+        searchString: searchString,
+        typeFilter: typeFilter
+    }
 
-    const totalPages = Math.ceil((totalPagesQuery.data ?? 0) / LIMIT);
-
-    // The backend returns 400 for out-of-range pages; derive the effective (in-range)
-    // page during render so the query stays valid even after the page count shrinks.
-    const effectivePage = Math.min(currentPage, Math.max(1, totalPages));
-
-    const suppliersQuery = useQuery<Supplier[], ParsedError>({
-        queryKey: ["admin-suppliers", effectivePage, searchString, typeFilter],
-        queryFn: () => viewSuppliersForAdmin(effectivePage, searchString, typeFilter),
+    const suppliersQuery = useQuery<SuppliersQueryResponse, ParsedError>({
+        queryKey: ["admin-suppliers", currentPage, searchString, typeFilter],
+        queryFn: () => getAllSuppliers(suppliersQueryParams),
         refetchOnMount: "always",
     });
+
+    const suppliers: Supplier[] = suppliersQuery.data?.suppliers ?? [];
+    const totalPages: number = suppliersQuery.data?.pagination?.totalPages ?? 0;
 
     const supplierTypesQuery = useQuery<SupplierType[], ParsedError>({
         queryKey: ["admin-supplier-types"],
@@ -107,7 +106,6 @@ const ManageSuppliersPage = () => {
     const suppliersIsError = suppliersQuery.isError;
     // Backend returns 400 "No records found for this page" when there is nothing to show.
     const isNoRecords = suppliersIsError && suppliersQuery.error?.statusCode === 400;
-    const suppliers = suppliersQuery.data ?? [];
 
     const supplierTypesIsLoading = supplierTypesQuery.isLoading;
     const supplierTypesIsError = supplierTypesQuery.isError;
@@ -120,7 +118,7 @@ const ManageSuppliersPage = () => {
     };
 
     const goToPage = (page: number) => {
-        if (page < 1 || page > totalPages || page === effectivePage) return;
+        if (page < 1 || page > totalPages || page === currentPage) return;
         setCurrentPage(page);
     };
 
@@ -276,16 +274,16 @@ const ManageSuppliersPage = () => {
                             ))}
                         </div>
 
-                        {totalPages > 1 && !totalPagesQuery.isLoading && (
+                        {totalPages > 1 && !suppliersQuery.isLoading && (
                             <Pagination className="p-2 border rounded-xl w-fit shadow-sm border-slate-200 bg-white">
                                 <PaginationContent>
-                                    {effectivePage > 1 && (
+                                    {currentPage > 1 && (
                                         <PaginationItem>
                                             <PaginationPrevious
                                                 href="#"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    goToPage(effectivePage - 1);
+                                                    goToPage(currentPage - 1);
                                                 }}
                                             />
                                         </PaginationItem>
@@ -294,7 +292,7 @@ const ManageSuppliersPage = () => {
                                         <PaginationItem key={i}>
                                             <PaginationLink
                                                 href="#"
-                                                isActive={effectivePage === i + 1}
+                                                isActive={currentPage === i + 1}
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     goToPage(i + 1);
@@ -304,13 +302,13 @@ const ManageSuppliersPage = () => {
                                             </PaginationLink>
                                         </PaginationItem>
                                     ))}
-                                    {effectivePage < totalPages && (
+                                    {currentPage < totalPages && (
                                         <PaginationItem>
                                             <PaginationNext
                                                 href="#"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    goToPage(effectivePage + 1);
+                                                    goToPage(currentPage + 1);
                                                 }}
                                             />
                                         </PaginationItem>
@@ -319,7 +317,7 @@ const ManageSuppliersPage = () => {
                             </Pagination>
                         )}
 
-                        {totalPagesQuery.isLoading && totalPages > 1 && (
+                        {suppliersQuery.isLoading && totalPages > 1 && (
                             <p className="text-center text-sm text-muted-foreground">
                                 Loading pagination...
                             </p>
