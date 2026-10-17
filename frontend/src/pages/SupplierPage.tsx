@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useQuery } from "@tanstack/react-query";
 import type { ParsedError } from "@/utils/errorHandler";
 import { getActiveSuppliers, getAllSupplierTypes, type SuppliersQueryParams, type SuppliersQueryResponse } from "@/api/supplierApi";
@@ -12,25 +11,25 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { SearchIcon } from 'lucide-react';
 
 const SupplierPage = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const currentPage = Number(searchParams.get("page")) || 1;
+    // does not use URL-based page number, similar to ManageSuppliersPage.tsx
+    const [currentPage, setCurrentPage] = useState<number>(1);
 
     // ensure the search string and type filters are saved to session storage
     // so that filters are still present when navigating between pages
     const [searchString, setSearchString] = useState(() => sessionStorage.getItem("searchString") ?? "");
     const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem("typeFilter") ?? "all"); // default to viewing all types of suppliers
     useEffect(() => {
-        sessionStorage.setItem("searchKey", searchString);
+        sessionStorage.setItem("searchString", searchString);
         sessionStorage.setItem("typeFilter", typeFilter);
     }, [searchString, typeFilter]);
 
     const handleSearchKeyInput = (event: React.ChangeEvent<HTMLInputElement>) => {
         console.log(searchString)
-        setSearchParams({ page: '1' }) // reset the page to be 1 upon any change in search input
+        setCurrentPage(1); // reset the page to be 1 upon any change in search input
         setSearchString(event.target.value);
     }
     const handleFilterInput = (filter: string) => {
-        setSearchParams({ page: '1' }) // reset the page to be 1 upon any change in type filter used
+        setCurrentPage(1); // reset the page to be 1 upon any change in type filter used
         setTypeFilter(filter.toUpperCase());
     }
 
@@ -133,14 +132,16 @@ const SupplierPage = () => {
                             {currentPage > 1 && (
                                 <PaginationItem>
                                     <PaginationPrevious
-                                        href={`?page=${Math.max(currentPage - 1, 1)}`}
+                                        href="#"
+                                        onClick={(e) => { e.preventDefault(); setCurrentPage(Math.max(currentPage - 1, 1)); }}
                                     />
                                 </PaginationItem>
                             )}
                             {Array.from({ length: totalNumberOfPages }, (_, i) => (
                                 <PaginationItem key={i}>
                                     <PaginationLink
-                                        href={`?page=${i + 1}`}
+                                        href="#"
+                                        onClick={(e) => { e.preventDefault(); setCurrentPage(i + 1); }}
                                     >
                                         {i + 1}
                                     </PaginationLink>
@@ -149,7 +150,8 @@ const SupplierPage = () => {
                             {currentPage < totalNumberOfPages && (
                                 <PaginationItem>
                                     <PaginationNext
-                                        href={`?page=${Math.min(currentPage + 1, totalNumberOfPages)}`}
+                                        href="#"
+                                        onClick={(e) => { e.preventDefault(); setCurrentPage(Math.min(currentPage + 1, totalNumberOfPages)); }}
                                     />
                                 </PaginationItem>
                             )}
