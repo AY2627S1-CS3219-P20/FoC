@@ -22,11 +22,11 @@ app.use(
 app.use(express.json());
 
 // Health check endpoint
-app.get("/supplier", (_req: Request, res: Response) => {
+app.get("/suppliers", (_req: Request, res: Response) => {
     res.send("Suppliers service is running");
 });
 
-app.use("/api/supplier", supplierRouter);
+app.use("/api/suppliers", supplierRouter);
 
 // Catch all * not found routes
 app.use((_req: Request, _res: Response) => {

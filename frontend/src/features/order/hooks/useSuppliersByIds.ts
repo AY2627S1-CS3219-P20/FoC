@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getSuppliersByIdsService } from "@/api/supplierApi";
+import { getSuppliersByIdsService } from "@/features/supplier/services/supplier.service";
 
 export function useSuppliersByIds(ids: string[]) {
     const uniqueIds = [...new Set(ids)].sort();

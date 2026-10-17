@@ -14,11 +14,10 @@ import {
   supplierDayLabels,
   type SupplierFormValues,
 } from "@/features/supplier/schemas/supplier.schema";
-import type { Supplier, SupplierDay } from "@/types/api.types";
+import type { Supplier, SupplierDay, SupplierType } from "../types/supplier.types";
 import { useQuery } from "@tanstack/react-query";
-import type { SupplierType } from "@/types/api.types";
 import type { ParsedError } from "@/utils/errorHandler";
-import { getAllSupplierTypes } from "@/api/supplierApi";
+import { getAllSupplierTypes } from "../services/supplier.service";
 
 interface OpeningHourRow {
   day: SupplierDay;

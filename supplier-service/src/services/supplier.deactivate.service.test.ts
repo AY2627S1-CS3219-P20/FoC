@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { deactivateSupplier } from "./supplier.deactivate.service.js";
+import { deactivateSupplier } from "./supplier.service.js";
 import { AppError } from "../errors/errors.js";
 
 type SupplierData = {

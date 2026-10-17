@@ -4,10 +4,17 @@ import type { Day } from "../generated/prisma/enums.js";
 import { prisma } from "../libs/prisma.js";
 import type { CreateSupplierInput, OpeningHoursInput, UpdateSupplierInput } from "../schemas/supplier.schema.js";
 
+// constants
+
 export const STATUS = {
     ACTIVATED: "ACTIVATED",
     DEACTIVATED: "DEACTIVATED",
 } as const;
+
+const LIMIT: number = 15; // only a max of 15 suppliers per page is displayed per page
+
+
+// helper functions
 
 function toPrismaTime(time: string): Date {
     // Opening hours are stored as wall-clock SGT. Parse "HH:MM" / "HH:MM:SS"
@@ -67,6 +74,147 @@ async function findSupplierByName(
     return existing.length > 0;
 }
 
+
+// supplier service functions
+
+export async function fetchAllSuppliers(page?: number, searchString?: string | null, typeFilter?: string | null) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
+    const suppliers = await prisma.supplier.findMany({
+        where: {
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            },
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        },
+        include: { openingHours: true }, // also get opening hours of suppliers
+        orderBy: { name: 'asc' }, // case-sensitive
+        ...(page ? { 
+            take: LIMIT,
+            skip: LIMIT * (page - 1),
+        } : {}), // if page is not null, return paginated query; else return all results
+    });
+
+    if (!suppliers || suppliers.length == 0) {
+        throw new AppError("No records found for this page", 400, "BAD_REQUEST");
+    }
+
+    const totalCount = await prisma.supplier.count({
+        where: {
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            },
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        }
+    });
+
+    return {
+        suppliers,
+        paginated: !!page, // true if page contains a value, false otherwise
+        pagination: {
+            limit: page ? LIMIT : null, // return LIMIT if page has a value, else return null
+            page: page ?? null, // return null if page is empty
+            totalCount: totalCount,
+            totalPages: page ? Math.ceil(totalCount / LIMIT) : null,
+        }
+    };
+}
+
+
+export async function fetchActiveSuppliers(page?: number, searchString?: string | null, typeFilter?: string | null) {
+    const search = searchString ?? "";
+    let type = "";
+    if (typeFilter && typeFilter.toLowerCase() !== "all") {
+        type = typeFilter;
+    }
+    const suppliers = await prisma.supplier.findMany({
+        where: {
+            status: STATUS.ACTIVATED,
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            },
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        },
+        include: { openingHours: true }, // also get opening hours of suppliers
+        orderBy: { name: 'asc' }, // case-sensitive
+        ...(page ? { 
+            take: LIMIT,
+            skip: LIMIT * (page - 1),
+        } : {}), // if page is not null, return paginated query; else return all results
+    });
+
+    if (!suppliers || suppliers.length == 0) {
+        throw new AppError("No records found for this page", 400, "BAD_REQUEST");
+    }
+
+    const totalCount = await prisma.supplier.count({
+        where: {
+            status: STATUS.ACTIVATED,
+            name: {
+                contains: search, // enforce partial string match
+                mode: 'insensitive', // enforce case insensitivity
+            },
+            type: {
+                contains: type, // should return all types if typeFilter is empty
+                mode: 'insensitive',
+            }
+        }
+    });
+
+    return {
+        suppliers,
+        paginated: !!page, // true if page contains a value, false otherwise
+        pagination: {
+            limit: page ? LIMIT : null, // return LIMIT if page has a value, else return null
+            page: page ?? null, // return null if page is empty
+            totalCount: totalCount,
+            totalPages: page ? Math.ceil(totalCount / LIMIT) : null,
+        }
+    };
+}
+
+
+export async function getSupplierByIdService(
+    supplierId: string
+) {
+    return prisma.supplier.findUnique({
+        where: {
+            id: supplierId,
+            status: STATUS.ACTIVATED,
+        },
+    });
+}
+
+
+export async function getSuppliersByIdsService(ids: string[]) {
+    return prisma.supplier.findMany({
+        where: {
+            id: { in: [...new Set(ids)] },
+        },
+        select: {
+            id: true,
+            name: true,
+            type: true,
+        },
+    });
+}
+
+
 export async function createSupplier(
     prisma: PrismaClient,
     input: CreateSupplierInput,
@@ -102,6 +250,7 @@ export async function createSupplier(
         include: { openingHours: true },
     });
 }
+
 
 export async function updateSupplier(
     prisma: PrismaClient,
@@ -165,238 +314,28 @@ export async function updateSupplier(
     });
 }
 
-const LIMIT: number = 15; // only a max of 15 suppliers per page is displayed per page
 
-// public fetch for the normal-user page: active suppliers only
-// searchString and typeFilter are optional fields, which may or may not be supplied
-export async function fetchActiveSuppliers(page: number, searchString?: string | null, typeFilter?: string | null) {
-    const search = searchString ?? "";
-    let type = "";
-    if (typeFilter && typeFilter.toLowerCase() !== "all") {
-        type = typeFilter;
-    }
-    const suppliers = await prisma.supplier.findMany({
-        where: {
-            status: STATUS.ACTIVATED,
-            name: {
-                contains: search, // enforce partial string match
-                mode: 'insensitive', // enforce case insensitivity
-            },
-            type: {
-                contains: type, // should return all types if typeFilter is empty
-                mode: 'insensitive',
-            }
-        },
-        include: { openingHours: true }, // also get opening hours of suppliers
-        orderBy: { name: 'asc' }, // case-sensitive
-        take: LIMIT,
-        skip: LIMIT * (page - 1),
-    });
+export async function deactivateSupplier(
+    prisma: PrismaClient,
+    id: string,
+): Promise<Prisma.SupplierModel> {
+    const supplier = await prisma.supplier.findUnique({ where: { id } });
 
-    if (!suppliers || suppliers.length == 0) {
-        throw new AppError("No records found for this page", 400, "BAD_REQUEST");
+    if (!supplier) {
+        throw new AppError("Supplier not found", 404, "NOT_FOUND");
     }
 
-    return suppliers;
-}
-
-// count the number of active suppliers that match the search string and type filter
-export async function countActiveSuppliers(searchString?: string | null, typeFilter?: string | null) {
-    const search = searchString ?? "";
-    let type = "";
-    if (typeFilter && typeFilter.toLowerCase() !== "all") {
-        type = typeFilter;
-    }
-    const count = await prisma.supplier.count({
-        where: {
-            status: {
-                equals: "ACTIVATED"
-            },
-            name: {
-                contains: search, // enforce partial string match
-                mode: 'insensitive', // enforce case insensitivity
-            },
-            type: {
-                contains: type, // should return all types if typeFilter is empty
-                mode: 'insensitive',
-            }
-        }
-    });
-    console.log(count)
-    return count;
-}
-
-// count the total number of suppliers (including deactivated) for the admin page
-export async function countSuppliers(searchString?: string | null, typeFilter?: string | null) {
-    const search = searchString ?? "";
-    let type = "";
-    if (typeFilter && typeFilter.toLowerCase() !== "all") {
-        type = typeFilter;
-    }
-    const count = await prisma.supplier.count({
-        where: {
-            name: {
-                contains: search, // enforce partial string match
-                mode: 'insensitive', // enforce case insensitivity
-            },
-            type: {
-                contains: type, // should return all types if typeFilter is empty
-                mode: 'insensitive',
-            }
-        }
-    });
-    return count;
-}
-
-// this function returns all supplier types available
-export async function fetchSupplierTypes() {
-    const types = await prisma.supplierType.findMany({
-        orderBy: { type: 'asc' }
-    });
-
-    return types;
-}
-
-// public fetch for the admin page: every supplier, including deactivated
-export async function fetchAllSuppliers(
-    page: number,
-    searchString?: string | null,
-    typeFilter?: string | null,
-) {
-    const search = searchString ?? "";
-    let type = "";
-    if (typeFilter && typeFilter.toLowerCase() !== "all") {
-        type = typeFilter;
+    if (supplier.status === STATUS.DEACTIVATED) {
+        throw new AppError(
+            "Supplier is already deactivated",
+            409,
+            "CONFLICT",
+        );
     }
 
-    return fetchSuppliers(page, {
-        name: { contains: search, mode: 'insensitive' },
-        type: { contains: type, mode: 'insensitive' },
-    });
-}
-
-// shared paginated fetch; callers supply an optional where clause
-async function fetchSuppliers(
-    page: number,
-    where?: Prisma.SupplierWhereInput,
-) {
-    const args: Prisma.SupplierFindManyArgs = {
-        include: { openingHours: true }, // also get opening hours of suppliers
-        orderBy: { name: 'asc' }, // case-sensitive
-        take: LIMIT,
-        skip: LIMIT * (page - 1),
-    };
-
-    if (where) args.where = where;
-
-    const suppliers = await prisma.supplier.findMany(args);
-
-    if (!suppliers || suppliers.length == 0) {
-        throw new AppError("No records found for this page", 400, "BAD_REQUEST");
-    }
-
-    return suppliers;
-}
-
-// this function creates a new supplier type
-export async function createType(type: string) {
-    const duplicateType = await prisma.supplierType.findFirst({
-        where: {
-            type: {
-                equals: type,
-                mode: 'insensitive',
-            }
-        }
-    });
-
-    if (duplicateType) { // this type already exists, throw error
-        throw new AppError("This type already exists", 400, "BAD_REQUEST");
-    }
-
-    const newType = await prisma.supplierType.upsert({
-        where: {
-            type: type,
-        },
-        create: {
-            type: type,
-        },
-        update: {}
-    });
-
-    return newType;
-}
-
-// this function deletes an existing supplier type, with no associated supplier record
-export async function deleteType(type: string) {
-    // there should only be one corresponding type found
-    const typeToDelete = await prisma.supplierType.findFirst({
-        where: { type: type },
-    });
-
-    if (!typeToDelete) {
-        // could not find the type to be deleted, it does not exist
-        throw new AppError("This type does not exist", 400, "BAD_REQUEST");
-    }
-
-    const associatedSuppliers = await prisma.supplier.findMany({
-        where: { type: typeToDelete.type },
-    });
-    // console.log(associatedSuppliers)
-
-    if (associatedSuppliers.length > 0) {
-        // there are suppliers to the type that the user wants to delete
-        throw new AppError("There are suppliers associated to this type, hence it cannot be deleted", 403);
-    }
-
-    const deletedType = await prisma.supplierType.delete({
-        where: { id: typeToDelete.id }
-    });
-
-    return deletedType;
-}
-
-export async function countForEachType() {
-    const counts = await prisma.supplierType.findMany({
-        select: { id: true, type: true, _count: { select: { suppliers: true } } },
-    });
-
-    const results = counts.map((record) => {
-        return { id: record.id, type: record.type, count: record._count.suppliers }
-    })
-
-    return results;
-}
-
-export async function getSupplierByIdService(
-    supplierId: string
-) {
-    return prisma.supplier.findUnique({
-        where: {
-            id: supplierId,
-            status: STATUS.ACTIVATED,
-        },
-    });
-}
-
-export async function getSuppliersByIdsService(ids: string[]) {
-    return prisma.supplier.findMany({
-        where: {
-            id: { in: [...new Set(ids)] },
-        },
-        select: {
-            id: true,
-            name: true,
-            type: true,
-        },
-    });
-}
-
-export async function getAllActiveSuppliersService() {
-    return prisma.supplier.findMany({
-        where: {
-            status: STATUS.ACTIVATED,
-        },
+    return prisma.supplier.update({
+        where: { id },
+        data: { status: STATUS.DEACTIVATED },
         include: { openingHours: true },
-        orderBy: { name: "asc" },
     });
 }

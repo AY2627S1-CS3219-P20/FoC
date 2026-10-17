@@ -1,6 +1,6 @@
 const BASE_AUTH = "/auth";
 const BASE_USER = "/users";
-const BASE_SUPPLIER = "/supplier";
+const BASE_SUPPLIER = "/suppliers";
 const BASE_CREDIT = "/credits";
 const BASE_ORDER = "/orders";
 
@@ -34,24 +34,21 @@ export const ENDPOINTS = {
     },
 
     supplier: {
-        viewSuppliersForAdmin: `${BASE_SUPPLIER}/all`,
-        createSupplier: `${BASE_SUPPLIER}/create`,
-        updateSupplier: `${BASE_SUPPLIER}/:id`,
-        deactivateSupplier: `${BASE_SUPPLIER}/:id/deactivate`,
-        uploadSupplierImage: `${BASE_SUPPLIER}/upload-image`,
-        viewSuppliersInPage: (page: number) => `${BASE_SUPPLIER}/?page=${page}`,
-        countActiveSuppliers: `${BASE_SUPPLIER}/count-active-suppliers`,
-        getAllSupplierTypes: `${BASE_SUPPLIER}/get-supplier-types`,
-        countSuppliersForAdmin: `${BASE_SUPPLIER}/count-all-suppliers`,
-        createSupplierType: `${BASE_SUPPLIER}/new-supplier-type`,
-        deleteSupplierType: `${BASE_SUPPLIER}/delete-supplier-type`,
-        countSupplierType: `${BASE_SUPPLIER}/count-supplier-type`,
-        getAllActiveSuppliers: `${BASE_SUPPLIER}/active`,
+        getAllSuppliers: `${BASE_SUPPLIER}/`,
+        getActiveSuppliers: `${BASE_SUPPLIER}/active`,
         getSuppliersByIds: (ids: string[]) => {
             const query = new URLSearchParams();
             ids.forEach((id) => query.append("ids", id));
             return `${BASE_SUPPLIER}/by-ids?${query.toString()}`;
         },
+        createSupplier: `${BASE_SUPPLIER}/`,
+        updateSupplier: `${BASE_SUPPLIER}/:supplierId`,
+        deactivateSupplier: `${BASE_SUPPLIER}/:supplierId/deactivation`,
+        getAllSupplierTypes: `${BASE_SUPPLIER}/types`,
+        countsForEachSupplierType: `${BASE_SUPPLIER}/types/count`,
+        createSupplierType: `${BASE_SUPPLIER}/types`,
+        deleteSupplierType: `${BASE_SUPPLIER}/types/:typeId`,
+        uploadSupplierImage: `${BASE_SUPPLIER}/assets/images`,
     },
 
     order: {

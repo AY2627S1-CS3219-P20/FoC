@@ -74,7 +74,7 @@ export const buildAssetUrl = (req: Request, filename: string): string => {
     const origin = base
         ? base.replace(/\/$/, "")
         : `${req.protocol}://${req.headers.host}`;
-    return `${origin}/api/supplier/assets/${filename}`;
+    return `${origin}/api/suppliers/assets/images/${filename}`;
 };
 
 export const getContentType = (filename: string): string => {

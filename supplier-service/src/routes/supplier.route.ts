@@ -2,71 +2,72 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
+import { upload } from "../libs/upload.js";
+import { uploadSupplierImage, serveAsset } from "../controllers/supplier.asset.controller.js"
+import { countSuppliersForType, createSupplierType, deleteSupplierType, getAllSupplierTypes } from "../controllers/supplier.type.controller.js";
 import {
-    countSupplierType,
-    createSupplierType,
-    deleteSupplierType,
-    viewSuppliersInPage,
-    viewSuppliersForAdmin,
     createSupplier,
     updateSupplier,
-    uploadSupplierImage,
-    serveAsset,
-    countAllActiveSuppliers,
-    countAllSuppliers,
-    getAllSupplierTypes,
+    getSuppliers,
+    getActiveSuppliers,
     getSupplierById,
     getSuppliersByIds,
-    getAllActiveSuppliers,
+    deactivateSupplier
 } from "../controllers/supplier.controller.js";
-import { upload } from "../libs/upload.js";
-import { deactivateSupplier as deactivateSupplierRoute } from "../controllers/supplier.deactivate.controller.js";
+
 
 const supplierRouter = Router();
 
-// Public: serve an uploaded image by filename
-supplierRouter.get("/assets/:file", serveAsset);
+// Get a supplier image based on its file name (no authentication)
+supplierRouter.get("/assets/images/:filename", serveAsset);
 
 // All supplier endpoints require authentication
 supplierRouter.use(authenticate);
 
-// View the suppliers listed on the current page (active suppliers only)
-supplierRouter.post("/", viewSuppliersInPage);
 
-// count the total number of active suppliers that match the search key and type filter
-supplierRouter.post("/count-active-suppliers", countAllActiveSuppliers);
+// --------------------- Supplier Types -----------------------
+// Query supplier types
+supplierRouter.get("/types", getAllSupplierTypes);
 
-// get all supplier types, don't require admin access 
-supplierRouter.get("/get-supplier-types", getAllSupplierTypes);
+// Count the number of suppliers with a specified typeId
+supplierRouter.get("/types/count", authorize(Role.ADMIN), countSuppliersForType);
 
-// both routes below expect a json body and require admin persmissions to access
-supplierRouter.post("/new-supplier-type", authorize(Role.ADMIN), createSupplierType) // create a new supplier type that does not currently exist
-supplierRouter.post("/delete-supplier-type", authorize(Role.ADMIN), deleteSupplierType) // delete a new supplier type that does not currently exist
-supplierRouter.get("/count-supplier-type", authorize(Role.ADMIN), countSupplierType) // count the number of suppliers for each type
+// Create new supplier type
+supplierRouter.post("/types", authorize(Role.ADMIN), createSupplierType);
 
-// Admin: list all suppliers including deactivated (management page)
-supplierRouter.post("/all", authorize(Role.ADMIN), viewSuppliersForAdmin);
-
-// Admin: count all suppliers including deactivated (management page)
-supplierRouter.post("/count-all-suppliers", authorize(Role.ADMIN), countAllSuppliers);
-
-// Admin: upload a supplier location image
-supplierRouter.post("/upload-image", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);
-
-// Admin supplier management
-supplierRouter.post("/create", authorize(Role.ADMIN), createSupplier);
-supplierRouter.patch("/:id", authorize(Role.ADMIN), updateSupplier);
-supplierRouter.patch("/:id/deactivate", authorize(Role.ADMIN), deactivateSupplierRoute);
+// Delete existing supplier type
+supplierRouter.delete("/types/:typeId", authorize(Role.ADMIN), deleteSupplierType);
 
 
-// ------------------- For order service ------------------- 
-// Get all suppliers that are active
-supplierRouter.get("/active", getAllActiveSuppliers);
+// ------------------------ Suppliers -------------------------
+// Query the ALL suppliers listed based on the current page number, search key and filters
+supplierRouter.get("", authorize(Role.ADMIN), getSuppliers);
 
-// Get suppliers by a list of IDs
+// Query the ACTIVE suppliers listed based on the current page number, search key and filters
+supplierRouter.get("/active", getActiveSuppliers);
+
+// Query the suppliers by providing a list of supplier ids we want to retrieve (name, id, type) information for
 supplierRouter.get("/by-ids", getSuppliersByIds);
 
-// Get supplier by id
+// Get one supplier's (full) information by providing its supplier id
 supplierRouter.get("/:supplierId", getSupplierById);
+
+// Create a new supplier (by admin)
+supplierRouter.post("", authorize(Role.ADMIN), createSupplier);
+
+// Update an existing supplier (by admin)
+supplierRouter.patch("/:supplierId", authorize(Role.ADMIN), updateSupplier);
+
+// Deactivate an existing supplier (by admin)
+supplierRouter.patch("/:supplierId/deactivation", authorize(Role.ADMIN), deactivateSupplier);
+
+// Activate an existing supplier (by admin)
+// supplierRouter.patch("/:supplierId/activation", authorize(Role.ADMIN), activateSupplier);
+
+
+// ------------------------- Assets -------------------------
+// Upload a new supplier image (by admin)
+supplierRouter.post("/assets/images", authorize(Role.ADMIN), upload.single("image"), uploadSupplierImage);
+
 
 export default supplierRouter;

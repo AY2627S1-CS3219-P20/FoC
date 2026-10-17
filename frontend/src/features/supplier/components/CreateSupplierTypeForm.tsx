@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "react-toastify";
 import { supplierTypeFormSchema } from "../schemas/supplier.schema";
-import { createSupplierType } from "@/api/supplierApi";
+import { createSupplierType } from "../services/supplier.service";
 import type { ParsedError } from "@/utils/errorHandler";
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
