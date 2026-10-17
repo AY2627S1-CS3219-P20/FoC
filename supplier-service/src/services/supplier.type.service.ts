@@ -51,10 +51,10 @@ export async function createType(type: string) {
 }
 
 // this function deletes an existing supplier type, with no associated supplier record
-export async function deleteType(type: string) {
+export async function deleteType(typeId: string) {
     // there should only be one corresponding type found
     const typeToDelete = await prisma.supplierType.findFirst({
-        where: { type: type },
+        where: { id: typeId },
     });
 
     if (!typeToDelete) {
