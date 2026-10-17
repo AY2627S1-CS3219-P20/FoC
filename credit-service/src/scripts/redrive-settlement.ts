@@ -39,7 +39,7 @@ async function redrive(limit: number): Promise<void> {
                 channel,
                 SETTLEMENT_MESSAGING.exchange,
                 SETTLEMENT_MESSAGING.routingKeys[event.data.eventType],
-                message.content, // Preserve exact event bytes, including occurredAt.
+                message.content, // Preserve exact event bytes.
                 {
                     messageId: message.properties.messageId,
                     contentType: message.properties.contentType ?? "application/json",
