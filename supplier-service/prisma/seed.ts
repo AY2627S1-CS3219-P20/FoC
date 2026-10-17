@@ -14,6 +14,12 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
+    const databaseRowCount = await prisma.supplier.count(); 
+    if (databaseRowCount > 0) {
+        console.log("Database has already been seeded.");
+        return;
+    }
+
     const csvFilePath = path.resolve('../data/csv/supplier-seed-data.csv');
     const content = fs.readFileSync(csvFilePath, 'utf-8'); // read file
     const rows = parse(content, {
