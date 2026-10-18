@@ -1,6 +1,6 @@
 import type { Response } from "express";
-import { createRequestSchema, requesterOrderHistoryQuerySchema, updateRequestSchema, } from "../schemas/order.requester.schema.js";
-import { createRequestService, getRequesterOrderHistoryService, receiveRequestService, updateRequestService } from "../services/order.requester.service.js";
+import { createRequestSchema, failRequestSchema, receiveRequestSchema, requesterOrderHistoryQuerySchema, updateRequestSchema, } from "../schemas/order.requester.schema.js";
+import { createRequestService, failRequestService, getRequesterOrderHistoryService, receiveRequestService, updateRequestService } from "../services/order.requester.service.js";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
 
@@ -92,10 +92,43 @@ export async function receiveRequest(
         throw new AppError("Order id is required", 400);
     }
 
-    const order = await receiveRequestService(requesterId, orderId);
+    const requestBody = receiveRequestSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError(requestBody.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const order = await receiveRequestService(requesterId, orderId, requestBody.data);
 
     res.status(200).json({
         message: "Order marked as received successfully",
         data: order,
     });
 }
+
+export async function failRequest(
+    req: AuthRequest,
+    res: Response
+) {
+    const requesterId = req.user!.userId;
+    if (!requesterId) {
+        throw new AppError("Authentication required", 401);
+    }
+
+    const orderId = req.params.orderId;
+    if (typeof orderId !== "string" || !orderId) {
+        throw new AppError("Order id is required", 400);
+    }
+
+    const requestBody = failRequestSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError(requestBody.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const order = await failRequestService(requesterId, orderId, requestBody.data);
+
+    res.status(200).json({
+        message: "Order marked as failed successfully",
+        data: order,
+    });
+}
+

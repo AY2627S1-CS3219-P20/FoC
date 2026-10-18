@@ -4,7 +4,7 @@ import { abortReservation, reserveCredits } from "../integrations/credit/credit.
 import { OrderEventType, OrderStatus } from "../generated/prisma/client.js";
 import { verifySupplierExists } from "../integrations/supplier/supplier.client.js";
 import { prisma } from "../libs/prisma.js";
-import type { CreateRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
+import type { CreateRequestInput, FailRequestInput, ReceiveRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
 import type { ReservationPayload } from "../types/order.types.js";
 
 export async function getRequesterOrderHistoryService(
@@ -254,6 +254,7 @@ export async function createRequestService(
 export async function receiveRequestService(
     requesterId: string,
     orderId: string,
+    input: ReceiveRequestInput,
 ) {
     const existingOrder = await prisma.order.findUnique({
         where: { id: orderId },
@@ -278,7 +279,7 @@ export async function receiveRequestService(
                 requesterId: requesterId,
                 status: OrderStatus.COMPLETED,
                 courierId: existingOrder.courierId,
-                version: existingOrder.version, // Ensure the version matches the current version for optimistic concurrency control
+                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
             },
             data: {
                 status: OrderStatus.RECEIVED,
@@ -322,6 +323,87 @@ export async function receiveRequestService(
             },
         });
 
+
+        return tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+        });
+    });
+};
+
+export async function failRequestService(
+    requesterId: string,
+    orderId: string,
+    input: FailRequestInput,
+) {
+    const existingOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+    });
+
+    // Ensure the order exists and belongs to the requester
+    if (!existingOrder || existingOrder.requesterId !== requesterId) {
+        throw new AppError("Order not found", 404);
+    }
+
+    // Only allow marking the order as failed if it is in COMPLETED status and has a courier assigned.
+    if (existingOrder.status !== OrderStatus.COMPLETED || !existingOrder.courierId) {
+        throw new AppError("This order cannot be marked as failed", 409);
+    }
+
+    if (!existingOrder.creditReservationId) {
+        throw new AppError("This order does not have a credit reservation to refund", 409);
+    }
+
+    const eventId = randomUUID();
+    const failedAt = new Date();
+
+    const eventPayload = {
+        eventId: eventId,
+        eventType: OrderEventType.ORDER_FAILED,
+        reservationId: existingOrder.creditReservationId,
+        orderId: existingOrder.id,
+        requesterId: existingOrder.requesterId,
+        amount: existingOrder.offeredCredits,
+    };
+
+    return prisma.$transaction(async (tx) => {
+        const updatedOrder = await tx.order.updateMany({
+            where: {
+                id: orderId,
+                requesterId: requesterId,
+                status: OrderStatus.COMPLETED,
+                courierId: existingOrder.courierId,
+                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+            },
+            data: {
+                status: OrderStatus.FAILED,
+                failedAt: failedAt,
+                failureReason: input.failureReason ?? null,
+                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+            },
+        });
+
+        if (updatedOrder.count !== 1) {
+            throw new AppError("The request changed while being marked as failed. Reload and try again.", 409);
+        }
+
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId: orderId,
+                fromStatus: OrderStatus.COMPLETED,
+                toStatus: OrderStatus.FAILED,
+                changedBy: requesterId,
+                reason: input.failureReason
+            },
+        });
+
+        await tx.outboxEvent.create({
+            data: {
+                id: eventId,
+                orderId: orderId,
+                eventType: OrderEventType.ORDER_FAILED,
+                payload: eventPayload,
+            },
+        });
 
         return tx.order.findUniqueOrThrow({
             where: { id: orderId },
