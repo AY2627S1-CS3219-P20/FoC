@@ -1,25 +1,14 @@
 import { Card } from "@/components/ui/card";
-import { type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
+import { statusVariant, type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
 import { AlarmClockIcon, CoinsIcon, FlagIcon, MapPinIcon, PencilIcon } from "lucide-react";
 import { format } from "date-fns";
-import { Button, type ButtonProps } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import RequestActivityDetailsDialog from "./RequestActivityDetailsDialog";
 import StatusUpdateDialog from "./StatusUpdateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import useAuth from "@/hooks/useAuth";
 import { ROLES } from "@/features/auth/types/auth.types";
-
-const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
-    OPEN: "teal",
-    ACCEPTED: "sky",
-    PICKED_UP: "yellow",
-    COMPLETED: "indigo200",
-    RECEIVED: "green",
-    CANCELED: "gray",
-    FAILED: "red",
-    EXPIRED: "orange",
-};
 
 type RequestActivityCardProps = {
     order: Order;
