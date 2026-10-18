@@ -124,3 +124,13 @@ export type UpdateRequestPayload = {
     expectedVersion: number;
     payload: CreateRequestFormData;
 }
+
+export interface CreateRequestPayload {
+    name: string;
+    description: string;
+    pickupSupplierId: string;
+    deliverySupplierId: string;
+    offeredCredits: number;
+    expiryAt: string;
+    remarks: string;
+}
