@@ -75,6 +75,9 @@ model Order {
   cancellationReason String? @db.Text
   failureReason      String? @db.Text
 
+  // Used to track the reserved credits for this order
+  creditReservationId String? @unique @db.Uuid
+
   // Relationships
   statusHistory OrderStatusHistory[]
   outboxEvents  OutboxEvent[]

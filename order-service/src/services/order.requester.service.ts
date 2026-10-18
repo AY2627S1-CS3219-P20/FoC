@@ -174,12 +174,19 @@ export async function createRequestService(
         const reservationResult = await reserveCredits(reservationInput);
         reservationId = reservationResult.id;
 
+        if (!reservationId) {
+            throw new AppError(
+                "Credit Service returned an invalid reservation",
+                502,
+            );
+        }
+
         // 5. Create the order request + history + outbox entries atomically in a transaction
         const orderRequest = await prisma.$transaction(async (tx) => {
             const createOrder = await tx.order.create({
                 data: {
                     id: orderId,
-                    requesterId,
+                    requesterId: requesterId,
                     courierId: null,
                     name: input.name,
                     description: input.description,
@@ -190,6 +197,7 @@ export async function createRequestService(
                     expiryAt: input.expiryAt,
                     status: OrderStatus.OPEN,
                     version: 1,
+                    creditReservationId: reservationId!,
                 },
             });
 
@@ -223,6 +231,7 @@ export async function createRequestService(
                 return existingOrder;
             }
 
+            // If the order was not created, attempt to abort the reservation
             if (reservationId) {
                 try {
                     console.error(`Attempting to abort reservation ${reservationId} for order ${orderId} due to order creation failure`);
