@@ -41,7 +41,13 @@ export const createRequestSchema = z.object({
         .string()
         .trim()
         .max(1500, "Remarks are too long")
-});
+}).refine(
+    data => data.pickupSupplierId !== data.deliverySupplierId,
+    {
+        message: "Pickup and delivery locations must be different",
+        path: ["deliverySupplierId"],
+    },
+);
 
 export type CreateRequestFormInput = z.input<typeof createRequestSchema>;
 export type CreateRequestFormData = z.output<typeof createRequestSchema>;
