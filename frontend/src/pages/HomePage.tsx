@@ -75,6 +75,21 @@ const HomePage = () => {
                     {!isAdmin && <CreateRequestDialog />}
                 </div>
 
+                <div className="flex flex-col gap-1 w-full md:w-1/2">
+                    <Field className="w-full">
+                        <InputGroup className="bg-white">
+                            <InputGroupAddon align="inline-start">
+                                <SearchIcon />
+                            </InputGroupAddon>
+                            <InputGroupInput
+                                id="input-search-key"
+                                type="text"
+                                placeholder="Search for an open order"
+                                onChange={handleSearchKeyInput} />
+                        </InputGroup>
+                    </Field>
+                </div>
+
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="flex flex-col gap-1">
                         <label className="text-sm font-medium">Filter Location</label>
@@ -129,21 +144,6 @@ const HomePage = () => {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <Field className="w-full">
-                            <InputGroup className="bg-white">
-                                <InputGroupAddon align="inline-start">
-                                    <SearchIcon />
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                    id="input-search-key"
-                                    type="text"
-                                    placeholder="Search for an open order"
-                                    onChange={handleSearchKeyInput} />
-                            </InputGroup>
-                        </Field>
                     </div>
                 </div>
 
