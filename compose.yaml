@@ -1,3 +1,6 @@
+include:
+- supplier-service/compose.yml
+
 services:
   rabbitmq:
     image: rabbitmq:4.2-management
