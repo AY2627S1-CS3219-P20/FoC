@@ -146,3 +146,14 @@ export interface CreateRequestPayload {
     expiryAt: string;
     remarks: string;
 }
+
+export type ReceiveRequestPayload = {
+    orderId: string;
+    expectedVersion: number;
+}
+
+export type FailRequestPayload = {
+    orderId: string;
+    expectedVersion: number;
+    failureReason: string;
+}

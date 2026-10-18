@@ -1,16 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Order } from "../types/order.types";
+import type { Order, ReceiveRequestPayload } from "../types/order.types";
 import type { ParsedError } from "@/utils/errorHandler";
 import { receiveRequestService } from "../services/order.requester.service";
 import { courierOrderQueryKeys } from "./courierOrderQueryKeys";
 import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 import { toast } from "react-toastify";
+import { creditKeys } from "@/features/credit/credit.keys";
 
 export function useReceiveRequest() {
     const queryClient = useQueryClient();
 
-    const { mutateAsync, isPending, isSuccess, isError } = useMutation<Order, ParsedError, string>({
-        mutationFn: (orderId) => receiveRequestService(orderId),
+    const { mutateAsync, isPending, isSuccess, isError } = useMutation<Order, ParsedError, ReceiveRequestPayload>({
+        mutationFn: ({ orderId, expectedVersion }) => receiveRequestService(orderId, expectedVersion),
         onSuccess: async () => {
             await Promise.all([
                 queryClient.invalidateQueries({
@@ -18,6 +19,9 @@ export function useReceiveRequest() {
                 }),
                 queryClient.invalidateQueries({
                     queryKey: requesterOrderHistoryQueryKeys.all,
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: creditKeys.all,
                 })
             ]);
             toast.success("Request marked as received");

@@ -9,11 +9,13 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ORDER_STATUSES, type Order, type OrderStatus } from "../types/order.types";
-import { updateStatusSchema } from "../schemas/update-status.schema";
+import { updateStatusSchema, type UpdateStatusFormInput } from "../schemas/update-status.schema";
 import useDropRequest from "../hooks/useDropRequest";
 import usePickUpRequest from "../hooks/usePickUpRequest";
 import useCompleteRequest from "../hooks/useCompleteRequest";
 import useReceiveRequest from "../hooks/useReceiveRequest";
+import useFailRequest from "../hooks/useFailRequest";
+import { Textarea } from "@/components/ui/textarea";
 
 type StatusUpdateDialogProps = {
     order: Order;
@@ -30,7 +32,7 @@ const StatusUpdateDialog = ({
     const STATUS_UPDATES: Partial<Record<OrderStatus, OrderStatus[]>> = {
         "ACCEPTED": ["CANCELED", "PICKED_UP"],
         "PICKED_UP": ["COMPLETED"],
-        "COMPLETED": ["RECEIVED"],
+        "COMPLETED": ["RECEIVED", "FAILED"],
     };
 
     const PRETTY_PRINT_OPTIONS: Partial<Record<OrderStatus, string>> = {
@@ -38,6 +40,7 @@ const StatusUpdateDialog = ({
         "CANCELED": "Cancel order",
         "COMPLETED": "Complete order",
         "RECEIVED": "Receive order",
+        "FAILED": "Fail order",
     };
 
     const prettyPrintCurrentStatus = (status: OrderStatus) => {
@@ -58,8 +61,9 @@ const StatusUpdateDialog = ({
     const { pickUpRequest, isPending: isPickingUp } = usePickUpRequest();
     const { completeRequest, isPending: isCompleting } = useCompleteRequest();
     const { receiveRequest, isPending: isReceiving } = useReceiveRequest();
+    const { failRequest, isPending: isFailing } = useFailRequest();
 
-    const updateStatus = async (order: Order, newStatus: OrderStatus) => {
+    const updateStatus = async (order: Order, newStatus: OrderStatus, failureReason: string) => {
         const currentStatus = order.status;
         const allowedNextStatuses = STATUS_UPDATES[currentStatus] ?? [];
 
@@ -78,7 +82,14 @@ const StatusUpdateDialog = ({
             await dropRequest(order.id);
             return;
         } else if (newStatus === ORDER_STATUSES[4]) { // new status is "RECEIVED"
-            await receiveRequest(order.id);
+            await receiveRequest({
+                orderId: order.id, expectedVersion: order.version
+            });
+            return;
+        } else if (newStatus === ORDER_STATUSES[6]) { // new status is "FAILED"
+            await failRequest({
+                orderId: order.id, expectedVersion: order.version, failureReason
+            });
             return;
         }
 
@@ -86,13 +97,22 @@ const StatusUpdateDialog = ({
         return;
     };
 
+    const defaultValues: UpdateStatusFormInput = {
+        newStatus: undefined,
+        failureReason: "",
+    };
+
     const form = useForm({
+        defaultValues: defaultValues,
         validators: {
             onSubmit: updateStatusSchema
         },
         onSubmit: async ({ value }) => {
             const payload = updateStatusSchema.parse(value);
-            await updateStatus(order, payload.newStatus);
+
+            if (!payload.newStatus) return;
+
+            await updateStatus(order, payload.newStatus, payload.failureReason);
             closeDialog(false);
         },
     });
@@ -114,8 +134,9 @@ const StatusUpdateDialog = ({
                     </DialogTitle>
                 </DialogHeader>
 
-                <div>
-                    <span style={{ fontWeight: 'bold' }}>Current status:</span> {prettyPrintCurrentStatus(order.status)}
+                <div className="flex flex-row items-center justify-start gap-2">
+                    <span className="font-bold">Current status:</span>
+                    <span>{prettyPrintCurrentStatus(order.status)}</span>
                 </div>
 
                 <form
@@ -131,15 +152,17 @@ const StatusUpdateDialog = ({
                             children={field => {
                                 const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
                                 return (
-                                    <Field data-invalid={isInvalid} className="min-w-0 flex-1 flex-row items-center justify-start gap-2 *:w-auto">
-                                        <FieldLabel htmlFor={field.name}><span style={{ fontWeight: 'bold' }}>New status:</span></FieldLabel>
+                                    <Field data-invalid={isInvalid} className="flex-1 flex-col md:flex-row items-start md:items-center justify-start gap-2 *:w-auto">
+                                        <FieldLabel htmlFor={field.name} className="font-bold shrink-0">
+                                            New status:
+                                        </FieldLabel>
                                         <Select
                                             value={field.state.value ?? null}
                                             onValueChange={(value) => {
                                                 field.handleChange(value as OrderStatus);
                                             }}
                                         >
-                                            <SelectTrigger className="w-48 bg-white">
+                                            <SelectTrigger className="w-full! md:w-48! bg-white" aria-invalid={isInvalid}>
                                                 <SelectValue placeholder="Select an option" />
                                             </SelectTrigger>
                                             <SelectContent alignItemWithTrigger={false}>
@@ -153,6 +176,39 @@ const StatusUpdateDialog = ({
                                 );
                             }}
                         />
+                        <form.Subscribe
+                            selector={state => state.values.newStatus}
+                        >
+                            {newStatus =>
+                                newStatus === "FAILED" ? (
+                                    <form.Field
+                                        name="failureReason"
+                                        children={field => {
+                                            const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                            return (
+                                                <Field data-invalid={isInvalid}>
+                                                    <FieldLabel htmlFor={field.name} className="font-bold">
+                                                        Failure reason:
+                                                    </FieldLabel>
+                                                    <Textarea
+                                                        id={field.name}
+                                                        name={field.name}
+                                                        value={field.state.value}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={event =>
+                                                            field.handleChange(event.target.value)
+                                                        }
+                                                        aria-invalid={isInvalid}
+                                                        placeholder="Explain why this request failed"
+                                                    />
+                                                    {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
+                                                </Field>
+                                            );
+                                        }}
+                                    />
+                                ) : null
+                            }
+                        </form.Subscribe>
                     </FieldGroup>
 
                     <div className="flex justify-end gap-2">
@@ -166,7 +222,7 @@ const StatusUpdateDialog = ({
                         <Button
                             type="submit"
                             variant="indigo"
-                            isLoading={isDropping || isPickingUp || isCompleting || isReceiving}>
+                            isLoading={isDropping || isPickingUp || isCompleting || isReceiving || isFailing}>
                             Confirm
                         </Button>
                     </div>
