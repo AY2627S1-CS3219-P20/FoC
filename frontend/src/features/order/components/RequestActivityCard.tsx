@@ -40,7 +40,7 @@ const RequestActivityCard = ({
     const [open, setOpen] = useState(false);
     const editableStatuses: Partial<Record<OrderStatus, ViewerRole>> = {
         "ACCEPTED": "courier",
-        "PICKED_UP": "courier", 
+        "PICKED_UP": "courier",
         "COMPLETED": "requester"
     };
     const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
@@ -127,9 +127,7 @@ const RequestActivityCard = ({
                             type="button"
                             variant={statusVariant[order.status]}
                             size="sm"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                            }}
+                            className="pointer-events-none"
                         >
                             {order.status}
                         </Button>
