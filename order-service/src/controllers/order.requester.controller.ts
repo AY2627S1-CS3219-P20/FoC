@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import { createRequestSchema, requesterOrderHistoryQuerySchema, updateRequestSchema, } from "../schemas/order.requester.schema.js";
-import { createRequestService, getRequesterOrderHistoryService, updateRequestService } from "../services/order.requester.service.js";
+import { createRequestService, getRequesterOrderHistoryService, receiveRequestService, updateRequestService } from "../services/order.requester.service.js";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
 
@@ -77,3 +77,25 @@ export async function createRequest(
         data: order,
     });
 };
+
+export async function receiveRequest(
+    req: AuthRequest,
+    res: Response
+) {
+    const requesterId = req.user!.userId;
+    if (!requesterId) {
+        throw new AppError("Authentication required", 401);
+    }
+
+    const orderId = req.params.orderId;
+    if (typeof orderId !== "string" || !orderId) {
+        throw new AppError("Order id is required", 400);
+    }
+
+    const order = await receiveRequestService(requesterId, orderId);
+
+    res.status(200).json({
+        message: "Order marked as received successfully",
+        data: order,
+    });
+}

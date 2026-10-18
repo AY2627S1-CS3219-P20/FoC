@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { AppError } from "../errors/errors.js";
-import { OrderStatus } from "../generated/prisma/client.js";
 import { abortReservation, reserveCredits } from "../integrations/credit/credit.client.js";
+import { OrderEventType, OrderStatus } from "../generated/prisma/client.js";
 import { verifySupplierExists } from "../integrations/supplier/supplier.client.js";
 import { prisma } from "../libs/prisma.js";
 import type { CreateRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
@@ -248,4 +249,82 @@ export async function createRequestService(
 
         throw error;
     }
+};
+
+export async function receiveRequestService(
+    requesterId: string,
+    orderId: string,
+) {
+    const existingOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+    });
+
+    // Ensure the order exists and belongs to the requester
+    if (!existingOrder || existingOrder.requesterId !== requesterId) {
+        throw new AppError("Order not found", 404);
+    }
+
+    // Only allow marking the order as received if it is in COMPLETED status and has a courier assigned.
+    if (existingOrder.status !== OrderStatus.COMPLETED || !existingOrder.courierId) {
+        throw new AppError("This order cannot be marked as received", 409);
+    }
+
+    const now = new Date();
+
+    return await prisma.$transaction(async (tx) => {
+        const updatedOrder = await tx.order.updateMany({
+            where: {
+                id: orderId,
+                requesterId: requesterId,
+                status: OrderStatus.COMPLETED,
+                courierId: existingOrder.courierId,
+                version: existingOrder.version, // Ensure the version matches the current version for optimistic concurrency control
+            },
+            data: {
+                status: OrderStatus.RECEIVED,
+                receivedAt: now,
+                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+            },
+        });
+
+        if (updatedOrder.count !== 1) {
+            throw new AppError("The request changed while being marked as received. Reload and try again.", 409);
+        }
+
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId: orderId,
+                fromStatus: OrderStatus.COMPLETED,
+                toStatus: OrderStatus.RECEIVED,
+                changedBy: requesterId,
+                reason: null
+            },
+        });
+
+        // The worker will use this eventId as RabbitMQ messageId.
+        // Credit service expects it to match the payload's eventId for idempotency.
+        const eventId = randomUUID();
+
+        await tx.outboxEvent.create({
+            data: {
+                id: eventId,
+                orderId: orderId,
+                eventType: OrderEventType.ORDER_RECEIVED,
+                payload: {
+                    eventId: eventId,
+                    eventType: OrderEventType.ORDER_RECEIVED,
+                    reservationId: existingOrder.creditReservationId,
+                    orderId: existingOrder.id,
+                    requesterId: existingOrder.requesterId,
+                    courierId: existingOrder.courierId,
+                    amount: existingOrder.offeredCredits,
+                },
+            },
+        });
+
+
+        return tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+        });
+    });
 };
