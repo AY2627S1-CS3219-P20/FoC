@@ -1,6 +1,6 @@
 services:
   # reference for postgres: https://www.prisma.io/docs/guides/deployment/docker
-  postgres:
+  supplier-postgres:
     image: postgres:17
     restart: always
     environment:
@@ -15,14 +15,14 @@ services:
       timeout: 2s
       retries: 20
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - supplier_postgres_data:/var/lib/postgresql/data
 
   supplier-service:
     build: .
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/suppliers?sslmode=disable
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supplier-postgres:5432/suppliers?sslmode=disable
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH}
     ports:
       - "3001:3001"
@@ -32,9 +32,9 @@ services:
       - ../data/csv:/data/csv:ro # read-only (ro)
       - supplier_uploads:/app/uploads
     depends_on:
-      postgres:
+      supplier-postgres:
         condition: service_healthy
 
 volumes:
-  postgres_data:
+  supplier_postgres_data:
   supplier_uploads:
