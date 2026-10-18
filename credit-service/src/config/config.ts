@@ -26,6 +26,7 @@ const config = {
     databaseUrl: getEnv("DATABASE_URL"),
     frontendUrl: getEnv("FRONTEND_URL"),
     jwtPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH"),
+    orderCreditServiceToken: getEnv("ORDER_CREDIT_SERVICE_TOKEN"),
 };
 
 export default config;

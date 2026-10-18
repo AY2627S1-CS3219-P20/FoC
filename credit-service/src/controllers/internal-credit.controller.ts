@@ -1,10 +1,68 @@
-import type { RequestHandler } from "express";
-import type { PrismaClient } from "../generated/prisma/client.js";
-import { reserveCredits } from "../services/reservation.service.js";
+import type { Request, Response } from "express";
+import { AppError } from "../errors/errors.js";
+import {
+    abortReservation,
+    getReservation,
+    reserveCredits,
+} from "../services/reservation.service.js";
+import {
+    abortReservationSchema,
+    reservationIdSchema,
+    reservationSchema,
+} from "../schemas/reservation.schema.js";
 
-export function createReservationController(prisma: PrismaClient): RequestHandler {
-    return async (req, res) => {
-        const result = await reserveCredits(prisma, req.body);
-        res.status(201).json({ success: true, data: result.reservation });
-    };
-}
+export const createReservationController = async (
+    req: Request, res: Response
+) => {
+    const parsedBody = reservationSchema.safeParse(req.body);
+
+    if (!parsedBody.success) {
+        throw new AppError("Invalid reservation", 400);
+    }
+
+    const result = await reserveCredits(parsedBody.data);
+
+    res.status(result.created ? 201 : 200).json({
+        success: true,
+        data: result.reservation,
+    });
+};
+
+export const getReservationController = async (
+    req: Request, res: Response
+) => {
+    const parsedId = reservationIdSchema.safeParse(req.params.reservationId);
+
+    if (!parsedId.success) {
+        throw new AppError("Invalid reservation ID", 400);
+    }
+
+    const reservation = await getReservation(parsedId.data);
+
+    res.status(200).json({
+        success: true,
+        data: reservation,
+    });
+};
+
+export const abortReservationController = async (
+    req: Request, res: Response
+) => {
+    const parsedId = reservationIdSchema.safeParse(req.params.reservationId);
+    const parsedBody = abortReservationSchema.safeParse(req.body);
+
+    if (!parsedId.success || !parsedBody.success) {
+        throw new AppError("Invalid reservation", 400);
+    }
+
+    if (parsedId.data !== parsedBody.data.reservationId) {
+        throw new AppError("Reservation ID does not match request body", 400);
+    }
+
+    const result = await abortReservation(parsedBody.data);
+
+    res.status(200).json({
+        success: true,
+        data: result.reservation,
+    });
+};
