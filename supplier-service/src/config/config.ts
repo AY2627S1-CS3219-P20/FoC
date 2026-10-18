@@ -27,6 +27,7 @@ const config = {
     frontendUrl: getEnv("FRONTEND_URL"),
     jwtPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH"),
     assetsPublicUrl: process.env.ASSETS_PUBLIC_URL ?? undefined,
+    orderSupplierServiceToken: getEnv("ORDER_SUPPLIER_SERVICE_TOKEN"),
 };
 
 export default config;
