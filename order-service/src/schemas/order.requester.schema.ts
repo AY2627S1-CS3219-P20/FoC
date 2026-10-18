@@ -79,6 +79,7 @@ export type ReceiveRequestInput = z.infer<typeof receiveRequestSchema>;
 export const failRequestSchema = z.object({
     expectedVersion: z.number().int().positive(),
     failureReason: z.string().trim()
+        .min(1, "Failure reason is required")
         .max(1500, "Failure reason must be less than 1500 characters")
 });
 export type FailRequestInput = z.infer<typeof failRequestSchema>;
