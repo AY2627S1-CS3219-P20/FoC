@@ -46,7 +46,7 @@ const RequestActivityCard = ({
     const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
     const [openStatusUpdateDialog, setOpenStatusUpdateDialog] = useState(false);
 
-    const { user, isAuthenticated } = useAuth();
+    const { user } = useAuth();
     const userRole = user?.role;
 
     return (
