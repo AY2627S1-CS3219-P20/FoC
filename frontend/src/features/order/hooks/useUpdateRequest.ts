@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Order, UpdateRequestPayload } from "../types/order.types";
 import type { ParsedError } from "@/utils/errorHandler";
 import { updateRequestService } from "../services/order.requester.service";
-import { requesterOrderHistoryQueryKeys } from "./useRequesterOrderHistory";
 import { toast } from "react-toastify";
+import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 
 export function useUpdateRequest() {
     const queryClient = useQueryClient();

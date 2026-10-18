@@ -13,6 +13,7 @@ import { updateStatusSchema } from "../schemas/update-status.schema";
 import useDropRequest from "../hooks/useDropRequest";
 import usePickUpRequest from "../hooks/usePickUpRequest";
 import useCompleteRequest from "../hooks/useCompleteRequest";
+import useReceiveRequest from "../hooks/useReceiveRequest";
 
 type StatusUpdateDialogProps = {
     order: Order;
@@ -28,13 +29,15 @@ const StatusUpdateDialog = ({
     // mapping for what the next status can be, given the current status
     const STATUS_UPDATES: Partial<Record<OrderStatus, OrderStatus[]>> = {
         "ACCEPTED": ["CANCELED", "PICKED_UP"],
-        "PICKED_UP": ["COMPLETED"]
+        "PICKED_UP": ["COMPLETED"],
+        "COMPLETED": ["RECEIVED"],
     };
 
     const PRETTY_PRINT_OPTIONS: Partial<Record<OrderStatus, string>> = {
         "PICKED_UP": "Pick up order",
         "CANCELED": "Cancel order",
         "COMPLETED": "Complete order",
+        "RECEIVED": "Receive order",
     };
 
     const prettyPrintCurrentStatus = (status: OrderStatus) => {
@@ -52,8 +55,9 @@ const StatusUpdateDialog = ({
 
     // hooks
     const { dropRequest, isPending: isDropping } = useDropRequest();
-    const { pickUpRequest, isPending: isPickingUp }= usePickUpRequest();
-    const { completeRequest, isPending: isCompleting }= useCompleteRequest();
+    const { pickUpRequest, isPending: isPickingUp } = usePickUpRequest();
+    const { completeRequest, isPending: isCompleting } = useCompleteRequest();
+    const { receiveRequest, isPending: isReceiving } = useReceiveRequest();
 
     const updateStatus = async (order: Order, newStatus: OrderStatus) => {
         const currentStatus = order.status;
@@ -61,7 +65,7 @@ const StatusUpdateDialog = ({
 
         if (!allowedNextStatuses.includes(newStatus)) {
             // not allowed, simply return
-            return; 
+            return;
         }
 
         if (newStatus === ORDER_STATUSES[2]) { // new status is "PICKED_UP"
@@ -73,22 +77,25 @@ const StatusUpdateDialog = ({
         } else if (newStatus === ORDER_STATUSES[5]) { // new status is "CANCELED"
             await dropRequest(order.id);
             return;
+        } else if (newStatus === ORDER_STATUSES[4]) { // new status is "RECEIVED"
+            await receiveRequest(order.id);
+            return;
         }
 
         // unsupported new order status, simply return
-        return; 
+        return;
     };
 
     const form = useForm({
-            validators: {
-                onSubmit: updateStatusSchema
-            },
-            onSubmit: async ({ value }) => {
-                const payload = updateStatusSchema.parse(value);
-                await updateStatus(order, payload.newStatus);
-                closeDialog(false);
-            },
-        });
+        validators: {
+            onSubmit: updateStatusSchema
+        },
+        onSubmit: async ({ value }) => {
+            const payload = updateStatusSchema.parse(value);
+            await updateStatus(order, payload.newStatus);
+            closeDialog(false);
+        },
+    });
 
     const closeDialog = (nextOpen: boolean) => {
         onOpenChange(nextOpen);
@@ -97,7 +104,7 @@ const StatusUpdateDialog = ({
             form.reset();
         }
     };
-    
+
     return (
         <Dialog open={open} onOpenChange={closeDialog}>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
@@ -133,7 +140,7 @@ const StatusUpdateDialog = ({
                                             }}
                                         >
                                             <SelectTrigger className="w-48 bg-white">
-                                                <SelectValue placeholder="Select an option"/>
+                                                <SelectValue placeholder="Select an option" />
                                             </SelectTrigger>
                                             <SelectContent alignItemWithTrigger={false}>
                                                 {STATUS_UPDATES[order.status]?.map((value) => (
@@ -149,19 +156,22 @@ const StatusUpdateDialog = ({
                     </FieldGroup>
 
                     <div className="flex justify-end gap-2">
-                            <Button
+                        <Button
                             type="button"
                             variant="outline"
                             onClick={() => closeDialog(false)}
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" variant="indigo" isLoading={isDropping || isPickingUp || isCompleting}>
+                        <Button
+                            type="submit"
+                            variant="indigo"
+                            isLoading={isDropping || isPickingUp || isCompleting || isReceiving}>
                             Confirm
                         </Button>
-                    </div>   
+                    </div>
                 </form>
-            </DialogContent>   
+            </DialogContent>
         </Dialog>
     );
 };

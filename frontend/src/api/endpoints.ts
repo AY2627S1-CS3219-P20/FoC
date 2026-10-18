@@ -61,5 +61,6 @@ export const ENDPOINTS = {
         getCourierOrderHistory: `${BASE_ORDER}/me/courier`,
         updateRequest: (orderId: string) => `${BASE_ORDER}/${orderId}`,
         createRequest: `${BASE_ORDER}`,
+        receiveRequest: (orderId: string) => `${BASE_ORDER}/${orderId}/receipt`,
     }
 } as const;

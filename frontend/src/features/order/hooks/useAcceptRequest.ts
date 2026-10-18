@@ -3,8 +3,8 @@ import type { Order } from "../types/order.types";
 import type { ParsedError } from "@/utils/errorHandler";
 import { acceptRequestService } from "../services/order.courier.service";
 import { courierOrderQueryKeys } from "./courierOrderQueryKeys";
-import { requesterOrderHistoryQueryKeys } from "./useRequesterOrderHistory";
 import { toast } from "react-toastify";
+import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 
 export function useAcceptRequest() {
     const queryClient = useQueryClient();
