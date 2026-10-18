@@ -2,14 +2,15 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { acceptOrder, 
-    completeOrder, 
-    dropOrder, 
-    getCourierOrderHistory, 
-    getOpenOrders, 
-    pickUpOrder 
+import {
+    acceptOrder,
+    completeOrder,
+    dropOrder,
+    getCourierOrderHistory,
+    getOpenOrders,
+    pickUpOrder
 } from "../controllers/order.courier.controller.js";
-import { getRequesterOrderHistory, updateRequest } from "../controllers/order.requester.controller.js";
+import { createRequest, getRequesterOrderHistory, updateRequest } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
 
@@ -18,7 +19,7 @@ orderRouter.use(authenticate);
 
 // ----------- Orders -----------
 // Create a new order
-// orderRouter.post("/");
+orderRouter.post("", authorize(Role.STUDENT), createRequest);
 
 // Get all orders with OPEN status 
 orderRouter.get("", getOpenOrders);

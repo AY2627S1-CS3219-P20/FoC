@@ -55,3 +55,17 @@ export const updateRequestService = async (
         throw parseError(error);
     }
 };
+
+export const createRequestService = async (
+    payload: CreateRequestFormData,
+): Promise<Order> => {
+    try {
+        const response = await orderApi.post<ApiResponse<Order>>(
+            ENDPOINTS.order.createRequest,
+            payload,
+        );
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};

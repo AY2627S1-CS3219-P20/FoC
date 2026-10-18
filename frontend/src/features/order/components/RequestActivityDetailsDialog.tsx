@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import SupplierSelect from "./SupplierSelect";
 import DateTimePicker from "./DateTimePicker";
-import type { Order, ViewerRole } from "../types/order.types";
+import { statusVariant, type Order, type ViewerRole } from "../types/order.types";
 import { useOrderRelatedUserDetails } from "../hooks/useOrderRelatedUserDetails";
 import { createRequestSchema } from "../schemas/create-request.schema";
 import useUpdateRequest from "../hooks/useUpdateRequest";
@@ -328,6 +328,17 @@ const RequestActivityDetailsDialog = ({
                             />
                         </FieldGroup>
                     )}
+
+                    <div className="flex flex-col gap-0.5">
+                        <p className="text-sm font-medium">Current status</p>
+                        <Button
+                            type="button"
+                            variant={statusVariant[order.status]}
+                            className="pointer-events-none w-fit rounded-4xl h-6.5 px-2 py-0 font-normal text-xs"
+                        >
+                            {order.status}
+                        </Button>
+                    </div>
 
                     <div className="space-y-2 border-t pt-4">
                         <p className="font-medium text-base">{relatedPersonLabel} Details</p>

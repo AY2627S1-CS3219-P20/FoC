@@ -13,7 +13,7 @@ export const requesterOrderHistoryQuerySchema = z.object({
 
 export type RequesterOrderHistoryQuery = z.infer<typeof requesterOrderHistoryQuerySchema>;
 
-export const createRequestSchema = z.object({
+export const requestFieldsSchema = z.object({
     name: z.string().trim()
         .min(1, "Request name is required")
         .max(255, "Request name must be less than 255 characters"),
@@ -45,9 +45,17 @@ export const createRequestSchema = z.object({
         ),
 });
 
+export const createRequestSchema = requestFieldsSchema.refine(
+    data => data.pickupSupplierId !== data.deliverySupplierId,
+    {
+        message: "Pickup and delivery locations must be different",
+        path: ["deliverySupplierId"],
+    },
+);
+
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 
-export const updateRequestSchema = createRequestSchema
+export const updateRequestSchema = requestFieldsSchema
     .omit({ offeredCredits: true }) // Offered credits cannot be updated after creation
     .partial()
     .extend({

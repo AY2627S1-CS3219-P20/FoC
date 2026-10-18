@@ -7,6 +7,7 @@ import config from "./config/config.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { ensureUploadsDir } from "./libs/upload.js";
 import { AppError } from "./errors/errors.js";
+import internalSupplierRouter from "./routes/internal-supplier.route.js";
 
 const app = express();
 
@@ -20,6 +21,8 @@ app.use(
 );
 
 app.use(express.json());
+
+app.use("/api/internal/suppliers", internalSupplierRouter);
 
 // Health check endpoint
 app.get("/suppliers", (_req: Request, res: Response) => {

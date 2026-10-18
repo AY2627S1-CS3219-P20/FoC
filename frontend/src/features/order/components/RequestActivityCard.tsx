@@ -1,25 +1,14 @@
 import { Card } from "@/components/ui/card";
-import { type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
+import { statusVariant, type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
 import { AlarmClockIcon, CoinsIcon, FlagIcon, MapPinIcon, PencilIcon } from "lucide-react";
 import { format } from "date-fns";
-import { Button, type ButtonProps } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import RequestActivityDetailsDialog from "./RequestActivityDetailsDialog";
 import StatusUpdateDialog from "./StatusUpdateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import useAuth from "@/hooks/useAuth";
 import { ROLES } from "@/features/auth/types/auth.types";
-
-const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
-    OPEN: "teal",
-    ACCEPTED: "sky",
-    PICKED_UP: "yellow",
-    COMPLETED: "indigo200",
-    RECEIVED: "green",
-    CANCELED: "gray",
-    FAILED: "red",
-    EXPIRED: "orange",
-};
 
 type RequestActivityCardProps = {
     order: Order;
@@ -40,13 +29,13 @@ const RequestActivityCard = ({
     const [open, setOpen] = useState(false);
     const editableStatuses: Partial<Record<OrderStatus, ViewerRole>> = {
         "ACCEPTED": "courier",
-        "PICKED_UP": "courier", 
+        "PICKED_UP": "courier",
         "COMPLETED": "requester"
     };
     const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
     const [openStatusUpdateDialog, setOpenStatusUpdateDialog] = useState(false);
 
-    const { user, isAuthenticated } = useAuth();
+    const { user } = useAuth();
     const userRole = user?.role;
 
     return (
@@ -127,9 +116,7 @@ const RequestActivityCard = ({
                             type="button"
                             variant={statusVariant[order.status]}
                             size="sm"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                            }}
+                            className="pointer-events-none"
                         >
                             {order.status}
                         </Button>
