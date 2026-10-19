@@ -1,6 +1,6 @@
 import type { Response } from "express";
-import { requesterOrderHistoryQuerySchema, updateRequestSchema,  } from "../schemas/order.requester.schema.js";
-import { getRequesterOrderHistoryService, updateRequestService } from "../services/order.requester.service.js";
+import { createRequestSchema, failRequestSchema, receiveRequestSchema, requesterOrderHistoryQuerySchema, updateRequestSchema, } from "../schemas/order.requester.schema.js";
+import { createRequestService, failRequestService, getRequesterOrderHistoryService, receiveRequestService, updateRequestService } from "../services/order.requester.service.js";
 import { AppError } from "../errors/errors.js";
 import type { AuthRequest } from "../types/auth.types.js";
 
@@ -35,10 +35,8 @@ export async function updateRequest(
     req: AuthRequest,
     res: Response
 ) {
-    const authorization = req.headers.authorization;
-    const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     const requesterId = req.user!.userId;
-    if (!accessToken || !requesterId) {
+    if (!requesterId) {
         throw new AppError("Authentication required", 401);
     }
 
@@ -53,7 +51,7 @@ export async function updateRequest(
     }
 
     const order = await updateRequestService(
-        requesterId, orderId, parsedBody.data, accessToken
+        requesterId, orderId, parsedBody.data
     );
 
     res.status(200).json({
@@ -61,3 +59,76 @@ export async function updateRequest(
         data: order,
     });
 };
+
+export async function createRequest(
+    req: AuthRequest,
+    res: Response,
+) {
+    const requesterId = req.user!.userId;
+    const requestBody = createRequestSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError(requestBody.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const order = await createRequestService(requesterId, requestBody.data);
+
+    res.status(201).json({
+        message: "Order created successfully",
+        data: order,
+    });
+};
+
+export async function receiveRequest(
+    req: AuthRequest,
+    res: Response
+) {
+    const requesterId = req.user!.userId;
+    if (!requesterId) {
+        throw new AppError("Authentication required", 401);
+    }
+
+    const orderId = req.params.orderId;
+    if (typeof orderId !== "string" || !orderId) {
+        throw new AppError("Order id is required", 400);
+    }
+
+    const requestBody = receiveRequestSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError(requestBody.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const order = await receiveRequestService(requesterId, orderId, requestBody.data);
+
+    res.status(200).json({
+        message: "Order marked as received successfully",
+        data: order,
+    });
+}
+
+export async function failRequest(
+    req: AuthRequest,
+    res: Response
+) {
+    const requesterId = req.user!.userId;
+    if (!requesterId) {
+        throw new AppError("Authentication required", 401);
+    }
+
+    const orderId = req.params.orderId;
+    if (typeof orderId !== "string" || !orderId) {
+        throw new AppError("Order id is required", 400);
+    }
+
+    const requestBody = failRequestSchema.safeParse(req.body);
+    if (!requestBody.success) {
+        throw new AppError(requestBody.error.issues.at(0)?.message || "Invalid request", 400);
+    }
+
+    const order = await failRequestService(requesterId, orderId, requestBody.data);
+
+    res.status(200).json({
+        message: "Order marked as failed successfully",
+        data: order,
+    });
+}
+

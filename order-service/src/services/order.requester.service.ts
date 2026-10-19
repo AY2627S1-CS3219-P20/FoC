@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { AppError } from "../errors/errors.js";
-import { OrderStatus } from "../generated/prisma/client.js";
+import { abortReservation, reserveCredits } from "../integrations/credit/credit.client.js";
+import { OrderEventType, OrderStatus } from "../generated/prisma/client.js";
 import { verifySupplierExists } from "../integrations/supplier/supplier.client.js";
 import { prisma } from "../libs/prisma.js";
-import type { RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
+import type { CreateRequestInput, FailRequestInput, ReceiveRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
+import type { ReservationPayload } from "../types/order.types.js";
 
 export async function getRequesterOrderHistoryService(
     requesterId: string,
@@ -41,7 +44,6 @@ export async function updateRequestService(
     requesterId: string,
     orderId: string,
     input: UpdateRequestInput,
-    accessToken: string
 ) {
     const { expectedVersion, ...changes } = input;
 
@@ -51,6 +53,19 @@ export async function updateRequestService(
 
     if (!existingOrder || existingOrder.requesterId !== requesterId) {
         throw new AppError("Order not found", 404);
+    }
+
+    // Compare the final pair, including whichever location wasn't changed.
+    const pickupSupplierId =
+        changes.pickupSupplierId ?? existingOrder.pickupSupplierId;
+    const deliverySupplierId =
+        changes.deliverySupplierId ?? existingOrder.deliverySupplierId;
+
+    if (pickupSupplierId === deliverySupplierId) {
+        throw new AppError(
+            "Pickup and delivery locations must be different",
+            400,
+        );
     }
 
     if (existingOrder.status !== OrderStatus.OPEN ||
@@ -63,10 +78,7 @@ export async function updateRequestService(
     }
 
     if (changes.pickupSupplierId) {
-        const pickupSupplierExists = await verifySupplierExists(
-            changes.pickupSupplierId,
-            accessToken
-        );
+        const pickupSupplierExists = await verifySupplierExists(changes.pickupSupplierId);
 
         if (!pickupSupplierExists) {
             throw new AppError("Pickup supplier does not exist", 400);
@@ -74,10 +86,7 @@ export async function updateRequestService(
     }
 
     if (changes.deliverySupplierId) {
-        const deliverySupplierExists = await verifySupplierExists(
-            changes.deliverySupplierId,
-            accessToken
-        );
+        const deliverySupplierExists = await verifySupplierExists(changes.deliverySupplierId);
         if (!deliverySupplierExists) {
             throw new AppError("Delivery supplier does not exist", 400);
         }
@@ -116,6 +125,287 @@ export async function updateRequestService(
 
         // Return the updated order
         return tx.order.findFirstOrThrow({
+            where: { id: orderId },
+        });
+    });
+};
+
+export async function createRequestService(
+    requesterId: string,
+    input: CreateRequestInput,
+) {
+    // 1. Validate the expiry date is in the future
+    if (input.expiryAt <= new Date()) {
+        throw new AppError("Expiry date must be in the future", 400);
+    }
+
+    // 2. Verify that the pickup and delivery suppliers exist
+    const [pickupSupplierExists, deliverySupplierExists] = await Promise.all([
+        verifySupplierExists(input.pickupSupplierId),
+        verifySupplierExists(input.deliverySupplierId)
+    ]);
+
+    if (!pickupSupplierExists) {
+        console.error(`Pickup supplier with ID ${input.pickupSupplierId} does not exist`);
+        throw new AppError("Pickup supplier does not exist", 404);
+    }
+
+    if (!deliverySupplierExists) {
+        console.error(`Delivery supplier with ID ${input.deliverySupplierId} does not exist`);
+        throw new AppError("Delivery supplier does not exist", 404);
+    }
+
+    // 3. Generate a new order ID 
+    const orderId = crypto.randomUUID();
+
+    const reservationInput: ReservationPayload = {
+        orderId,
+        requesterId,
+        amount: input.offeredCredits,
+    };
+
+    let reservationId: string | undefined;
+
+    // A timeout may happen after the credit service commits the reservation.
+    // Mark it as potentially reserved before making the request.
+    let reservationMayExist = false;
+    try {
+        // 4. Reserve credits for the order
+        reservationMayExist = true;
+        const reservationResult = await reserveCredits(reservationInput);
+        reservationId = reservationResult.id;
+
+        if (!reservationId) {
+            throw new AppError(
+                "Credit Service returned an invalid reservation",
+                502,
+            );
+        }
+
+        // 5. Create the order request + history + outbox entries atomically in a transaction
+        const orderRequest = await prisma.$transaction(async (tx) => {
+            const createOrder = await tx.order.create({
+                data: {
+                    id: orderId,
+                    requesterId: requesterId,
+                    courierId: null,
+                    name: input.name,
+                    description: input.description,
+                    pickupSupplierId: input.pickupSupplierId,
+                    deliverySupplierId: input.deliverySupplierId,
+                    offeredCredits: input.offeredCredits,
+                    remarks: input.remarks ?? null,
+                    expiryAt: input.expiryAt,
+                    status: OrderStatus.OPEN,
+                    version: 1,
+                    creditReservationId: reservationId!,
+                },
+            });
+
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: createOrder.id,
+                    fromStatus: null,
+                    toStatus: OrderStatus.OPEN,
+                    changedBy: requesterId,
+                    reason: null,
+                },
+            });
+
+            return createOrder;
+        });
+
+        return orderRequest;
+    } catch (error) {
+        if (reservationMayExist) {
+            let existingOrder;
+            try {
+                existingOrder = await prisma.order.findUnique({
+                    where: { id: orderId },
+                });
+            } catch (lookupError) {
+                console.error(`CRITICAL: Failed to look up order ${orderId} after reservation`, lookupError);
+                throw error; // Don't abort the reservation if we can't confirm the order's existence
+            }
+
+            if (existingOrder) {
+                return existingOrder;
+            }
+
+            // If the order was not created, attempt to abort the reservation
+            if (reservationId) {
+                try {
+                    console.error(`Attempting to abort reservation ${reservationId} for order ${orderId} due to order creation failure`);
+                    await abortReservation({ reservationId, ...reservationInput });
+                } catch (abortError) {
+                    console.error(`CRITICAL: Failed to abort reservation ${reservationId} for order ${orderId}`, abortError);
+                }
+            } else {
+                // The credit reservations may have timed out after committing the reservation,
+                // but its reservation ID was not returned. This needs a manual investigation to ensure the reservation is aborted.
+                console.error(`CRITICAL: Reservation may exist for order ${orderId} but no reservation ID was returned. Manual investigation required.`);
+            }
+        }
+
+        throw error;
+    }
+};
+
+export async function receiveRequestService(
+    requesterId: string,
+    orderId: string,
+    input: ReceiveRequestInput,
+) {
+    const existingOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+    });
+
+    // Ensure the order exists and belongs to the requester
+    if (!existingOrder || existingOrder.requesterId !== requesterId) {
+        throw new AppError("Order not found", 404);
+    }
+
+    // Only allow marking the order as received if it is in COMPLETED status and has a courier assigned.
+    if (existingOrder.status !== OrderStatus.COMPLETED || !existingOrder.courierId) {
+        throw new AppError("This order cannot be marked as received", 409);
+    }
+
+    const now = new Date();
+
+    return await prisma.$transaction(async (tx) => {
+        const updatedOrder = await tx.order.updateMany({
+            where: {
+                id: orderId,
+                requesterId: requesterId,
+                status: OrderStatus.COMPLETED,
+                courierId: existingOrder.courierId,
+                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+            },
+            data: {
+                status: OrderStatus.RECEIVED,
+                receivedAt: now,
+                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+            },
+        });
+
+        if (updatedOrder.count !== 1) {
+            throw new AppError("The request changed while being marked as received. Reload and try again.", 409);
+        }
+
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId: orderId,
+                fromStatus: OrderStatus.COMPLETED,
+                toStatus: OrderStatus.RECEIVED,
+                changedBy: requesterId,
+                reason: null
+            },
+        });
+
+        // The worker will use this eventId as RabbitMQ messageId.
+        // Credit service expects it to match the payload's eventId for idempotency.
+        const eventId = randomUUID();
+
+        await tx.outboxEvent.create({
+            data: {
+                id: eventId,
+                orderId: orderId,
+                eventType: OrderEventType.ORDER_RECEIVED,
+                payload: {
+                    eventId: eventId,
+                    eventType: OrderEventType.ORDER_RECEIVED,
+                    reservationId: existingOrder.creditReservationId,
+                    orderId: existingOrder.id,
+                    requesterId: existingOrder.requesterId,
+                    courierId: existingOrder.courierId,
+                    amount: existingOrder.offeredCredits,
+                },
+            },
+        });
+
+
+        return tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+        });
+    });
+};
+
+export async function failRequestService(
+    requesterId: string,
+    orderId: string,
+    input: FailRequestInput,
+) {
+    const existingOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+    });
+
+    // Ensure the order exists and belongs to the requester
+    if (!existingOrder || existingOrder.requesterId !== requesterId) {
+        throw new AppError("Order not found", 404);
+    }
+
+    // Only allow marking the order as failed if it is in COMPLETED status and has a courier assigned.
+    if (existingOrder.status !== OrderStatus.COMPLETED || !existingOrder.courierId) {
+        throw new AppError("This order cannot be marked as failed", 409);
+    }
+
+    if (!existingOrder.creditReservationId) {
+        throw new AppError("This order does not have a credit reservation to refund", 409);
+    }
+
+    const eventId = randomUUID();
+    const failedAt = new Date();
+
+    const eventPayload = {
+        eventId: eventId,
+        eventType: OrderEventType.ORDER_FAILED,
+        reservationId: existingOrder.creditReservationId,
+        orderId: existingOrder.id,
+        requesterId: existingOrder.requesterId,
+        amount: existingOrder.offeredCredits,
+    };
+
+    return prisma.$transaction(async (tx) => {
+        const updatedOrder = await tx.order.updateMany({
+            where: {
+                id: orderId,
+                requesterId: requesterId,
+                status: OrderStatus.COMPLETED,
+                courierId: existingOrder.courierId,
+                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+            },
+            data: {
+                status: OrderStatus.FAILED,
+                failedAt: failedAt,
+                failureReason: input.failureReason ?? null,
+                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+            },
+        });
+
+        if (updatedOrder.count !== 1) {
+            throw new AppError("The request changed while being marked as failed. Reload and try again.", 409);
+        }
+
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId: orderId,
+                fromStatus: OrderStatus.COMPLETED,
+                toStatus: OrderStatus.FAILED,
+                changedBy: requesterId,
+                reason: input.failureReason
+            },
+        });
+
+        await tx.outboxEvent.create({
+            data: {
+                id: eventId,
+                orderId: orderId,
+                eventType: OrderEventType.ORDER_FAILED,
+                payload: eventPayload,
+            },
+        });
+
+        return tx.order.findUniqueOrThrow({
             where: { id: orderId },
         });
     });

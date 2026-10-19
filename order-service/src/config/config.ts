@@ -28,6 +28,9 @@ const config = {
     supplierServiceUrl: getEnv("SUPPLIER_SERVICE_URL"),
     creditServiceUrl: getEnv("CREDIT_SERVICE_URL"),
     jwtPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH"),
+    orderCreditServiceToken: getEnv("ORDER_CREDIT_SERVICE_TOKEN"),
+    orderSupplierServiceToken: getEnv("ORDER_SUPPLIER_SERVICE_TOKEN"),
+    rabbitmqUrl: getEnv("RABBITMQ_URL"),
 };
 
 export default config;

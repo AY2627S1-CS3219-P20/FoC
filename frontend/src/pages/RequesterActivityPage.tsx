@@ -1,6 +1,7 @@
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CreateRequestDialog from "@/features/order/components/CreateRequestDialog";
 import RequestActivityCard from "@/features/order/components/RequestActivityCard";
 import { useRequesterOrderHistory } from "@/features/order/hooks/useRequesterOrderHistory";
 import { useSuppliersByIds } from "@/features/order/hooks/useSuppliersByIds";
@@ -55,9 +56,12 @@ const RequesterActivtyPage = () => {
     return (
         <>
             <div className="flex flex-col items-start justify-center gap-5 px-5 md:px-10 py-5 w-full">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-xl md:text-2xl font-bold">My Requester Activities</h1>
-                    <p className="text-sm text-muted-foreground">Click on any request to view its full details.</p>
+                <div className="flex flex-col md:flex-row items-start justify-between gap-4 w-full">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-xl md:text-2xl font-bold">My Requester Activities</h1>
+                        <p className="text-sm text-muted-foreground">Click on any request to view its full details.</p>
+                    </div>
+                    <CreateRequestDialog />
                 </div>
 
                 <Tabs value={selectedStatus} onValueChange={handleStatusChange} className="w-full">

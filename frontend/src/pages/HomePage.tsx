@@ -9,10 +9,15 @@ import { useOpenOrders } from "@/features/order/hooks/useOpenOrders";
 import { useSuppliersByIds } from "@/features/order/hooks/useSuppliersByIds";
 import { type SortBy, type SortOrder } from "@/features/order/types/order.types";
 import { useState } from "react";
+import CreateRequestDialog from "@/features/order/components/CreateRequestDialog";
+import useAuth from "@/hooks/useAuth";
+import { ROLES } from "@/features/auth/types/auth.types";
 
 const LIMIT = 15;
 
 const HomePage = () => {
+    const { user } = useAuth();
+    const isAdmin = user?.role === ROLES.ADMIN;
 
     const [page, setPage] = useState(1);
     const [sortBy, setSortBy] = useState<SortBy>("expiryAt");
@@ -55,16 +60,34 @@ const HomePage = () => {
     const isSuppliersLoading = supplierIds.length > 0 && suppliersQuery.isPending;
 
     const handleSearchKeyInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-            console.log(searchString)
-            setSearchString(event.target.value);
-        }
+        console.log(searchString)
+        setSearchString(event.target.value);
+    }
 
     return (
         <>
             <div className="flex flex-col items-start justify-center gap-5 px-5 md:px-10 py-5 w-full">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-xl md:text-2xl font-bold">{totalCount} Open Requests</h1>
-                    <p className="text-sm text-muted-foreground">Click on any request to view its full details.</p>
+                <div className="flex flex-col md:flex-row items-start justify-between gap-4 w-full">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-xl md:text-2xl font-bold">{totalCount} Open Requests</h1>
+                        <p className="text-sm text-muted-foreground">Click on any request to view its full details.</p>
+                    </div>
+                    {!isAdmin && <CreateRequestDialog />}
+                </div>
+
+                <div className="flex flex-col gap-1 w-full md:w-1/2">
+                    <Field className="w-full">
+                        <InputGroup className="bg-white">
+                            <InputGroupAddon align="inline-start">
+                                <SearchIcon />
+                            </InputGroupAddon>
+                            <InputGroupInput
+                                id="input-search-key"
+                                type="text"
+                                placeholder="Search for an open order"
+                                onChange={handleSearchKeyInput} />
+                        </InputGroup>
+                    </Field>
                 </div>
 
                 <div className="flex flex-wrap items-end gap-4">
@@ -121,21 +144,6 @@ const HomePage = () => {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <Field className="w-full">
-                            <InputGroup className="bg-white">
-                                <InputGroupAddon align="inline-start">
-                                    <SearchIcon />
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                    id="input-search-key"
-                                    type="text"
-                                    placeholder="Search for an open order"
-                                    onChange={handleSearchKeyInput} />
-                            </InputGroup>
-                        </Field>
                     </div>
                 </div>
 

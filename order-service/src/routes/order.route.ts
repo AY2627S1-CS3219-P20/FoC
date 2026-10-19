@@ -2,14 +2,15 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/authorize.middleware.js";
 import { Role } from "../types/auth.types.js";
-import { acceptOrder, 
-    completeOrder, 
-    dropOrder, 
-    getCourierOrderHistory, 
-    getOpenOrders, 
-    pickUpOrder 
+import {
+    acceptOrder,
+    completeOrder,
+    dropOrder,
+    getCourierOrderHistory,
+    getOpenOrders,
+    pickUpOrder
 } from "../controllers/order.courier.controller.js";
-import { getRequesterOrderHistory, updateRequest } from "../controllers/order.requester.controller.js";
+import { createRequest, failRequest, getRequesterOrderHistory, receiveRequest, updateRequest } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
 
@@ -18,7 +19,7 @@ orderRouter.use(authenticate);
 
 // ----------- Orders -----------
 // Create a new order
-// orderRouter.post("/");
+orderRouter.post("", authorize(Role.STUDENT), createRequest);
 
 // Get all orders with OPEN status 
 orderRouter.get("", getOpenOrders);
@@ -41,10 +42,10 @@ orderRouter.patch("/:orderId", authorize(Role.STUDENT), updateRequest);
 // orderRouter.post("/:orderId/cancellation");
 
 // Mark an order as received (by requester)
-// orderRouter.post("/:orderId/receipt");
+orderRouter.post("/:orderId/receipt", authorize(Role.STUDENT), receiveRequest);
 
 // Mark an order as failed (by requester)
-// orderRouter.post("/:orderId/failure");
+orderRouter.post("/:orderId/failure", authorize(Role.STUDENT), failRequest);
 
 // Mark an order as renewed (by requester)
 // orderRouter.post("/:orderId/renewal");

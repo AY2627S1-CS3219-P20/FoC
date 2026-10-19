@@ -10,7 +10,6 @@ import {
     updateSupplier,
     getSuppliers,
     getActiveSuppliers,
-    getSupplierById,
     getSuppliersByIds,
     deactivateSupplier
 } from "../controllers/supplier.controller.js";
@@ -48,9 +47,6 @@ supplierRouter.get("/active", getActiveSuppliers);
 
 // Query the suppliers by providing a list of supplier ids we want to retrieve (name, id, type) information for
 supplierRouter.get("/by-ids", getSuppliersByIds);
-
-// Get one supplier's (full) information by providing its supplier id
-supplierRouter.get("/:supplierId", getSupplierById);
 
 // Create a new supplier (by admin)
 supplierRouter.post("", authorize(Role.ADMIN), createSupplier);

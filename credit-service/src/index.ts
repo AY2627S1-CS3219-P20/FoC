@@ -8,7 +8,7 @@ import { AppError } from "./errors/errors.js";
 import creditRouter from "./routes/credit.route.js";
 import { prisma } from "./libs/prisma.js";
 import { startRegistrationConsumer } from "./services/registration-consumer.service.js";
-import { createInternalCreditRouter } from "./routes/internal-credit.route.js";
+import internalCreditRouter from "./routes/internal-credit.route.js";
 import { startSettlementConsumer } from "./services/settlement-consumer.service.js";
 
 const app = express();
@@ -20,8 +20,9 @@ app.use(
     }),
 );
 
-app.use("/internal/credits", createInternalCreditRouter(prisma, () => process.env.ORDER_CREDIT_SERVICE_TOKEN));
 app.use(express.json());
+
+app.use("/api/internal/credits", internalCreditRouter);
 
 // Health check endpoint
 app.get("/credits", (_req: Request, res: Response) => {

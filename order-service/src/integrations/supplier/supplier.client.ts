@@ -1,21 +1,21 @@
 import axios from "axios";
 import config from "../../config/config.js";
 import { AppError } from "../../errors/errors.js";
-import { createApiClient } from "../../libs/api-client.js";
 
-const SUPPLIER_SERVICE_URL = config.supplierServiceUrl;
+const supplierApi = axios.create({
+    baseURL: config.supplierServiceUrl,
+    timeout: 5_000,
+    headers: {
+        "X-Order-Supplier-Service-Secret":
+            config.orderSupplierServiceToken,
+    },
+});
 
 export async function verifySupplierExists(
     supplierId: string,
-    accessToken: string
 ): Promise<boolean> {
-    const ApiClient = createApiClient(
-        SUPPLIER_SERVICE_URL,
-        accessToken
-    );
-
     try {
-        await ApiClient.get(`/api/suppliers/${supplierId}`);
+        await supplierApi.get(`/api/internal/suppliers/${supplierId}`);
         return true;
     } catch (error) {
         if (axios.isAxiosError(error)) {

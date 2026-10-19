@@ -2,13 +2,7 @@ import type { RequesterOrderHistoryParams, RequesterOrderHistoryResponse } from 
 import { useQuery } from "@tanstack/react-query";
 import { getRequesterOrderHistoryService } from "@/features/order/services/order.requester.service";
 import type { ParsedError } from "@/utils/errorHandler";
-
-export const requesterOrderHistoryQueryKeys = {
-    all: ["requesterOrderHistory"] as const,
-    history: (params: RequesterOrderHistoryParams) =>
-        [...requesterOrderHistoryQueryKeys.all, "history", params] as const,
-    completed: () => [...requesterOrderHistoryQueryKeys.all, "completed"] as const,
-};
+import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 
 export const useRequesterOrderHistory = (
     params: RequesterOrderHistoryParams

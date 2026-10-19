@@ -1,4 +1,16 @@
+import type { ButtonProps } from "@/components/ui/button";
 import type { CreateRequestFormData } from "../schemas/create-request.schema";
+
+export const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
+    OPEN: "teal",
+    ACCEPTED: "sky",
+    PICKED_UP: "yellow",
+    COMPLETED: "indigo200",
+    RECEIVED: "green",
+    CANCELED: "gray",
+    FAILED: "red",
+    EXPIRED: "orange",
+};
 
 export const ORDER_STATUSES = [
     "OPEN",
@@ -123,4 +135,25 @@ export type UpdateRequestPayload = {
     orderId: string;
     expectedVersion: number;
     payload: CreateRequestFormData;
+}
+
+export interface CreateRequestPayload {
+    name: string;
+    description: string;
+    pickupSupplierId: string;
+    deliverySupplierId: string;
+    offeredCredits: number;
+    expiryAt: string;
+    remarks: string;
+}
+
+export type ReceiveRequestPayload = {
+    orderId: string;
+    expectedVersion: number;
+}
+
+export type FailRequestPayload = {
+    orderId: string;
+    expectedVersion: number;
+    failureReason: string;
 }
