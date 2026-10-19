@@ -329,6 +329,7 @@ const RequestActivityDetailsDialog = ({
                         </FieldGroup>
                     )}
 
+                    {/* Show the current status of the order */}
                     <div className="flex flex-col gap-0.5">
                         <p className="text-sm font-medium">Current status</p>
                         <Button
@@ -340,6 +341,23 @@ const RequestActivityDetailsDialog = ({
                         </Button>
                     </div>
 
+                    {/* Show the failure reason if the order has failed */}
+                    {order.failureReason && (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-medium">Failure reason</p>
+                            <p className="text-sm text-muted-foreground text-wrap">{order.failureReason}</p>
+                        </div>
+                    )}
+
+                    {/* Show the cancellation reason if the order is cancelled */}
+                    {order.cancellationReason && (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-medium">Cancellation reason</p>
+                            <p className="text-sm text-muted-foreground text-wrap">{order.cancellationReason}</p>
+                        </div>
+                    )}
+
+                    {/* Show the details of the related person (requester or courier) */}
                     <div className="space-y-2 border-t pt-4">
                         <p className="font-medium text-base">{relatedPersonLabel} Details</p>
 
