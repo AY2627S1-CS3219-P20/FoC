@@ -99,3 +99,22 @@ export const failedRequestService = async (
         throw parseError(error);
     }
 };
+
+export async function cancelRequestService(
+    orderId: string,
+    payload: {
+        expectedVersion: number;
+        cancellationReason?: string;
+    },
+): Promise<Order> {
+    try {
+        const response = await orderApi.post<ApiResponse<Order>>(
+            ENDPOINTS.order.cancelRequest(orderId),
+            payload,
+        );
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+}

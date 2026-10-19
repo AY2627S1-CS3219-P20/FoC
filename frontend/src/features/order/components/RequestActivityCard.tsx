@@ -24,13 +24,19 @@ const RequestActivityCard = ({
     order, isEditable, isAcceptable, viewerRole,
     pickupSupplierName, deliverySupplierName, isSuppliersLoading
 }: RequestActivityCardProps) => {
-    const canEdit = isEditable ?? !order.courierId;
+    const canEditRequest =
+        (isEditable ?? true) &&
+        viewerRole === "requester" &&
+        order.status === "OPEN" &&
+        order.courierId === null;
+
     const canAccept = isAcceptable ?? false;
     const [open, setOpen] = useState(false);
     const editableStatuses: Partial<Record<OrderStatus, ViewerRole>> = {
         "ACCEPTED": "courier",
         "PICKED_UP": "courier",
-        "COMPLETED": "requester"
+        "COMPLETED": "requester",
+        "OPEN": "requester",
     };
     const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
     const [openStatusUpdateDialog, setOpenStatusUpdateDialog] = useState(false);
@@ -128,7 +134,7 @@ const RequestActivityCard = ({
                 order={order}
                 open={open}
                 onOpenChange={setOpen}
-                canEdit={canEdit}
+                canEditRequest={canEditRequest}
                 canAccept={canAccept && userRole == ROLES.STUDENT}
                 viewerRole={viewerRole}
                 pickupSupplierName={pickupSupplierName}
@@ -138,6 +144,7 @@ const RequestActivityCard = ({
 
             <StatusUpdateDialog
                 order={order}
+                viewerRole={viewerRole}
                 open={openStatusUpdateDialog}
                 onOpenChange={setOpenStatusUpdateDialog}
             />

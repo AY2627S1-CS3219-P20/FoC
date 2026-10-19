@@ -10,7 +10,7 @@ import {
     getOpenOrders,
     pickUpOrder
 } from "../controllers/order.courier.controller.js";
-import { createRequest, failRequest, getRequesterOrderHistory, receiveRequest, updateRequest } from "../controllers/order.requester.controller.js";
+import { cancelRequest, createRequest, failRequest, getRequesterOrderHistory, receiveRequest, updateRequest } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
 
@@ -39,7 +39,7 @@ orderRouter.patch("/:orderId", authorize(Role.STUDENT), updateRequest);
 
 // ----------- Order lifecycle -----------
 // Cancel an order (by requester)
-// orderRouter.post("/:orderId/cancellation");
+orderRouter.post("/:orderId/cancellation", authorize(Role.STUDENT), cancelRequest);
 
 // Mark an order as received (by requester)
 orderRouter.post("/:orderId/receipt", authorize(Role.STUDENT), receiveRequest);

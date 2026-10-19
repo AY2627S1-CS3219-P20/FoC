@@ -25,7 +25,7 @@ type RequestActivityDetailsDialogProps = {
     order: Order;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    canEdit: boolean;
+    canEditRequest: boolean;
     canAccept: boolean;
     viewerRole: ViewerRole;
     pickupSupplierName?: string;
@@ -50,7 +50,7 @@ const RequestActivityDetailsDialog = ({
     order,
     open,
     onOpenChange,
-    canEdit,
+    canEditRequest,
     canAccept,
     viewerRole,
     pickupSupplierName,
@@ -126,7 +126,7 @@ const RequestActivityDetailsDialog = ({
                     }}
                     className="flex flex-col gap-4"
                 >
-                    {!canEdit || !isEditing ? (
+                    {!canEditRequest || !isEditing ? (
                         <div className="space-y-4">
                             <DetailText
                                 label="Request name"
@@ -329,6 +329,7 @@ const RequestActivityDetailsDialog = ({
                         </FieldGroup>
                     )}
 
+                    {/* Show the current status of the order */}
                     <div className="flex flex-col gap-0.5">
                         <p className="text-sm font-medium">Current status</p>
                         <Button
@@ -340,6 +341,23 @@ const RequestActivityDetailsDialog = ({
                         </Button>
                     </div>
 
+                    {/* Show the failure reason if the order has failed */}
+                    {order.failureReason && (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-medium">Failure reason</p>
+                            <p className="text-sm text-muted-foreground text-wrap">{order.failureReason}</p>
+                        </div>
+                    )}
+
+                    {/* Show the cancellation reason if the order is cancelled */}
+                    {order.cancellationReason && (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-medium">Cancellation reason</p>
+                            <p className="text-sm text-muted-foreground text-wrap">{order.cancellationReason}</p>
+                        </div>
+                    )}
+
+                    {/* Show the details of the related person (requester or courier) */}
                     <div className="space-y-2 border-t pt-4">
                         <p className="font-medium text-base">{relatedPersonLabel} Details</p>
 
@@ -364,7 +382,7 @@ const RequestActivityDetailsDialog = ({
                         ) : null}
                     </div>
 
-                    {canEdit && (
+                    {canEditRequest && (
                         <div className="flex justify-end gap-2">
                             {isEditing ? (
                                 <>

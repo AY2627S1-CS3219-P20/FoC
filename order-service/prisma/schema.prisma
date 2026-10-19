@@ -67,7 +67,7 @@ model Order {
   pickedUpAt  DateTime? @db.Timestamptz(6)
   completedAt DateTime? @db.Timestamptz(6)
   receivedAt  DateTime? @db.Timestamptz(6)
-  cancelledAt DateTime? @db.Timestamptz(6)
+  canceledAt  DateTime? @db.Timestamptz(6)
   expiredAt   DateTime? @db.Timestamptz(6)
   failedAt    DateTime? @db.Timestamptz(6)
 

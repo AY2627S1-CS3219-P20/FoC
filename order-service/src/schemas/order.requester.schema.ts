@@ -83,3 +83,11 @@ export const failRequestSchema = z.object({
         .max(1500, "Failure reason must be less than 1500 characters")
 });
 export type FailRequestInput = z.infer<typeof failRequestSchema>;
+
+export const cancelRequestSchema = z.object({
+    expectedVersion: z.number().int().positive(),
+    cancellationReason: z.string().trim()
+        .max(1500, "Cancellation reason must be less than 1500 characters")
+        .optional(),
+});
+export type CancelRequestInput = z.infer<typeof cancelRequestSchema>;

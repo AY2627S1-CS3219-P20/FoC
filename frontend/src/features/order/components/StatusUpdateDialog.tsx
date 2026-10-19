@@ -8,34 +8,43 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ORDER_STATUSES, type Order, type OrderStatus } from "../types/order.types";
-import { updateStatusSchema, type UpdateStatusFormInput } from "../schemas/update-status.schema";
+import { type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
+import { updateStatusSchema, type UpdateStatusFormData, type UpdateStatusFormInput } from "../schemas/update-status.schema";
 import useDropRequest from "../hooks/useDropRequest";
 import usePickUpRequest from "../hooks/usePickUpRequest";
 import useCompleteRequest from "../hooks/useCompleteRequest";
 import useReceiveRequest from "../hooks/useReceiveRequest";
 import useFailRequest from "../hooks/useFailRequest";
 import { Textarea } from "@/components/ui/textarea";
+import useCancelRequest from "../hooks/useCancelRequest";
 
 type StatusUpdateDialogProps = {
     order: Order;
+    viewerRole: ViewerRole;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 };
 
 const StatusUpdateDialog = ({
     order,
+    viewerRole,
     open,
     onOpenChange
 }: StatusUpdateDialogProps) => {
     // mapping for what the next status can be, given the current status
-    const STATUS_UPDATES: Partial<Record<OrderStatus, OrderStatus[]>> = {
-        "ACCEPTED": ["CANCELED", "PICKED_UP"],
-        "PICKED_UP": ["COMPLETED"],
-        "COMPLETED": ["RECEIVED", "FAILED"],
-    };
+    const STATUS_UPDATES: Partial<Record<OrderStatus, OrderStatus[]>> =
+        viewerRole === "courier"
+            ? {
+                ACCEPTED: ["OPEN", "PICKED_UP"], // OPEN means drop acceptance
+                PICKED_UP: ["COMPLETED"],
+            }
+            : {
+                OPEN: ["CANCELED"],
+                COMPLETED: ["RECEIVED", "FAILED"],
+            };
 
     const PRETTY_PRINT_OPTIONS: Partial<Record<OrderStatus, string>> = {
+        "OPEN": "Drop order",
         "PICKED_UP": "Pick up order",
         "CANCELED": "Cancel order",
         "COMPLETED": "Complete order",
@@ -62,8 +71,17 @@ const StatusUpdateDialog = ({
     const { completeRequest, isPending: isCompleting } = useCompleteRequest();
     const { receiveRequest, isPending: isReceiving } = useReceiveRequest();
     const { failRequest, isPending: isFailing } = useFailRequest();
+    const { cancelRequest, isPending: isCanceling } = useCancelRequest();
 
-    const updateStatus = async (order: Order, newStatus: OrderStatus, failureReason: string) => {
+    const updateStatus = async (
+        order: Order,
+        payload: UpdateStatusFormData
+    ) => {
+        const { newStatus, failureReason, cancellationReason } = payload;
+        if (!newStatus) {
+            return;
+        }
+
         const currentStatus = order.status;
         const allowedNextStatuses = STATUS_UPDATES[currentStatus] ?? [];
 
@@ -72,23 +90,38 @@ const StatusUpdateDialog = ({
             return;
         }
 
-        if (newStatus === ORDER_STATUSES[2]) { // new status is "PICKED_UP"
-            await pickUpRequest(order.id);
-            return;
-        } else if (newStatus === ORDER_STATUSES[3]) { // new status is "COMPLETED"
-            await completeRequest(order.id);
-            return;
-        } else if (newStatus === ORDER_STATUSES[5]) { // new status is "CANCELED"
+        if (newStatus === "OPEN") {
+            // Courier drops the acceptance: ACCEPTED -> OPEN
             await dropRequest(order.id);
             return;
-        } else if (newStatus === ORDER_STATUSES[4]) { // new status is "RECEIVED"
+        } else if (newStatus === "PICKED_UP") {
+            // Courier picks up the order: ACCEPTED -> PICKED_UP
+            await pickUpRequest(order.id);
+            return;
+        } else if (newStatus === "COMPLETED") {
+            // Courier completes the order: PICKED_UP -> COMPLETED
+            await completeRequest(order.id);
+            return;
+        } else if (newStatus === "CANCELED") {
+            // Requester cancels the order: OPEN -> CANCELED
+            await cancelRequest({
+                orderId: order.id,
+                expectedVersion: order.version,
+                cancellationReason: cancellationReason
+            });
+            return;
+        } else if (newStatus === "RECEIVED") {
+            // Requester receives the order: COMPLETED -> RECEIVED
             await receiveRequest({
                 orderId: order.id, expectedVersion: order.version
             });
             return;
-        } else if (newStatus === ORDER_STATUSES[6]) { // new status is "FAILED"
+        } else if (newStatus === "FAILED") {
+            // Requester fails the order: COMPLETED -> FAILED
             await failRequest({
-                orderId: order.id, expectedVersion: order.version, failureReason
+                orderId: order.id,
+                expectedVersion: order.version,
+                failureReason: failureReason
             });
             return;
         }
@@ -100,6 +133,7 @@ const StatusUpdateDialog = ({
     const defaultValues: UpdateStatusFormInput = {
         newStatus: undefined,
         failureReason: "",
+        cancellationReason: undefined,
     };
 
     const form = useForm({
@@ -112,7 +146,7 @@ const StatusUpdateDialog = ({
 
             if (!payload.newStatus) return;
 
-            await updateStatus(order, payload.newStatus, payload.failureReason);
+            await updateStatus(order, payload);
             closeDialog(false);
         },
     });
@@ -162,12 +196,21 @@ const StatusUpdateDialog = ({
                                                 field.handleChange(value as OrderStatus);
                                             }}
                                         >
-                                            <SelectTrigger className="w-full! md:w-48! bg-white" aria-invalid={isInvalid}>
-                                                <SelectValue placeholder="Select an option" />
+                                            <SelectTrigger
+                                                className="w-full! md:w-48! bg-white"
+                                                aria-invalid={isInvalid}
+                                            >
+                                                <SelectValue placeholder="Select an option">
+                                                    {field.state.value
+                                                        ? PRETTY_PRINT_OPTIONS[field.state.value] ?? field.state.value
+                                                        : undefined}
+                                                </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent alignItemWithTrigger={false}>
                                                 {STATUS_UPDATES[order.status]?.map((value) => (
-                                                    <SelectItem key={value} value={value}>{PRETTY_PRINT_OPTIONS[value]}</SelectItem>
+                                                    <SelectItem key={value} value={value}>
+                                                        {PRETTY_PRINT_OPTIONS[value]}
+                                                    </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -209,6 +252,38 @@ const StatusUpdateDialog = ({
                                 ) : null
                             }
                         </form.Subscribe>
+                        <form.Subscribe selector={state => state.values.newStatus}>
+                            {newStatus =>
+                                newStatus === "CANCELED" ? (
+                                    <form.Field
+                                        name="cancellationReason"
+                                        children={field => {
+                                            const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+                                            return (
+                                                <Field>
+                                                    <FieldLabel htmlFor={field.name} className="font-bold">
+                                                        Cancellation reason (optional):
+                                                    </FieldLabel>
+                                                    <Textarea
+                                                        id={field.name}
+                                                        name={field.name}
+                                                        value={field.state.value}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={event =>
+                                                            field.handleChange(event.target.value)
+                                                        }
+                                                        aria-invalid={isInvalid}
+                                                        placeholder="Add a reason for cancelling"
+                                                    />
+                                                    {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
+
+                                                </Field>
+                                            );
+                                        }}
+                                    />
+                                ) : null
+                            }
+                        </form.Subscribe>
                     </FieldGroup>
 
                     <div className="flex justify-end gap-2">
@@ -222,7 +297,7 @@ const StatusUpdateDialog = ({
                         <Button
                             type="submit"
                             variant="indigo"
-                            isLoading={isDropping || isPickingUp || isCompleting || isReceiving || isFailing}>
+                            isLoading={isDropping || isPickingUp || isCompleting || isReceiving || isFailing || isCanceling}>
                             Confirm
                         </Button>
                     </div>
