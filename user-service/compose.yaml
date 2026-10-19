@@ -1,0 +1,48 @@
+services:
+  # Source: Docker Hub Official Postgres Image — https://hub.docker.com/_/postgres
+  user-postgres:
+    image: postgres:17
+    restart: unless-stopped
+    # Local Prisma Studio access; remove for the final isolated deployment.
+    ports:
+      - "127.0.0.1:5434:5432"
+    networks:
+      - internal-network
+    environment:
+      POSTGRES_DB: ${USER_POSTGRES_DB:?Set USER_POSTGRES_DB in user-service/.env}
+      POSTGRES_USER: ${USER_POSTGRES_USER:?Set USER_POSTGRES_USER in user-service/.env}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD:?Set USER_POSTGRES_PASSWORD in user-service/.env}
+    volumes:
+      - user_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 2s
+      retries: 20
+
+  user-service:
+    build: .
+    restart: unless-stopped
+    # Local browser testing; remove when the frontend proxy is added.
+    ports:
+      - "${PORT:?Set PORT in user-service/.env}:${PORT}"
+    networks:
+      - internal-network
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${USER_POSTGRES_USER}:${USER_POSTGRES_PASSWORD}@user-postgres:5432/${USER_POSTGRES_DB}?sslmode=disable
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+    volumes:
+      - ./keys/private.pem:/app/keys/private.pem:ro
+      - ./keys/public.pem:/app/keys/public.pem:ro
+    depends_on:
+      user-postgres:
+        condition: service_healthy
+
+volumes:
+  user_postgres_data:
+
+networks:
+  # Outbound access remains available for Brevo SMTP.
+  internal-network:

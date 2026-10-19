@@ -1,11 +1,22 @@
 include:
-- supplier-service/compose.yml
+  - supplier-service/compose.yml
+  - user-service/compose.yaml
 
 services:
+  # RabbitMQ is shared; keep its startup dependency at the root.
+  user-service:
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   rabbitmq:
+    # Source: Docker Hub Official RabbitMQ Image — https://hub.docker.com/_/rabbitmq
     image: rabbitmq:4.2-management
     hostname: foc-rabbitmq
     restart: unless-stopped
+    networks:
+      - default
+      - internal-network
     environment:
       RABBITMQ_NODENAME: rabbit@foc-rabbitmq
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-foc}
