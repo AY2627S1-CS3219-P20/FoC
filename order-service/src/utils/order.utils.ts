@@ -15,7 +15,7 @@ export async function updateExpiredOrders() {
         // update rows in the Order table
         const ordersUpdated = await tx.order.updateManyAndReturn({
             where: {
-                status: { notIn: [STATUS.RECEIVED, STATUS.CANCELED, STATUS.FAILED, STATUS.EXPIRED] },
+                status: { notIn: [STATUS.RECEIVED, STATUS.CANCELED, STATUS.FAILED, STATUS.EXPIRED] }, // exclude STATUS.COMPLETED so that credits can be released if time >= expiry and an order has already been completed
                 expiryAt: {
                     lte: now, // currently past the expired time (expiry time <= current time), need to update
                 }
@@ -34,7 +34,7 @@ export async function updateExpiredOrders() {
             const transactionRecord = await tx.orderStatusHistory.create({
                 data: {
                     orderId: order.id,
-                    fromStatus: STATUS.OPEN,
+                    fromStatus: order.status,
                     toStatus: STATUS.EXPIRED, 
                     changedBy: null // indicate system update with null
                 }
