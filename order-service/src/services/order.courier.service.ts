@@ -124,11 +124,12 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
         const updatedOrder = await tx.order.update({
             where: {
                 id: order.id,
+                version: order.version // ensure the version has remained unchanged since we last queried
             }, 
             data: {
                 courierId: courierId,
                 status: newStatus,
-                version: order.version + 1,
+                version: { increment: 1 },
                 acceptedAt: now // record time when order was accepted (F3.2.2)
             }
         });
@@ -142,7 +143,7 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
         const transactionRecord = await tx.orderStatusHistory.create({
             data: {
                 orderId: updatedOrder.id,
-                fromStatus: STATUS.ACCEPTED,
+                fromStatus: oldStatus,
                 toStatus: newStatus, 
                 changedBy: courierId
             }
@@ -194,10 +195,11 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
         const updatedOrder = await tx.order.update({
             where: {
                 id: order.id,
+                version: order.version // ensure the version has remained unchanged since we last queried
             }, 
             data: {
                 status: newStatus,
-                version: order.version + 1,
+                version: { increment: 1 },
                 pickedUpAt: now // record time when order was accepted (F4.2.1)
             }
         });
@@ -263,10 +265,11 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
         const updatedOrder = await tx.order.update({
             where: {
                 id: order.id,
+                version: order.version // ensure the version has remained unchanged since we last queried
             }, 
             data: {
                 status: newStatus,
-                version: order.version + 1,
+                version: { increment: 1 },
                 completedAt: now // record time when order was accepted (F5.2.1)
             }
         });
@@ -330,11 +333,12 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
         const updatedOrder = await tx.order.update({
             where: {
                 id: order.id,
+                version: order.version // ensure the version has remained unchanged since we last queried
             }, 
             data: {
                 courierId: null, // remove courier (F7.2)
                 status: newStatus, // change to OPEN status (F7.2.1)
-                version: order.version + 1,
+                version: { increment: 1 },
                 acceptedAt: null, // reset acceptedAt timestamp
             }
         });
