@@ -68,9 +68,11 @@ export async function updateRequestService(
         );
     }
 
-    if (existingOrder.status !== OrderStatus.OPEN ||
-        existingOrder.courierId !== null) {
-        throw new AppError("This order can no longer be edited", 400);
+    // Ensure the order is in OPEN status and has no courier assigned before allowing it to be updated
+    if (existingOrder.status !== OrderStatus.OPEN || existingOrder.courierId !== null) {
+        throw new AppError(
+            "This request has already been accepted and cannot be updated",
+            409);
     }
 
     if (changes.expiryAt && changes.expiryAt <= new Date()) {
@@ -265,12 +267,34 @@ export async function receiveRequestService(
         throw new AppError("Order not found", 404);
     }
 
-    // Only allow marking the order as received if it is in COMPLETED status and has a courier assigned.
+    // Ensure the order is in COMPLETED status and has a courier assigned before allowing it to be marked as received
     if (existingOrder.status !== OrderStatus.COMPLETED || !existingOrder.courierId) {
-        throw new AppError("This order cannot be marked as received", 409);
+        throw new AppError(
+            "The courier must complete the request before you can mark it as received",
+            409,
+        );
     }
 
-    const now = new Date();
+    // Ensure the order has a credit reservation before allowing it to be marked as received
+    if (!existingOrder.creditReservationId) {
+        throw new AppError(
+            "This request has no credit reservation to transfer to the courier",
+            409,
+        );
+    }
+
+    const eventId = randomUUID();
+    const receivedAt = new Date();
+
+    const eventPayload = {
+        eventId: eventId,
+        eventType: OrderEventType.ORDER_RECEIVED,
+        reservationId: existingOrder.creditReservationId,
+        orderId: existingOrder.id,
+        requesterId: existingOrder.requesterId,
+        courierId: existingOrder.courierId,
+        amount: existingOrder.offeredCredits,
+    };
 
     return await prisma.$transaction(async (tx) => {
         const updatedOrder = await tx.order.updateMany({
@@ -283,7 +307,7 @@ export async function receiveRequestService(
             },
             data: {
                 status: OrderStatus.RECEIVED,
-                receivedAt: now,
+                receivedAt: receivedAt,
                 version: { increment: 1 }, // Increment the version for optimistic concurrency control
             },
         });
@@ -302,24 +326,12 @@ export async function receiveRequestService(
             },
         });
 
-        // The worker will use this eventId as RabbitMQ messageId.
-        // Credit service expects it to match the payload's eventId for idempotency.
-        const eventId = randomUUID();
-
         await tx.outboxEvent.create({
             data: {
                 id: eventId,
                 orderId: orderId,
                 eventType: OrderEventType.ORDER_RECEIVED,
-                payload: {
-                    eventId: eventId,
-                    eventType: OrderEventType.ORDER_RECEIVED,
-                    reservationId: existingOrder.creditReservationId,
-                    orderId: existingOrder.id,
-                    requesterId: existingOrder.requesterId,
-                    courierId: existingOrder.courierId,
-                    amount: existingOrder.offeredCredits,
-                },
+                payload: eventPayload,
             },
         });
 
@@ -344,11 +356,15 @@ export async function failRequestService(
         throw new AppError("Order not found", 404);
     }
 
-    // Only allow marking the order as failed if it is in COMPLETED status and has a courier assigned.
+    // Ensure the order is in COMPLETED status and has a courier assigned before allowing it to be marked as failed
     if (existingOrder.status !== OrderStatus.COMPLETED || !existingOrder.courierId) {
-        throw new AppError("This order cannot be marked as failed", 409);
+        throw new AppError(
+            "The courier must complete the request before you can mark it as failed",
+            409,
+        );
     }
 
+    // Ensure the order has a credit reservation before allowing it to be marked as failed
     if (!existingOrder.creditReservationId) {
         throw new AppError("This order does not have a credit reservation to refund", 409);
     }
@@ -377,7 +393,7 @@ export async function failRequestService(
             data: {
                 status: OrderStatus.FAILED,
                 failedAt: failedAt,
-                failureReason: input.failureReason ?? null,
+                failureReason: input.failureReason,
                 version: { increment: 1 }, // Increment the version for optimistic concurrency control
             },
         });
