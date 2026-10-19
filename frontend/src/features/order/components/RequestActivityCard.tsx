@@ -108,7 +108,7 @@ const RequestActivityCard = ({
                                 setOpenStatusUpdateDialog(true);
                             }}
                         >
-                            <PencilIcon className="size-4 shrink-0 text-slate-500" />
+                            <PencilIcon className="shrink-0" />
                             {order.status}
                         </Button>
                     ) : (

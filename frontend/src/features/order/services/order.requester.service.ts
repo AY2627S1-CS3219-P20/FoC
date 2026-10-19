@@ -69,3 +69,33 @@ export const createRequestService = async (
         throw parseError(error);
     }
 };
+
+export const receiveRequestService = async (
+    orderId: string,
+    expectedVersion: number
+): Promise<Order> => {
+    try {
+        const response = await orderApi.post<ApiResponse<Order>>(
+            ENDPOINTS.order.receiveRequest(orderId),
+            { expectedVersion }
+        );
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};
+
+export const failedRequestService = async (
+    orderId: string,
+    payload: { expectedVersion: number, failureReason: string }
+): Promise<Order> => {
+    try {
+        const response = await orderApi.post<ApiResponse<Order>>(
+            ENDPOINTS.order.failedRequest(orderId),
+            payload
+        );
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+};

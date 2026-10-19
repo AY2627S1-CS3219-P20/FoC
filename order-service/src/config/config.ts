@@ -30,6 +30,7 @@ const config = {
     jwtPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH"),
     orderCreditServiceToken: getEnv("ORDER_CREDIT_SERVICE_TOKEN"),
     orderSupplierServiceToken: getEnv("ORDER_SUPPLIER_SERVICE_TOKEN"),
+    rabbitmqUrl: getEnv("RABBITMQ_URL"),
 };
 
 export default config;
