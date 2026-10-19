@@ -839,6 +839,88 @@ Refresh tokens:
 - Are rotated when a new access token is issued.
 - Cannot be reused after being revoked.
 
+## Docker (local demo)
+
+Build from the repository root:
+
+```sh
+docker build -t foc-user-service ./user-service
+```
+
+The `builder` stage installs locked dependencies with `npm ci`, generates
+Prisma Client, and compiles TypeScript. The `production` stage contains the
+compiled application and production dependencies. It uses the base image's
+default root user for this demo. Prisma remains a production dependency because the entrypoint
+runs `prisma migrate deploy` before starting `node dist/index.js`.
+
+Copy `.env.example` to `.env` inside `user-service` and fill in the values.
+For the localhost HTTP demo, keep `PORT=3000` and `NODE_ENV=development` as
+in the example, and use database/broker URLs reachable from the container.
+The image still runs the compiled application. `localhost` inside the container refers
+to that container; use Compose service names for containerized dependencies,
+or `host.docker.internal` for services running on your Docker Desktop host.
+Use `sslmode=disable` for a local PostgreSQL server without TLS.
+
+Supply the environment file at runtime and mount `keys/` read-only at
+`/app/keys`. The existing relative JWT paths then work unchanged. Database
+credentials, Brevo credentials, and JWT keys are not included in the image.
+Brevo remains an external SMTP service; User needs outbound access to it.
+
+`compose.yaml` in this directory defines User Service and its own PostgreSQL
+container, database healthcheck, and named storage volume. Fill in
+`USER_POSTGRES_DB`, `USER_POSTGRES_USER`, and `USER_POSTGRES_PASSWORD` in `.env`.
+Use a URL-safe database username/password (a randomly generated hex password
+works). Compose supplies the container database URL and JWT key paths.
+
+The root `compose.yaml` includes this file alongside Supplier's Compose file
+and supplies shared RabbitMQ. Set `RABBITMQ_URL` in this service's `.env` to use
+the `rabbitmq` hostname and credentials matching the root broker configuration.
+From the repository root, start just User and its dependencies with:
+
+```sh
+docker compose up -d --build user-service
+docker compose logs user-service
+```
+
+User waits for healthy PostgreSQL and RabbitMQ when started from the root.
+For local browser testing, its API is published at `http://localhost:3000`
+(using `PORT` from `.env`). PostgreSQL is published on loopback port 5434
+for local Studio access. Remove these development port mappings for the
+final isolated deployment. You can also check HTTP
+from inside the container:
+
+```sh
+docker compose exec user-service node -e "fetch('http://localhost:3000/user').then(r => r.text()).then(console.log)"
+```
+
+Running `docker compose up -d --build` inside `user-service` starts only User
+and PostgreSQL; RabbitMQ must be reachable separately for event publishing.
+Stopping, restarting, or recreating containers preserves database data in
+`user_postgres_data`; `docker compose down -v` deletes that volume.
+Failed migrations stop startup instead of serving against an incorrect schema.
+`GET /user` is a liveness endpoint, not a dependency check.
+
+Refresh cookies retain the original behavior: `secure` is enabled when
+`NODE_ENV=production`. They remain HttpOnly and signed.
+
+### Local Prisma Studio
+
+For local development, PostgreSQL is published only on `127.0.0.1:5434`.
+Set `DATABASE_URL` in `user-service/.env` to
+`postgresql://USER:PASSWORD@localhost:5434/DATABASE?sslmode=disable`, using
+the same credentials and database as `USER_POSTGRES_*`. Compose overrides
+this URL inside the API container to use `user-postgres:5432`.
+
+With the database container running, open Studio on your laptop:
+
+```sh
+cd user-service
+npx prisma studio
+```
+
+Studio accesses the existing container database and its persisted records.
+Remove PostgreSQL's host port mapping for the final isolated deployment.
+
 ## Acknowledgements
 
 - [Express](https://expressjs.com/)
