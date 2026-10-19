@@ -3,17 +3,18 @@ import { ORDER_STATUSES } from "../types/order.types";
 
 export const updateStatusSchema = z.object({
     newStatus: z.enum(ORDER_STATUSES).optional(),
-    failureReason: z.string().trim().max(
-        1500,
-        "Failure reason must be less than 1500 characters"
-    )
+    failureReason: z.string().trim()
+        .max(1500, "Failure reason must be less than 1500 characters"),
+    cancellationReason: z.string().trim()
+        .max(1500, "Cancellation reason must be less than 1500 characters")
+        .optional(),
 }).superRefine((value, ctx) => {
     // If the new status is not provided, then it's an error
     if (!value.newStatus) {
         ctx.addIssue({
             code: "custom",
             path: ["newStatus"],
-            message: "Select a status",
+            message: "A new status is required",
         });
     }
 

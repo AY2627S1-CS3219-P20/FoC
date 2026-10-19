@@ -25,7 +25,7 @@ type RequestActivityDetailsDialogProps = {
     order: Order;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    canEdit: boolean;
+    canEditRequest: boolean;
     canAccept: boolean;
     viewerRole: ViewerRole;
     pickupSupplierName?: string;
@@ -50,7 +50,7 @@ const RequestActivityDetailsDialog = ({
     order,
     open,
     onOpenChange,
-    canEdit,
+    canEditRequest,
     canAccept,
     viewerRole,
     pickupSupplierName,
@@ -126,7 +126,7 @@ const RequestActivityDetailsDialog = ({
                     }}
                     className="flex flex-col gap-4"
                 >
-                    {!canEdit || !isEditing ? (
+                    {!canEditRequest || !isEditing ? (
                         <div className="space-y-4">
                             <DetailText
                                 label="Request name"
@@ -364,7 +364,7 @@ const RequestActivityDetailsDialog = ({
                         ) : null}
                     </div>
 
-                    {canEdit && (
+                    {canEditRequest && (
                         <div className="flex justify-end gap-2">
                             {isEditing ? (
                                 <>

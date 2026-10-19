@@ -157,3 +157,9 @@ export type FailRequestPayload = {
     expectedVersion: number;
     failureReason: string;
 }
+
+export type CancelRequestPayload = {
+    orderId: string;
+    expectedVersion: number;
+    cancellationReason?: string;
+}
