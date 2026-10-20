@@ -5,9 +5,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
-# for production
-# RUN npm ci --omit=dev
+RUN npm ci
 
 # bundle source code inside the docker image
 COPY . .
@@ -15,16 +13,18 @@ COPY . .
 # placeholders in the DATABASE_URL can be used since `prisma generate` does not connect to the database
 ARG DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate && npm run build
+# Keep Prisma and tsx for startup migrations and the TypeScript seed script.
+RUN npm prune --omit=dev
 
 
 # ---------- runtime stage ----------
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
+# Copy package manifests and production dependencies from the build stage
 COPY package*.json ./
-RUN npm install
-# for production
-# RUN npm ci --omit=dev
+COPY --from=build /app/node_modules ./node_modules
+# Startup migrations and the TypeScript seed script require prisma and tsx.
 
 COPY --from=build /app/dist ./dist
 # migrate and seed commands need the prisma schema, migrations, config and generated prisma client

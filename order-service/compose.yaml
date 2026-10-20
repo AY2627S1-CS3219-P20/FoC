@@ -1,0 +1,32 @@
+services:
+  order-postgres:
+    image: postgres:17
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5435:5432"
+    environment:
+      POSTGRES_DB: ${ORDER_POSTGRES_DB:?Set ORDER_POSTGRES_DB in order-service/.env}
+      POSTGRES_USER: ${ORDER_POSTGRES_USER:?Set ORDER_POSTGRES_USER in order-service/.env}
+      POSTGRES_PASSWORD: ${ORDER_POSTGRES_PASSWORD:?Set ORDER_POSTGRES_PASSWORD in order-service/.env}
+    volumes:
+      - order_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 2s
+      retries: 20
+
+  order-service:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:?Set PORT in order-service/.env}:${PORT}"
+    env_file: .env
+    volumes:
+      - ../user-service/keys/public.pem:${JWT_PUBLIC_KEY_PATH:?Set JWT_PUBLIC_KEY_PATH in order-service/.env}:ro
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+
+volumes:
+  order_postgres_data:
