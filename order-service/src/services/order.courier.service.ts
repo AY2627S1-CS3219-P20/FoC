@@ -2,7 +2,6 @@ import { AppError } from "../errors/errors.js";
 import { prisma } from "../libs/prisma.js";
 import type { GetCourierOrderHistoryInput, GetOpenOrdersInput } from "../schemas/order.courier.schema.js";
 import { OrderStatus } from "../generated/prisma/client.js";
-import { updateExpiredOrders } from "../utils/order.utils.js";
 
 // order lifecycle statuses
 const STATUS = OrderStatus;
@@ -16,53 +15,57 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
     const sortOrder: string = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
     const filterLocation = input.filterLocation ?? null; // supplier id we want to filter by
     const searchString: string = input.searchString ?? "";
+    const now = new Date();
 
-    // ensure that the status of orders are updated, lazy update
-    await updateExpiredOrders();
-    
     const orders = await prisma.order.findMany({
-        where: { 
+        where: {
             name: {
                 contains: searchString, // enforce partial string match
                 mode: 'insensitive', // enforce case insensitivity
-            }, 
+            },
             // as long as delivery/pickup supplier id matches, record will be included in the results
             ...(filterLocation
-            ? {
-                OR: [
-                    { deliverySupplierId: filterLocation },
-                    { pickupSupplierId: filterLocation },
-                ],
-            }
-            : {}),
-            status: STATUS.OPEN, 
-            requesterId: { 
+                ? {
+                    OR: [
+                        { deliverySupplierId: filterLocation },
+                        { pickupSupplierId: filterLocation },
+                    ],
+                }
+                : {}),
+            status: STATUS.OPEN,
+            requesterId: {
                 not: courierId
+            },
+            expiryAt: {
+                gt: now // only include orders that have not yet expired
             }
         },
-        orderBy: { [sortBy]: sortOrder }, 
-        take: LIMIT, 
+        orderBy: { [sortBy]: sortOrder },
+        take: LIMIT,
         skip: LIMIT * (page - 1),
     });
 
     const totalCount = await prisma.order.count({
-        where: { 
+        where: {
             name: {
                 contains: searchString, // enforce partial string match
                 mode: 'insensitive', // enforce case insensitivity
-            }, 
+            },
             // as long as delivery/pickup supplier id matches, record will be included in the results
             ...(filterLocation
-            ? {
-                OR: [
-                    { deliverySupplierId: filterLocation },
-                    { pickupSupplierId: filterLocation },
-                ],
-            }
-            : {}),
-            status: STATUS.OPEN, 
-            requesterId: { 
+                ? {
+                    OR: [
+                        { deliverySupplierId: filterLocation },
+                        { pickupSupplierId: filterLocation },
+                    ],
+                }
+                : {}),
+            status: STATUS.OPEN,
+            requesterId: {
                 not: courierId
+            },
+            expiryAt: {
+                gt: now // only include orders that have not yet expired
             }
         }
     });
@@ -83,9 +86,6 @@ export async function getAllOpenOrders(courierId: string, input: GetOpenOrdersIn
 }
 
 export async function acceptOpenOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated, lazy update
-    await updateExpiredOrders();
-
     const oldStatus: OrderStatus = STATUS.OPEN;
     const newStatus: OrderStatus = STATUS.ACCEPTED;
 
@@ -102,11 +102,8 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
     }
 
     // order has expired
-    if (order.expiryAt <= now || order.status === STATUS.EXPIRED) {
-        if (order.status === STATUS.OPEN) {
-            await updateExpiredOrders(); // update the row to expired, if it is still open
-        }
-        throw new AppError(`Order ${orderId} has expired`, 400);
+    if (order.status === STATUS.EXPIRED || order.expiryAt <= now) {
+        throw new AppError(`Order ${orderId} has expired`, 409);
     }
 
     // disallow action if order is no longer open (F3.1.3)
@@ -124,8 +121,11 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
         const updatedOrder = await tx.order.update({
             where: {
                 id: order.id,
-                version: order.version // ensure the version has remained unchanged since we last queried
-            }, 
+                version: order.version, // ensure the version has remained unchanged since we last queried
+                expiryAt: {
+                    gt: now, // ensure that the order has not expired before updating
+                }
+            },
             data: {
                 courierId: courierId,
                 status: newStatus,
@@ -134,7 +134,7 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
             }
         });
 
-         // check if update was successful
+        // check if update was successful
         if (!updatedOrder || updatedOrder.status != newStatus) {
             throw new AppError(`Status update for order ${order.id} has failed`, 500);
         }
@@ -144,7 +144,7 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
             data: {
                 orderId: updatedOrder.id,
                 fromStatus: oldStatus,
-                toStatus: newStatus, 
+                toStatus: newStatus,
                 changedBy: courierId
             }
         });
@@ -161,9 +161,6 @@ export async function acceptOpenOrder(courierId: string, orderId: string) {
 }
 
 export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated, lazy update
-    await updateExpiredOrders();
-
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
     const newStatus: OrderStatus = STATUS.PICKED_UP;
 
@@ -196,7 +193,7 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
             where: {
                 id: order.id,
                 version: order.version // ensure the version has remained unchanged since we last queried
-            }, 
+            },
             data: {
                 status: newStatus,
                 version: { increment: 1 },
@@ -204,7 +201,7 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
             }
         });
 
-         // check if update was successful
+        // check if update was successful
         if (!updatedOrder || updatedOrder.status != newStatus) {
             throw new AppError(`Status update for order ${order.id} has failed`, 500);
         }
@@ -214,7 +211,7 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
             data: {
                 orderId: updatedOrder.id,
                 fromStatus: oldStatus,
-                toStatus: newStatus, 
+                toStatus: newStatus,
                 changedBy: courierId
             }
         });
@@ -231,9 +228,6 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
 }
 
 export async function completePickedUpOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated, lazy update
-    await updateExpiredOrders();
-
     const oldStatus: OrderStatus = STATUS.PICKED_UP;
     const newStatus: OrderStatus = STATUS.COMPLETED;
 
@@ -266,7 +260,7 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
             where: {
                 id: order.id,
                 version: order.version // ensure the version has remained unchanged since we last queried
-            }, 
+            },
             data: {
                 status: newStatus,
                 version: { increment: 1 },
@@ -274,7 +268,7 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
             }
         });
 
-         // check if update was successful
+        // check if update was successful
         if (!updatedOrder || updatedOrder.status != newStatus) {
             throw new AppError(`Status update for order ${order.id} has failed`, 500);
         }
@@ -284,7 +278,7 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
             data: {
                 orderId: updatedOrder.id,
                 fromStatus: oldStatus,
-                toStatus: newStatus, 
+                toStatus: newStatus,
                 changedBy: courierId
             }
         });
@@ -301,9 +295,6 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
 }
 
 export async function dropAcceptedOrder(courierId: string, orderId: string) {
-    // ensure that the status of orders are updated, lazy update
-    await updateExpiredOrders();
-
     const oldStatus: OrderStatus = STATUS.ACCEPTED;
     const newStatus: OrderStatus = STATUS.OPEN;
 
@@ -334,7 +325,7 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
             where: {
                 id: order.id,
                 version: order.version // ensure the version has remained unchanged since we last queried
-            }, 
+            },
             data: {
                 courierId: null, // remove courier (F7.2)
                 status: newStatus, // change to OPEN status (F7.2.1)
@@ -343,7 +334,7 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
             }
         });
 
-         // check if update was successful
+        // check if update was successful
         if (!updatedOrder || updatedOrder.status != newStatus) {
             throw new AppError(`Status update for order ${order.id} has failed`, 500);
         }
@@ -353,7 +344,7 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
             data: {
                 orderId: updatedOrder.id,
                 fromStatus: oldStatus,
-                toStatus: newStatus, 
+                toStatus: newStatus,
                 changedBy: courierId
             }
         });
@@ -370,26 +361,23 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
 }
 
 export async function getCourierAcceptanceHistory(courierId: string, input: GetCourierOrderHistoryInput) {
-    // ensure that the status of orders are updated, lazy update
-    await updateExpiredOrders();
-
     const page: number = input.page;
     const sortBy: string = input.sortBy; // default set to sorting by accepted time
     const sortOrder = input.sortOrder; // default set to sorting in ascending order (earliest to latest)
-    const status: OrderStatus | undefined = input.status; 
+    const status: OrderStatus | undefined = input.status;
 
     const orders = await prisma.order.findMany({
-        where: { 
+        where: {
             courierId: courierId, // enforce full string match
             ...(status ? { status: status } : {}), // If status is provided, include it in the where clause; otherwise, don't filter by status 
-        }, 
-        orderBy: { [sortBy]: sortOrder }, 
-        take: LIMIT, 
+        },
+        orderBy: { [sortBy]: sortOrder },
+        take: LIMIT,
         skip: LIMIT * (page - 1),
     });
 
     const totalCount = await prisma.order.count({
-        where: { 
+        where: {
             courierId: courierId, // enforce full string match
             ...(status ? { status: status } : {}), // If status is provided, include it in the where clause; otherwise, don't filter by status 
         }
