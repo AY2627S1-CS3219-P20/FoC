@@ -10,7 +10,7 @@ import {
     getOpenOrders,
     pickUpOrder
 } from "../controllers/order.courier.controller.js";
-import { cancelRequest, createRequest, failRequest, getRequesterOrderHistory, receiveRequest, updateRequest } from "../controllers/order.requester.controller.js";
+import { cancelRequest, createRequest, failRequest, getRequesterOrderHistory, receiveRequest, renewExpiredRequest, updateRequest } from "../controllers/order.requester.controller.js";
 
 const orderRouter = Router();
 
@@ -48,7 +48,7 @@ orderRouter.post("/:orderId/receipt", authorize(Role.STUDENT), receiveRequest);
 orderRouter.post("/:orderId/failure", authorize(Role.STUDENT), failRequest);
 
 // Mark an order as renewed (by requester)
-// orderRouter.post("/:orderId/renewal");
+orderRouter.post("/:orderId/renewal", authorize(Role.STUDENT), renewExpiredRequest);
 
 // Accept an order (by courier)
 orderRouter.put("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);

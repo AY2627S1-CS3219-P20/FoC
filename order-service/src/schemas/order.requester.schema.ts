@@ -91,3 +91,10 @@ export const cancelRequestSchema = z.object({
         .optional(),
 });
 export type CancelRequestInput = z.infer<typeof cancelRequestSchema>;
+
+export const renewExpiredRequestSchema = z.strictObject({
+    expiryAt: z.coerce.date()
+        .refine((date) => date > new Date(), "Expiry must be in the future"),
+    expectedVersion: z.number().int().positive(),
+});
+export type RenewExpiredRequestInput = z.infer<typeof renewExpiredRequestSchema>;

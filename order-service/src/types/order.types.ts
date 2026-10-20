@@ -29,6 +29,8 @@ export type CreditReservation = {
     amount: number;
     status: ReservationStatus;
     courierId: string | null;
+    renewalKey: string | null;
+    renewedFromReservationId: string | null;
     settlementEventId: string | null;
     settlementReason: SettlementReason | null;
     settlementPayload: unknown | null;
@@ -41,4 +43,12 @@ export type CreditReservation = {
 export type CreditReservationResponse = {
     success: boolean;
     data: CreditReservation;
+};
+
+export type RenewReservationPayload = {
+    renewalKey: string;
+    previousReservationId: string;
+    orderId: string;
+    requesterId: string;
+    amount: number;
 };
