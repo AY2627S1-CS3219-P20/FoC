@@ -3,7 +3,7 @@ import { OrderEventType, type PrismaClient } from "../generated/prisma/client.js
 import { connectOrderMessaging, publishOrderEvent, type SettlementOrderEventType } from "../libs/rabbitmq.js";
 
 const BATCH_SIZE = 30; // The maximum number of outbox events to fetch and publish in a single batch.
-const POLL_INTERVAL_MS = 1000; // Poll every 1 second for new orders to publish to RabbitMQ.
+const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds for new orders to publish to RabbitMQ.
 const MAX_BACKOFF_SECONDS = 60; // Wait up to 60 seconds before reconnecting to RabbitMQ after a failure.
 
 // The types of event this publisher is responsible for
