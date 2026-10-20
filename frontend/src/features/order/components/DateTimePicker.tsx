@@ -111,11 +111,13 @@ const DateTimePicker = ({
             >
                 <div className="flex flex-col">
                     <div className="flex justify-center border-b">
-                        <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={handleDateSelect}
-                        />
+                        <ScrollArea className="h-40 lg:h-full">
+                            <Calendar
+                                mode="single"
+                                selected={date}
+                                onSelect={handleDateSelect}
+                            />
+                        </ScrollArea>
                     </div>
 
                     <div className="grid grid-cols-2 divide-x">
@@ -123,7 +125,7 @@ const DateTimePicker = ({
                             <p className="p-2 text-center text-sm font-medium">
                                 Hour
                             </p>
-                            <ScrollArea className="h-32">
+                            <ScrollArea className="h-20 lg:h-32">
                                 <div className="grid grid-cols-4 gap-1 p-2">
                                     {hours.map(hour => (
                                         <Button
@@ -151,7 +153,7 @@ const DateTimePicker = ({
                             <p className="p-2 text-center text-sm font-medium">
                                 Minute
                             </p>
-                            <ScrollArea className="h-32">
+                            <ScrollArea className="h-20 lg:h-32">
                                 <div className="grid grid-cols-3 gap-1 p-2">
                                     {minutes.map(minute => (
                                         <Button

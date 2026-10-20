@@ -8,6 +8,7 @@ import { AppError } from "./errors/errors.js";
 import orderRouter from "./routes/order.route.js";
 import { startOrderOutboxPublisher } from "./workers/order-outbox.publisher.js";
 import { prisma } from "./libs/prisma.js";
+import { startOrderExpiryWorker } from "./workers/order-expiry.worker.js";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use(errorHandler);
 const PORT = config.port;
 
 let stopOutboxPublisher: (() => Promise<void>) | undefined;
+let stopOrderExpiryWorker: (() => Promise<void>) | undefined;
 let shuttingDown = false;
 
 const server = app.listen(PORT, () => {
@@ -45,6 +47,7 @@ const server = app.listen(PORT, () => {
     // If the service is not shutting down, start the outbox publisher.
     if (!shuttingDown) {
         stopOutboxPublisher = startOrderOutboxPublisher(prisma);
+        stopOrderExpiryWorker = startOrderExpiryWorker();
     }
 });
 
@@ -60,6 +63,7 @@ const shutdown = async () => {
     try {
         await Promise.all([
             stopOutboxPublisher?.(),
+            stopOrderExpiryWorker?.(),
             new Promise<void>((resolve, reject) => {
                 server.close((err) => {
                     if (err) reject(err);

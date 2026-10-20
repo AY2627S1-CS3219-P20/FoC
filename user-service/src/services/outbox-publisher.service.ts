@@ -6,7 +6,7 @@ import {
   REGISTRATION_MESSAGING,
 } from "../libs/rabbitmq.js";
 
-const POLL_INTERVAL_MS = 1_000;
+const POLL_INTERVAL_MS = 5_000; // 5 seconds between polls when no pending events are found.
 
 function retryDelay(attempt: number): number {
   return Math.min(2 ** Math.min(Math.max(attempt - 1, 0), 6), 60) * 1_000;

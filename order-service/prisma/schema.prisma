@@ -76,7 +76,7 @@ model Order {
   failureReason      String? @db.Text
 
   // Used to track the reserved credits for this order
-  creditReservationId String? @unique @db.Uuid
+  creditReservationId String @unique @db.Uuid
 
   // Relationships
   statusHistory OrderStatusHistory[]

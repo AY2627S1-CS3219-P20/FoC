@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { AppError } from "../errors/errors.js";
-import { abortReservation, reserveCredits } from "../integrations/credit/credit.client.js";
+import { abortReservation, renewCredits, reserveCredits } from "../integrations/credit/credit.client.js";
 import { OrderEventType, OrderStatus } from "../generated/prisma/client.js";
 import { verifySupplierExists } from "../integrations/supplier/supplier.client.js";
 import { prisma } from "../libs/prisma.js";
-import type { CancelRequestInput, CreateRequestInput, FailRequestInput, ReceiveRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
+import type { CancelRequestInput, CreateRequestInput, FailRequestInput, ReceiveRequestInput, RenewExpiredRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
 import type { ReservationPayload } from "../types/order.types.js";
 
 export async function getRequesterOrderHistoryService(
@@ -512,3 +512,119 @@ export async function cancelRequestService(
         });
     });
 };
+
+export async function renewExpiredRequestService(
+    requesterId: string,
+    orderId: string,
+    input: RenewExpiredRequestInput,
+) {
+    const existingOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+    });
+
+    // Ensure the order exists and belongs to the requester
+    if (!existingOrder || existingOrder.requesterId !== requesterId) {
+        throw new AppError("Order not found", 404);
+    }
+
+    // If the request is already OPEN and the version is exactly one more than the expected version, 
+    // it means that the request has already been renewed by another process.
+    // Then we can return the existing order without making any changes.
+    if (existingOrder.status === OrderStatus.OPEN &&
+        existingOrder.version === input.expectedVersion + 1) {
+        return existingOrder;
+    }
+
+    // Ensure the order is in EXPIRED status before allowing it to be renewed
+    if (existingOrder.status !== OrderStatus.EXPIRED) {
+        throw new AppError("Only expired requests can be renewed", 409);
+    }
+
+    if (existingOrder.version !== input.expectedVersion) {
+        throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
+    }
+
+    if (!existingOrder.creditReservationId) {
+        throw new AppError("This order does not have a credit reservation to renew", 409);
+    }
+
+    // Generate a unique renewal key for this renewal attempt.
+    // This key is used to ensure that the credit service can identify,
+    // and handle duplicate renewal requests for the same order.
+    const renewalKey = `${orderId}:RENEWAL:${input.expectedVersion}`;
+
+    let newReservation:
+        | Awaited<ReturnType<typeof renewCredits>>
+        | undefined;
+
+    try {
+        newReservation = await renewCredits({
+            renewalKey,
+            previousReservationId: existingOrder.creditReservationId,
+            orderId: existingOrder.id,
+            requesterId: requesterId,
+            amount: existingOrder.offeredCredits,
+        });
+
+        console.log(`Successfully renewed reservation for order ${orderId}. New reservation ID: ${newReservation.id}`);
+
+        return await prisma.$transaction(async (tx) => {
+            const updatedOrder = await tx.order.updateMany({
+                where: {
+                    id: orderId,
+                    requesterId: requesterId,
+                    status: OrderStatus.EXPIRED,
+                    version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+                },
+                data: {
+                    status: OrderStatus.OPEN,
+                    expiryAt: input.expiryAt,
+                    expiredAt: null,
+                    creditReservationId: newReservation!.id,
+                    version: { increment: 1 }, // Increment the version for optimistic concurrency control
+                },
+            });
+
+            if (updatedOrder.count !== 1) {
+                throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
+            }
+
+            return tx.order.findUniqueOrThrow({
+                where: { id: orderId },
+            });
+        });
+    } catch (error) {
+        if (newReservation) {
+            // If the renewal was successful but the order update failed, we need to check if the order is still expired.
+            const currentOrder = await prisma.order.findUnique({
+                where: { id: orderId },
+            }).catch(() => null);
+
+            // If the current order's credit reservation ID matches the new reservation ID,
+            //  it means that the renewal was successful and the order has already been updated.
+            if (currentOrder?.creditReservationId === newReservation.id) {
+                return currentOrder;
+            }
+
+            const orderStillExpired =
+                currentOrder?.status === OrderStatus.EXPIRED &&
+                currentOrder?.version === input.expectedVersion;
+
+            // If the order is no longer expired, we should abort the new reservation.
+            if (!orderStillExpired) {
+                try {
+                    await abortReservation({
+                        reservationId: newReservation.id,
+                        orderId: existingOrder.id,
+                        requesterId: requesterId,
+                        amount: existingOrder.offeredCredits,
+                    });
+                } catch (abortError) {
+                    console.error(`CRITICAL: Failed to abort reservation ${newReservation.id} for order ${orderId}`, abortError);
+                }
+            }
+        }
+
+        throw error;
+    }
+}

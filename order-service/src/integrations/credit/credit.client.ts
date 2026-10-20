@@ -1,7 +1,7 @@
 import axios from "axios";
 import config from "../../config/config.js";
 import { AppError } from "../../errors/errors.js";
-import type { AbortReservationPayload, CreditReservation, CreditReservationResponse, ReservationPayload } from "../../types/order.types.js";
+import type { AbortReservationPayload, CreditReservation, CreditReservationResponse, RenewReservationPayload, ReservationPayload } from "../../types/order.types.js";
 
 const creditApi = axios.create({
     baseURL: config.creditServiceUrl,
@@ -72,3 +72,17 @@ export async function abortReservation(
     }
 }
 
+export async function renewCredits(
+    payload: RenewReservationPayload
+): Promise<CreditReservation> {
+    try {
+        console.log("Renewing credits with payload:", payload);
+        const response = await creditApi.post<CreditReservationResponse>(
+            `/api/internal/credits/reservations/renew`,
+            payload
+        );
+        return response.data.data;
+    } catch (error) {
+        handleCreditServiceError(error);
+    }
+}

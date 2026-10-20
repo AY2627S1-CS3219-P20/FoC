@@ -5,6 +5,7 @@ import type { ApiResponse } from "@/types/api.types";
 import orderApi from "@/api/orderApi";
 import authApi from "@/api/authApi";
 import type { CreateRequestFormData } from "../schemas/create-request.schema";
+import type { RenewRequestFormData } from "../schemas/renew-request.schema";
 
 export const getRequesterOrderHistoryService = async (
     params: RequesterOrderHistoryParams,
@@ -110,6 +111,22 @@ export async function cancelRequestService(
     try {
         const response = await orderApi.post<ApiResponse<Order>>(
             ENDPOINTS.order.cancelRequest(orderId),
+            payload,
+        );
+
+        return response.data.data!;
+    } catch (error) {
+        throw parseError(error);
+    }
+}
+
+export async function renewRequestService(
+    orderId: string,
+    payload: RenewRequestFormData,
+): Promise<Order> {
+    try {
+        const response = await orderApi.post<ApiResponse<Order>>(
+            ENDPOINTS.order.renewRequest(orderId),
             payload,
         );
 

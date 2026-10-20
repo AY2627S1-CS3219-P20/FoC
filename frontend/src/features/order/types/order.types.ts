@@ -1,5 +1,6 @@
 import type { ButtonProps } from "@/components/ui/button";
 import type { CreateRequestFormData } from "../schemas/create-request.schema";
+import type { RenewRequestFormData } from "../schemas/renew-request.schema";
 
 export const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
     OPEN: "teal",
@@ -162,4 +163,9 @@ export type CancelRequestPayload = {
     orderId: string;
     expectedVersion: number;
     cancellationReason?: string;
+}
+
+export type RenewRequestPayload = {
+    orderId: string;
+    payload: RenewRequestFormData;
 }

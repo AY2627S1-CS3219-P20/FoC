@@ -9,6 +9,7 @@ import StatusUpdateDialog from "./StatusUpdateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import useAuth from "@/hooks/useAuth";
 import { ROLES } from "@/features/auth/types/auth.types";
+import RenewRequestDialog from "./RenewRequestDialog";
 
 type RequestActivityCardProps = {
     order: Order;
@@ -43,6 +44,12 @@ const RequestActivityCard = ({
 
     const { user } = useAuth();
     const userRole = user?.role;
+
+    const canRenewRequest =
+        viewerRole === "requester" &&
+        order.status === "EXPIRED" &&
+        order.courierId === null;
+    const [openRenewRequestDialog, setOpenRenewRequestDialog] = useState(false);
 
     return (
         <>
@@ -117,16 +124,31 @@ const RequestActivityCard = ({
                             <PencilIcon className="shrink-0" />
                             {order.status}
                         </Button>
-                    ) : (
-                        <Button
-                            type="button"
-                            variant={statusVariant[order.status]}
-                            size="sm"
-                            className="pointer-events-none"
-                        >
-                            {order.status}
-                        </Button>
-                    )}
+                    ) : canRenewRequest ?
+                        (
+                            <Button
+                                type="button"
+                                variant={statusVariant[order.status]}
+                                size="sm"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    setOpenRenewRequestDialog(true);
+                                }}
+                            >
+                                <PencilIcon className="shrink-0" />
+                                {order.status}
+                            </Button>
+                        )
+                        : (
+                            <Button
+                                type="button"
+                                variant={statusVariant[order.status]}
+                                size="sm"
+                                className="pointer-events-none"
+                            >
+                                {order.status}
+                            </Button>
+                        )}
                 </div>
             </Card>
 
@@ -147,6 +169,12 @@ const RequestActivityCard = ({
                 viewerRole={viewerRole}
                 open={openStatusUpdateDialog}
                 onOpenChange={setOpenStatusUpdateDialog}
+            />
+
+            <RenewRequestDialog
+                order={order}
+                open={openRenewRequestDialog}
+                onOpenChange={setOpenRenewRequestDialog}
             />
 
         </>
