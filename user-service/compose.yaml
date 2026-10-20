@@ -5,8 +5,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:5434:5432"
-    networks:
-      - internal-network
     environment:
       POSTGRES_DB: ${USER_POSTGRES_DB:?Set USER_POSTGRES_DB in user-service/.env}
       POSTGRES_USER: ${USER_POSTGRES_USER:?Set USER_POSTGRES_USER in user-service/.env}
@@ -25,8 +23,6 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:?Set PORT in user-service/.env}:${PORT}"
-    networks:
-      - internal-network
     # Inject user-service/.env values into the container at runtime.
     env_file: .env
     # These explicit values override matching entries supplied by env_file.
@@ -45,6 +41,3 @@ services:
 
 volumes:
   user_postgres_data:
-
-networks:
-  internal-network:

@@ -4,8 +4,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:5436:5432"
-    networks:
-      - internal-network
     environment:
       POSTGRES_DB: ${CREDIT_POSTGRES_DB:?Set CREDIT_POSTGRES_DB in credit-service/.env}
       POSTGRES_USER: ${CREDIT_POSTGRES_USER:?Set CREDIT_POSTGRES_USER in credit-service/.env}
@@ -23,8 +21,6 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:?Set PORT in credit-service/.env}:${PORT}"
-    networks:
-      - internal-network
     env_file: .env
     volumes:
       - ../user-service/keys/public.pem:${JWT_PUBLIC_KEY_PATH:?Set JWT_PUBLIC_KEY_PATH in credit-service/.env}:ro
@@ -34,6 +30,3 @@ services:
 
 volumes:
   credit_postgres_data:
-
-networks:
-  internal-network:

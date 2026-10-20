@@ -4,8 +4,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:5435:5432"
-    networks:
-      - internal-network
     environment:
       POSTGRES_DB: ${ORDER_POSTGRES_DB:?Set ORDER_POSTGRES_DB in order-service/.env}
       POSTGRES_USER: ${ORDER_POSTGRES_USER:?Set ORDER_POSTGRES_USER in order-service/.env}
@@ -23,9 +21,6 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:?Set PORT in order-service/.env}:${PORT}"
-    networks:
-      - default
-      - internal-network
     env_file: .env
     volumes:
       - ../user-service/keys/public.pem:${JWT_PUBLIC_KEY_PATH:?Set JWT_PUBLIC_KEY_PATH in order-service/.env}:ro
@@ -35,6 +30,3 @@ services:
 
 volumes:
   order_postgres_data:
-
-networks:
-  internal-network:

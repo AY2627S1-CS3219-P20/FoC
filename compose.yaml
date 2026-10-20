@@ -27,9 +27,6 @@ services:
     image: rabbitmq:4.2-management
     hostname: foc-rabbitmq
     restart: unless-stopped
-    networks:
-      - default
-      - internal-network
     environment:
       RABBITMQ_NODENAME: rabbit@foc-rabbitmq
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-foc}
