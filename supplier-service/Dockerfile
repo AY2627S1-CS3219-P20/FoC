@@ -5,9 +5,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
-# for production
-# RUN npm ci --omit=dev
+RUN npm ci
 
 # bundle source code inside the docker image
 COPY . .
@@ -21,10 +19,10 @@ RUN npx prisma generate && npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
+# Copy package manifests and production dependencies from the build stage
 COPY package*.json ./
-RUN npm install
-# for production
-# RUN npm ci --omit=dev
+COPY --from=build /app/node_modules ./node_modules
+# Startup migrations and the TypeScript seed script require prisma and tsx.
 
 COPY --from=build /app/dist ./dist
 # migrate and seed commands need the prisma schema, migrations, config and generated prisma client
