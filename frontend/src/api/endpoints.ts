@@ -64,5 +64,6 @@ export const ENDPOINTS = {
         receiveRequest: (orderId: string) => `${BASE_ORDER}/${orderId}/receipt`,
         failedRequest: (orderId: string) => `${BASE_ORDER}/${orderId}/failure`,
         cancelRequest: (orderId: string) => `${BASE_ORDER}/${orderId}/cancellation`,
+        renewRequest: (orderId: string) => `${BASE_ORDER}/${orderId}/renewal`,
     }
 } as const;
