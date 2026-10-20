@@ -89,9 +89,10 @@ interface SupplierCardProps {
     supplier: Supplier;
     onEdit?: () => void;
     onDeactivate?: () => void;
+    onActivate?: () => void;
 }
 
-const SupplierCard = ({ supplier, onEdit, onDeactivate }: SupplierCardProps) => {
+const SupplierCard = ({ supplier, onEdit, onDeactivate, onActivate }: SupplierCardProps) => {
     const { user } = useAuth();
     const isAdmin = user?.role === "ADMIN";
     const isDeactivated = supplier.status === "DEACTIVATED";
@@ -171,6 +172,13 @@ const SupplierCard = ({ supplier, onEdit, onDeactivate }: SupplierCardProps) => 
                                 Deactivate
                             </Button>
                         )}
+                    </div>
+                )}
+                {isAdmin && isDeactivated && onActivate && location.pathname === ROUTES.ADMIN.MANAGE_SUPPLIERS && (
+                    <div className="flex justify-end border-t border-slate-200 pt-3">
+                        <Button type="button" variant="green" size="sm" onClick={onActivate}>
+                            Activate
+                        </Button>
                     </div>
                 )}
             </div>

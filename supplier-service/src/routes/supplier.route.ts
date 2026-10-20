@@ -11,7 +11,8 @@ import {
     getSuppliers,
     getActiveSuppliers,
     getSuppliersByIds,
-    deactivateSupplier
+    deactivateSupplier,
+    activateSupplier
 } from "../controllers/supplier.controller.js";
 
 
@@ -58,7 +59,7 @@ supplierRouter.patch("/:supplierId", authorize(Role.ADMIN), updateSupplier);
 supplierRouter.patch("/:supplierId/deactivation", authorize(Role.ADMIN), deactivateSupplier);
 
 // Activate an existing supplier (by admin)
-// supplierRouter.patch("/:supplierId/activation", authorize(Role.ADMIN), activateSupplier);
+supplierRouter.patch("/:supplierId/activation", authorize(Role.ADMIN), activateSupplier);
 
 
 // ------------------------- Assets -------------------------
