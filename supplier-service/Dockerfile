@@ -13,6 +13,8 @@ COPY . .
 # placeholders in the DATABASE_URL can be used since `prisma generate` does not connect to the database
 ARG DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate && npm run build
+# Keep Prisma and tsx for startup migrations and the TypeScript seed script.
+RUN npm prune --omit=dev
 
 
 # ---------- runtime stage ----------

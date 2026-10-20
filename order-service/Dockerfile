@@ -10,6 +10,8 @@ COPY prisma ./prisma
 COPY src ./src
 # Prisma generation requires a URL but does not connect to the database.
 RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" npm run db:generate && npm run build
+# Keep runtime dependencies, including Prisma for startup migrations.
+RUN npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
