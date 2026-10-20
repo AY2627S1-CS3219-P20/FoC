@@ -3,6 +3,7 @@ include:
   - user-service/compose.yaml
   - order-service/compose.yaml
   - credit-service/compose.yaml
+  - frontend/compose.yaml
 
 services:
   # RabbitMQ is shared; keep its startup dependency at the root.

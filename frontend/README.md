@@ -1,5 +1,27 @@
 # React + TypeScript + Vite
 
+## Docker
+
+Copy `.env.example` to `.env` if needed. Set `FRONTEND_PORT` and the four
+`VITE_*_API_BASE_URL` values, then run from the repository root:
+
+```sh
+docker compose up -d --build
+```
+
+Open `http://localhost:5173` with the example settings. The image builds the app
+with Node.js and serves only the static output using non-root Nginx. Client-side
+routes support direct navigation and page refreshes.
+
+API requests run in the browser, so use browser-accessible backend addresses
+(such as `http://localhost:3000/api`), rather than Docker service names. If you
+change the frontend port, update the backend `FRONTEND_URL` settings to match.
+
+Vite embeds `VITE_*` values in the public JavaScript bundle during the build.
+Only put public configuration in these variables. After changing them, rebuild
+with `docker compose up -d --build frontend`; restarting alone is insufficient.
+The `.env` file and any keys are excluded from the Docker build context.
+
 ## Credits page (CS F3)
 
 Authenticated students can open `/credits` from the existing Credits navigation link.
@@ -36,10 +58,8 @@ npm run lint
 npm run build
 ```
 
-At the CS F3 implementation baseline, the full TypeScript build already failed
-on supplier count/type mismatches and unused auth/supplier variables. The credit
-changes add no TypeScript errors. Vite production bundling passes independently;
-a passing bundle does not replace the full type check.
+The Docker build runs `npm run build`, including the full TypeScript check and
+Vite production bundling.
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
