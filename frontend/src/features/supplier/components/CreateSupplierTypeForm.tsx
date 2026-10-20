@@ -16,7 +16,7 @@ interface CreateSupplierTypeFormProps {
 }
 
 const CreateSupplierTypeForm = ({ submitLabel, onSuccess, onCancel }: CreateSupplierTypeFormProps) => {
-    const { mutate, isPending, isError, error } = useMutation({
+    const { mutate, isPending } = useMutation({
         mutationFn: createSupplierType,
         onSuccess: () => {
             toast.success("Supplier type created");

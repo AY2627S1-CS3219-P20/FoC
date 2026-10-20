@@ -32,7 +32,7 @@ const useLogin = () => {
         throw parseError(rawError);
       }
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       const from = location.state?.from?.pathname || ROUTES.HOME;
       navigate(from, { replace: true });
       

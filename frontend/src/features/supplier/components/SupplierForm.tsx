@@ -72,8 +72,6 @@ const SupplierForm = ({
     refetchOnMount: "always",
   });
 
-  const supplierTypesIsLoading = supplierTypesQuery.isLoading;
-  const supplierTypesIsError = supplierTypesQuery.isError;
   const supplierTypes = supplierTypesQuery.data ?? [];
 
   const form = useForm({
