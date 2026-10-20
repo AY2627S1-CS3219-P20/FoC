@@ -2,6 +2,7 @@ include:
   - supplier-service/compose.yml
   - user-service/compose.yaml
   - order-service/compose.yaml
+  - credit-service/compose.yaml
 
 services:
   # RabbitMQ is shared; keep its startup dependency at the root.
@@ -11,6 +12,11 @@ services:
         condition: service_healthy
 
   order-service:
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  credit-service:
     depends_on:
       rabbitmq:
         condition: service_healthy
