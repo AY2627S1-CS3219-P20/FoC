@@ -1,5 +1,5 @@
 import { Router, type ErrorRequestHandler } from "express";
-import { abortReservationController, createReservationController, getReservationController } from "../controllers/internal-credit.controller.js";
+import { abortReservationController, createReservationController, getReservationController, renewReservationController } from "../controllers/internal-credit.controller.js";
 import { AppError } from "../errors/errors.js";
 import { authenticateOrderCreditService } from "../middleware/order-credit-service-auth.middleware.js";
 
@@ -21,5 +21,6 @@ internalCreditRouter.use(parseJsonError);
 internalCreditRouter.post("/reservations", createReservationController);
 internalCreditRouter.get("/reservations/:reservationId", getReservationController);
 internalCreditRouter.post("/reservations/:reservationId/abort", abortReservationController);
+internalCreditRouter.post("/reservations/renew", renewReservationController);
 
 export default internalCreditRouter;

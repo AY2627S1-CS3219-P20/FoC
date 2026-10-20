@@ -22,7 +22,7 @@ enum CreditTransactionType {
 }
 
 model CreditAccount {
-  id String @id @default(uuid()) @db.Uuid
+  id     String @id @default(uuid()) @db.Uuid
   userId String @unique @db.Uuid
 
   // Non-negative balance CHECK constraints are maintained in SQL migrations.
@@ -52,8 +52,8 @@ model CreditTransaction {
   orderId        String?               @db.Uuid
   idempotencyKey String                @unique
 
-  reservationId String? @db.Uuid
-  reservation CreditReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reservationId String?            @db.Uuid
+  reservation   CreditReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   account CreditAccount @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
@@ -61,7 +61,6 @@ model CreditTransaction {
   @@index([accountId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([accountId, type, createdAt(sort: Desc), id(sort: Desc)])
 }
-
 
 enum ReservationStatus {
   RESERVED
@@ -80,23 +79,29 @@ enum SettlementReason {
 }
 
 model CreditReservation {
-  id String @id @default(uuid()) @db.Uuid
-  orderId String @db.Uuid
-  requesterId String @db.Uuid
-  amount Int
-  status ReservationStatus @default(RESERVED)
-  courierId String? @db.Uuid
-  settlementEventId String? @unique @db.Uuid
-  settlementReason SettlementReason?
+  id          String            @id @default(uuid()) @db.Uuid
+  orderId     String            @db.Uuid
+  requesterId String            @db.Uuid
+  amount      Int
+  status      ReservationStatus @default(RESERVED)
+  courierId   String?           @db.Uuid
+
+  // Optional fields for reservation renewal.
+  renewalKey            String? @unique
+  previousReservationId String? @db.Uuid
+
+  // Optional fields for settlement events.
+  settlementEventId String?             @unique @db.Uuid
+  settlementReason  SettlementReason?
   // Preserve the complete validated envelope to detect altered replays.
   settlementPayload Json?
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
-  settledAt DateTime? @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(6)
+  settledAt         DateTime?           @db.Timestamptz(6)
   // Abort tombstones may precede account provisioning.
-  accountId String? @db.Uuid
-  account CreditAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  transactions CreditTransaction[]
+  accountId         String?             @db.Uuid
+  account           CreditAccount?      @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  transactions      CreditTransaction[]
 
   @@index([orderId, createdAt])
   @@index([status, createdAt])
