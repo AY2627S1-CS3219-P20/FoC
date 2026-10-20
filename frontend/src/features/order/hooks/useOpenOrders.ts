@@ -11,7 +11,7 @@ export const useOpenOrders = (
         queryKey: courierOrderQueryKeys.open(params),
         queryFn: () => getOpenRequestsService(params),
         placeholderData: (previousData) => previousData,
-        refetchInterval: 30_000, // Refetch every 30 seconds
+        refetchInterval: 10_000, // Refetch every 10 seconds
         refetchIntervalInBackground: false,
         refetchOnWindowFocus: true,
     });
