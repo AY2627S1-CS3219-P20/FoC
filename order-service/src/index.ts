@@ -22,7 +22,7 @@ app.use(
 app.use(express.json());
 
 // Health check endpoint
-app.get("/orders", (_req: Request, res: Response) => {
+app.get("/healthz", (_req: Request, res: Response) => {
     res.send("Orders service is running");
 });
 

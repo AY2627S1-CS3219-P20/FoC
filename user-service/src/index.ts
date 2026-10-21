@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(cookieParser(config.cookieSecret));
 
 // Health check endpoint
-app.get("/user", (_req: Request, res: Response) => {
+app.get("/healthz", (_req: Request, res: Response) => {
     res.send("User service is running");
 });
 

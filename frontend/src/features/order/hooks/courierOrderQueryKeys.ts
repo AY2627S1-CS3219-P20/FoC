@@ -2,8 +2,8 @@ import type { CourierOrderHistoryParams, OpenOrdersQueryParams } from "@/feature
 
 export const courierOrderQueryKeys = {
     all: ["courierOrder"] as const,
-    history: (params: CourierOrderHistoryParams) =>
-        [...courierOrderQueryKeys.all, "history", params] as const,
+    history: (userId: string, params: CourierOrderHistoryParams) =>
+        [...courierOrderQueryKeys.all, "history", userId, params] as const,
     open: (params: OpenOrdersQueryParams) =>
         [...courierOrderQueryKeys.all, "open", params] as const,
 };

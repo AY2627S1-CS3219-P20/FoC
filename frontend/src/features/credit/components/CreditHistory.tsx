@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { creditKeys } from "../credit.keys";
+import { creditKeys } from "../hooks/credit.keys";
 import { transactionLabels } from "../credit.presentation";
 import useCreditTransactions from "../hooks/useCreditTransactions";
 import {

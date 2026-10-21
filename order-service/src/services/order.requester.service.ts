@@ -55,6 +55,11 @@ export async function updateRequestService(
         throw new AppError("Order not found", 404);
     }
 
+    // Ensure the version matches the current version for optimistic concurrency control
+    if (existingOrder.version !== expectedVersion) {
+        throw new AppError("The request changed while you were editing it. Reload and try again.", 409);
+    }
+
     // Compare the final pair, including whichever location wasn't changed.
     const pickupSupplierId =
         changes.pickupSupplierId ?? existingOrder.pickupSupplierId;
@@ -113,7 +118,7 @@ export async function updateRequestService(
                 requesterId: requesterId,
                 status: OrderStatus.OPEN,
                 courierId: null,
-                version: expectedVersion, // Ensure the version matches the expected version for optimistic concurrency control
+                version: expectedVersion,
             },
             data: {
                 ...dataToUpdate,
@@ -121,8 +126,8 @@ export async function updateRequestService(
             },
         });
 
-        if (updatedOrder.count === 0) {
-            throw new AppError("The request changed while you were editing it. Reload and try again.", 409);
+        if (updatedOrder.count !== 1) {
+            throw new AppError("The request changed while you were updating it. Reload and try again.", 409);
         }
 
         // Return the updated order
@@ -283,6 +288,11 @@ export async function receiveRequestService(
         );
     }
 
+    // Ensure the version matches the current version for optimistic concurrency control
+    if (existingOrder.version !== input.expectedVersion) {
+        throw new AppError("The request changed while being marked as received. Reload and try again.", 409);
+    }
+
     const eventId = randomUUID();
     const receivedAt = new Date();
 
@@ -303,12 +313,12 @@ export async function receiveRequestService(
                 requesterId: requesterId,
                 status: OrderStatus.COMPLETED,
                 courierId: existingOrder.courierId,
-                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+                version: input.expectedVersion,
             },
             data: {
                 status: OrderStatus.RECEIVED,
                 receivedAt: receivedAt,
-                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+                version: { increment: 1 },
             },
         });
 
@@ -369,6 +379,11 @@ export async function failRequestService(
         throw new AppError("This order does not have a credit reservation to refund", 409);
     }
 
+    // Ensure the version matches the current version for optimistic concurrency control
+    if (existingOrder.version !== input.expectedVersion) {
+        throw new AppError("The request changed while being marked as failed. Reload and try again.", 409);
+    }
+
     const eventId = randomUUID();
     const failedAt = new Date();
 
@@ -388,13 +403,13 @@ export async function failRequestService(
                 requesterId: requesterId,
                 status: OrderStatus.COMPLETED,
                 courierId: existingOrder.courierId,
-                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+                version: input.expectedVersion,
             },
             data: {
                 status: OrderStatus.FAILED,
                 failedAt: failedAt,
                 failureReason: input.failureReason,
-                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+                version: { increment: 1 },
             },
         });
 
@@ -454,6 +469,11 @@ export async function cancelRequestService(
         throw new AppError("This order does not have a credit reservation to release", 409);
     }
 
+    // Ensure the version matches the current version for optimistic concurrency control
+    if (existingOrder.version !== input.expectedVersion) {
+        throw new AppError("The request changed while you were canceling it. Reload and try again.", 409);
+    }
+
     const eventId = randomUUID();
     const canceledAt = new Date();
     const reason = input.cancellationReason ?? null;
@@ -474,13 +494,13 @@ export async function cancelRequestService(
                 requesterId: requesterId,
                 courierId: null,
                 status: OrderStatus.OPEN,
-                version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+                version: input.expectedVersion,
             },
             data: {
                 status: OrderStatus.CANCELED,
                 canceledAt: canceledAt,
                 cancellationReason: reason,
-                version: { increment: 1 }, // Increment the version for optimistic concurrency control
+                version: { increment: 1 },
             },
         });
 
@@ -540,12 +560,14 @@ export async function renewExpiredRequestService(
         throw new AppError("Only expired requests can be renewed", 409);
     }
 
-    if (existingOrder.version !== input.expectedVersion) {
-        throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
-    }
-
+    // Ensure the order has a credit reservation before allowing it to be renewed
     if (!existingOrder.creditReservationId) {
         throw new AppError("This order does not have a credit reservation to renew", 409);
+    }
+
+    // Ensure the version matches the current version for optimistic concurrency control
+    if (existingOrder.version !== input.expectedVersion) {
+        throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
     }
 
     // Generate a unique renewal key for this renewal attempt.
@@ -573,15 +595,16 @@ export async function renewExpiredRequestService(
                 where: {
                     id: orderId,
                     requesterId: requesterId,
+                    creditReservationId: existingOrder.creditReservationId,
                     status: OrderStatus.EXPIRED,
-                    version: input.expectedVersion, // Ensure the version matches the current version for optimistic concurrency control
+                    version: input.expectedVersion,
                 },
                 data: {
                     status: OrderStatus.OPEN,
                     expiryAt: input.expiryAt,
                     expiredAt: null,
                     creditReservationId: newReservation!.id,
-                    version: { increment: 1 }, // Increment the version for optimistic concurrency control
+                    version: { increment: 1 },
                 },
             });
 

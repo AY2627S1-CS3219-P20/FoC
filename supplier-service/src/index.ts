@@ -25,7 +25,7 @@ app.use(express.json());
 app.use("/api/internal/suppliers", internalSupplierRouter);
 
 // Health check endpoint
-app.get("/suppliers", (_req: Request, res: Response) => {
+app.get("/healthz", (_req: Request, res: Response) => {
     res.send("Suppliers service is running");
 });
 

@@ -25,7 +25,7 @@ app.use(express.json());
 app.use("/api/internal/credits", internalCreditRouter);
 
 // Health check endpoint
-app.get("/credits", (_req: Request, res: Response) => {
+app.get("/healthz", (_req: Request, res: Response) => {
     res.send("Credits service is running");
 });
 

@@ -1,5 +1,5 @@
 import type { ApiUser } from "@/features/auth/types/auth.types";
-import { creditKeys } from "@/features/credit/credit.keys";
+import { creditKeys } from "@/features/credit/hooks/credit.keys";
 import queryClient from "@/lib/queryClient";
 import { create } from "zustand";
 

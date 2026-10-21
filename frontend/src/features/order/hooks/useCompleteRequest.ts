@@ -4,7 +4,6 @@ import type { ParsedError } from "@/utils/errorHandler";
 import { completeRequestService } from "../services/order.courier.service";
 import { courierOrderQueryKeys } from "./courierOrderQueryKeys";
 import { toast } from "react-toastify";
-import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 
 export function useCompleteRequest() {
     const queryClient = useQueryClient();
@@ -12,14 +11,10 @@ export function useCompleteRequest() {
     const { mutateAsync, isPending, isSuccess, isError } = useMutation<Order, ParsedError, string>({
         mutationFn: (orderId) => completeRequestService(orderId),
         onSuccess: async () => {
-            await Promise.all([
-                queryClient.invalidateQueries({
-                    queryKey: courierOrderQueryKeys.all,
-                }),
-                queryClient.invalidateQueries({
-                    queryKey: requesterOrderHistoryQueryKeys.all,
-                })
-            ]);
+            queryClient.invalidateQueries({
+                queryKey: courierOrderQueryKeys.all,
+            });
+
             toast.success("Request completed");
         },
         onError: (error) => {

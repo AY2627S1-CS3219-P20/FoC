@@ -4,7 +4,7 @@ import type { ParsedError } from "@/utils/errorHandler";
 import { cancelRequestService } from "../services/order.requester.service";
 import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 import { toast } from "react-toastify";
-import { creditKeys } from "@/features/credit/credit.keys";
+import { creditKeys } from "@/features/credit/hooks/credit.keys";
 
 export function useCancelRequest() {
     const queryClient = useQueryClient();
