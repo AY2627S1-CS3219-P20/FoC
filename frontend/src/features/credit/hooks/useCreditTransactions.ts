@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ROLES } from "@/features/auth/types/auth.types";
 import useAuth from "@/hooks/useAuth";
 import { parseError, type ParsedError } from "@/utils/errorHandler";
-import { creditKeys } from "../credit.keys";
+import { creditKeys } from "./credit.keys";
 import { getCreditTransactionsService } from "../services/credit.service";
 import type { CreditTransactionParams, CreditTransactions } from "../types/credit.types";
 

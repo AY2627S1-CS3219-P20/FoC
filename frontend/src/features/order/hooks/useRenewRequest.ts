@@ -3,8 +3,7 @@ import { toast } from "react-toastify";
 import type { ParsedError } from "@/utils/errorHandler";
 import type { Order, RenewRequestPayload } from "../types/order.types";
 import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
-import { courierOrderQueryKeys } from "./courierOrderQueryKeys";
-import { creditKeys } from "@/features/credit/credit.keys";
+import { creditKeys } from "@/features/credit/hooks/credit.keys";
 import { renewRequestService } from "../services/order.requester.service";
 
 export function useRenewRequest() {
@@ -15,19 +14,13 @@ export function useRenewRequest() {
     >({
         mutationFn: ({ orderId, payload }) =>
             renewRequestService(orderId, payload),
-        onSuccess: async (order) => {
+        onSuccess: async () => {
             await Promise.all([
                 queryClient.invalidateQueries({
                     queryKey: requesterOrderHistoryQueryKeys.all,
                 }),
                 queryClient.invalidateQueries({
-                    queryKey: courierOrderQueryKeys.all,
-                }),
-                queryClient.invalidateQueries({
-                    queryKey: creditKeys.balance(order.requesterId),
-                }),
-                queryClient.invalidateQueries({
-                    queryKey: creditKeys.transactions(order.requesterId),
+                    queryKey: creditKeys.all,
                 }),
             ]);
 

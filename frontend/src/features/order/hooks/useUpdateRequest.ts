@@ -14,6 +14,7 @@ export function useUpdateRequest() {
             await queryClient.invalidateQueries({
                 queryKey: requesterOrderHistoryQueryKeys.all,
             });
+            
             toast.success("Request updated successfully");
         },
         onError: (error) => {

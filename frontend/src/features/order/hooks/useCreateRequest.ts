@@ -3,7 +3,7 @@ import { parseError, type ParsedError } from "@/utils/errorHandler";
 import { toast } from "react-toastify";
 import type { CreateRequestPayload, Order } from "@/features/order/types/order.types";
 import { createRequestService } from "@/features/order/services/order.requester.service";
-import { creditKeys } from "@/features/credit/credit.keys";
+import { creditKeys } from "@/features/credit/hooks/credit.keys";
 import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 
 const useCreateRequest = () => {

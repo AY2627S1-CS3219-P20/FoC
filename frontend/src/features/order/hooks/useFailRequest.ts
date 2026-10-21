@@ -2,10 +2,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { FailRequestPayload, Order } from "../types/order.types";
 import type { ParsedError } from "@/utils/errorHandler";
 import { failedRequestService } from "../services/order.requester.service";
-import { courierOrderQueryKeys } from "./courierOrderQueryKeys";
 import { requesterOrderHistoryQueryKeys } from "./requesterOrderQueryKeys";
 import { toast } from "react-toastify";
-import { creditKeys } from "@/features/credit/credit.keys";
+import { creditKeys } from "@/features/credit/hooks/credit.keys";
 
 export function useFailRequest() {
     const queryClient = useQueryClient();
@@ -15,15 +14,13 @@ export function useFailRequest() {
         onSuccess: async () => {
             await Promise.all([
                 queryClient.invalidateQueries({
-                    queryKey: courierOrderQueryKeys.all,
-                }),
-                queryClient.invalidateQueries({
                     queryKey: requesterOrderHistoryQueryKeys.all,
                 }),
                 queryClient.invalidateQueries({
                     queryKey: creditKeys.all,
                 })
             ]);
+
             toast.success("Request marked as failed");
         },
         onError: (error) => {

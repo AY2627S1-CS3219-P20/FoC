@@ -1,4 +1,4 @@
-import type { CreditTransactionParams } from "./types/credit.types";
+import type { CreditTransactionParams } from "../types/credit.types";
 
 export const creditKeys = {
     all: ["credits"] as const,
