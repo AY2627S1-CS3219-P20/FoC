@@ -19,8 +19,8 @@ services:
   credit-service:
     build: .
     restart: unless-stopped
-    ports:
-      - "${PORT:?Set PORT in credit-service/.env}:${PORT}"
+    # ports:
+    #   - "${PORT:?Set PORT in credit-service/.env}:${PORT}"
     env_file: .env
     volumes:
       - ../user-service/keys/public.pem:${JWT_PUBLIC_KEY_PATH:?Set JWT_PUBLIC_KEY_PATH in credit-service/.env}:ro

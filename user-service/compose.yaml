@@ -21,8 +21,8 @@ services:
   user-service:
     build: .
     restart: unless-stopped
-    ports:
-      - "${PORT:?Set PORT in user-service/.env}:${PORT}"
+    # ports:
+    #   - "${PORT:?Set PORT in user-service/.env}:${PORT}"
     # Inject user-service/.env values into the container at runtime.
     env_file: .env
     # These explicit values override matching entries supplied by env_file.
