@@ -100,6 +100,13 @@ Sets `status = DEACTIVATED`. The record is kept so historical orders remain
 viewable. Rejects unknown suppliers (`404`) and already-deactivated suppliers
 (`409`). Deactivated suppliers no longer appear as available for new errands.
 
+### Activate supplier (`PATCH /api/suppliers/:supplierId/activation`)
+
+Admin-only; no request body is required. Sets `status = ACTIVATED` so the supplier
+is available for new errands again, preserving its details and historical orders.
+Returns `200` with the supplier, including opening hours. An already-active supplier
+returns `200` without a database update. Unknown suppliers return `404`.
+
 ### Fetch all the current supplier types (`GET /api/suppliers/types`)
 A simple function that returns all the supplier types in ascending alphabetical order. No query parameters are required for this endpoint.
 

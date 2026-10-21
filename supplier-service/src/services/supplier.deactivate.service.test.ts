@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { deactivateSupplier } from "./supplier.service.js";
+import { activateSupplier, deactivateSupplier } from "./supplier.service.js";
 import { AppError } from "../errors/errors.js";
 
 type SupplierData = {
@@ -38,13 +38,15 @@ function createMockPrisma(config: MockConfig = {}) {
     };
 
     const captured = {
+        findUniqueArgs: undefined as unknown,
         updateArgs: undefined as unknown,
     };
 
     const prisma = {
         supplier: {
-            findUnique: mock.fn(async () => {
+            findUnique: mock.fn(async (args: unknown) => {
                 calls.findUnique++;
+                captured.findUniqueArgs = args;
                 return config.supplierFindUnique ?? null;
             }),
             update: mock.fn(async (args: unknown) => {
@@ -103,4 +105,44 @@ test("deactivateSupplier sets the supplier status to DEACTIVATED", async () => {
 
     const data = (captured.updateArgs as { data: SupplierData }).data;
     assert.equal(data.status, "DEACTIVATED");
+});
+
+test("activateSupplier returns 404 without writing for an unknown supplier", async () => {
+    const { prisma, calls } = createMockPrisma();
+    await assert.rejects(() => activateSupplier(prisma, "missing"), (error: unknown) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.statusCode, 404);
+        return true;
+    });
+    assert.equal(calls.update, 0);
+});
+
+test("activateSupplier returns the existing active supplier without writing", async () => {
+    const supplier = { ...MOCK_SUPPLIER, openingHours: [{ day: "MONDAY" }] };
+    const { prisma, calls, captured } = createMockPrisma({ supplierFindUnique: supplier });
+    const result = await activateSupplier(prisma, supplier.id);
+    assert.strictEqual(result, supplier);
+    assert.equal(calls.update, 0);
+    assert.deepEqual(captured.findUniqueArgs, {
+        where: { id: supplier.id },
+        include: { openingHours: true },
+    });
+});
+
+test("activateSupplier changes only the selected supplier's status and is safe to repeat", async () => {
+    const supplier = { ...MOCK_SUPPLIER, status: "DEACTIVATED" };
+    const activeSupplier = { ...supplier, status: "ACTIVATED" };
+    const { prisma, calls, captured } = createMockPrisma({
+        supplierFindUnique: supplier,
+        updateReturn: activeSupplier,
+    });
+    assert.deepEqual(await activateSupplier(prisma, supplier.id), activeSupplier);
+    assert.deepEqual(captured.updateArgs, {
+        where: { id: supplier.id },
+        data: { status: "ACTIVATED" },
+        include: { openingHours: true },
+    });
+    supplier.status = "ACTIVATED";
+    assert.strictEqual(await activateSupplier(prisma, supplier.id), supplier);
+    assert.equal(calls.update, 1);
 });

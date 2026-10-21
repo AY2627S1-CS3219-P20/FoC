@@ -44,6 +44,7 @@ export const ENDPOINTS = {
         createSupplier: `${BASE_SUPPLIER}/`,
         updateSupplier: `${BASE_SUPPLIER}/:supplierId`,
         deactivateSupplier: `${BASE_SUPPLIER}/:supplierId/deactivation`,
+        activateSupplier: `${BASE_SUPPLIER}/:supplierId/activation`,
         getAllSupplierTypes: `${BASE_SUPPLIER}/types`,
         countsForEachSupplierType: `${BASE_SUPPLIER}/types/count`,
         createSupplierType: `${BASE_SUPPLIER}/types`,
