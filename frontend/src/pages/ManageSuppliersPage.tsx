@@ -10,7 +10,8 @@ import {
     createSupplier,
     updateSupplier,
     getAllSupplierTypes,
-    deactivateSupplier
+    deactivateSupplier,
+    activateSupplier
 } from "@/features/supplier/services/supplier.service";
 import {
     Pagination,
@@ -36,7 +37,6 @@ import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import SupplierForm from "@/features/supplier/components/SupplierForm";
 import SupplierModal from "@/features/supplier/components/SupplierModal";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { allActiveSuppliersQueryKey } from "@/features/order/hooks/useAllActiveSuppliers";
 
 interface OpeningHourRow {
     day: SupplierDay;
@@ -74,6 +74,7 @@ const ManageSuppliersPage = () => {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
     const [supplierToDeactivate, setSupplierToDeactivate] = useState<Supplier | null>(null);
+    const [supplierToActivate, setSupplierToActivate] = useState<Supplier | null>(null);
 
     // keep the search string and type filter across navigations, matching the /suppliers page
     const [searchString, setSearchString] = useState(() => sessionStorage.getItem("searchString") ?? "");
@@ -116,7 +117,7 @@ const ManageSuppliersPage = () => {
     const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: ["admin-suppliers"], exact: false });
         queryClient.invalidateQueries({ queryKey: ["admin-suppliers-total-pages"] });
-        queryClient.invalidateQueries({ queryKey: allActiveSuppliersQueryKey });
+        queryClient.invalidateQueries({ queryKey: ["suppliers"] });
     };
 
     const goToPage = (page: number) => {
@@ -164,6 +165,18 @@ const ManageSuppliersPage = () => {
         onSuccess: () => {
             toast.success("Supplier deactivated");
             setSupplierToDeactivate(null);
+            invalidate();
+        },
+        onError: (error: ParsedError) => {
+            toast.error(error.message);
+        },
+    });
+
+    const activateMutation = useMutation({
+        mutationFn: activateSupplier,
+        onSuccess: () => {
+            toast.success("Supplier activated");
+            setSupplierToActivate(null);
             invalidate();
         },
         onError: (error: ParsedError) => {
@@ -272,6 +285,7 @@ const ManageSuppliersPage = () => {
                                     supplier={supplier}
                                     onEdit={() => setEditingSupplier(supplier)}
                                     onDeactivate={() => setSupplierToDeactivate(supplier)}
+                                    onActivate={() => setSupplierToActivate(supplier)}
                                 />
                             ))}
                         </div>
@@ -356,6 +370,39 @@ const ManageSuppliersPage = () => {
                         onSubmit={handleSubmitForm}
                         onCancel={() => setEditingSupplier(null)}
                     />
+                </SupplierModal>
+            )}
+
+            {supplierToActivate && (
+                <SupplierModal
+                    open={true}
+                    onClose={() => { if (!activateMutation.isPending) setSupplierToActivate(null); }}
+                    title="Activate Supplier"
+                >
+                    <div className="flex flex-col gap-4">
+                        <p className="text-sm">
+                            Activate <span className="font-medium">{supplierToActivate.name}</span>?
+                            {" "}This supplier will be available for new errand requests again.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={activateMutation.isPending}
+                                onClick={() => setSupplierToActivate(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="green"
+                                isLoading={activateMutation.isPending}
+                                onClick={() => activateMutation.mutate(supplierToActivate.id)}
+                            >
+                                Activate supplier
+                            </Button>
+                        </div>
+                    </div>
                 </SupplierModal>
             )}
 

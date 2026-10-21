@@ -14,7 +14,8 @@ import {
     fetchAllSuppliers,
     updateSupplier as updateSupplierService,
     getSuppliersByIdsService,
-    deactivateSupplier as deactivateSupplierService
+    deactivateSupplier as deactivateSupplierService,
+    activateSupplier as activateSupplierService
 } from "../services/supplier.service.js";
 
 export async function getSuppliers(req: Request, res: Response) {
@@ -105,6 +106,22 @@ export async function deactivateSupplier(req: Request, res: Response) {
     }
 
     const supplier = await deactivateSupplierService(prisma, id);
+
+    return res.status(200).json({
+        success: true,
+        code: "SUCCESS",
+        data: supplier,
+    });
+}
+
+export async function activateSupplier(req: Request, res: Response) {
+    const id = req.params.supplierId;
+
+    if (typeof id !== "string" || !id) {
+        throw new AppError("Supplier id is required", 400, "BAD_REQUEST");
+    }
+
+    const supplier = await activateSupplierService(prisma, id);
 
     return res.status(200).json({
         success: true,
