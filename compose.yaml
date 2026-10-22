@@ -12,7 +12,7 @@ services:
       - supplier-service
       - order-service
       - credit-service
-    networks: 
+    networks:
       - default
       - backend
 
@@ -94,12 +94,9 @@ networks:
     internal: true
   user-db:
     internal: true
-  supplier-db: 
-    internal:
-      true
+  supplier-db:
+    internal: true
   order-db:
-    internal:
-      true
+    internal: true
   credit-db:
-    internal:
-      true
+    internal: true
