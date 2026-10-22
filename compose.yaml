@@ -1,26 +1,62 @@
 include:
-  - supplier-service/compose.yml
+  - supplier-service/compose.yaml
   - user-service/compose.yaml
   - order-service/compose.yaml
   - credit-service/compose.yaml
   - frontend/compose.yaml
 
 services:
+  frontend: 
+    networks: 
+      - default
+      - backend
+
   # RabbitMQ is shared; keep its startup dependency at the root.
   user-service:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - default
+      - backend
+      - user-db
+
+  user-postgres:
+    networks:
+      - user-db
 
   order-service:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - backend
+      - order-db
+
+  order-postgres:
+    networks:
+      - order-db
 
   credit-service:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - backend
+      - credit-db
+
+  credit-postgres:
+    networks:
+      - credit-db
+
+  supplier-service:
+    networks:
+      - backend
+      - supplier-db
+
+  supplier-postgres:
+    networks:
+      - supplier-db
 
   rabbitmq:
     # Source: Docker Hub Official RabbitMQ Image — https://hub.docker.com/_/rabbitmq
@@ -42,6 +78,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - backend
 
 volumes:
   rabbitmq_data:
+
+networks:
+  backend:
+    internal: true
+  user-db:
+    internal: true
+  supplier-db: 
+    internal:
+      true
+  order-db:
+    internal:
+      true
+  credit-db:
+    internal:
+      true

@@ -24,8 +24,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supplier-postgres:5432/suppliers?sslmode=disable
       JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
-    ports:
-      - "3001:3001"
+    # ports:
+    #   - "3001:3001"
     volumes:
       - ./keys/public.pem:/app/keys/public.pem:ro # read-only (ro)
       # seed.ts reads ../data/csv relative to /app, i.e. /data/csv
