@@ -36,7 +36,7 @@ export const acceptRequestService = async (
     orderId: string,
 ): Promise<Order> => {
     try {
-        const response = await orderApi.put<ApiResponse<Order>>(
+        const response = await orderApi.post<ApiResponse<Order>>(
             `${ENDPOINTS.order.acceptOrder}`.replace(":orderId", orderId)
         );
 
@@ -50,7 +50,7 @@ export const pickUpRequestService = async (
     orderId: string,
 ): Promise<Order> => {
     try {
-        const response = await orderApi.put<ApiResponse<Order>>(
+        const response = await orderApi.post<ApiResponse<Order>>(
             `${ENDPOINTS.order.pickUpOrder}`.replace(":orderId", orderId)
         );
 
@@ -64,7 +64,7 @@ export const completeRequestService = async (
     orderId: string,
 ): Promise<Order> => {
     try {
-        const response = await orderApi.put<ApiResponse<Order>>(
+        const response = await orderApi.post<ApiResponse<Order>>(
             `${ENDPOINTS.order.completeOrder}`.replace(":orderId", orderId)
         );
 

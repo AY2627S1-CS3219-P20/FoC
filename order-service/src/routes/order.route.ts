@@ -51,15 +51,15 @@ orderRouter.post("/:orderId/failure", authorize(Role.STUDENT), failRequest);
 orderRouter.post("/:orderId/renewal", authorize(Role.STUDENT), renewExpiredRequest);
 
 // Accept an order (by courier)
-orderRouter.put("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
+orderRouter.post("/:orderId/acceptance", authorize(Role.STUDENT), acceptOrder);
 
 // Drop acceptance (by courier)
 orderRouter.delete("/:orderId/acceptance", authorize(Role.STUDENT), dropOrder);
 
 // Mark an order as picked up (by courier)
-orderRouter.put("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
+orderRouter.post("/:orderId/pickup", authorize(Role.STUDENT), pickUpOrder);
 
 // Mark an order as completed (by courier)
-orderRouter.put("/:orderId/completion", authorize(Role.STUDENT), completeOrder);;
+orderRouter.post("/:orderId/completion", authorize(Role.STUDENT), completeOrder);
 
 export default orderRouter;
