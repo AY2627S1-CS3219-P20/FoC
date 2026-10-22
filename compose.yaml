@@ -6,7 +6,12 @@ include:
   - frontend/compose.yaml
 
 services:
-  frontend: 
+  frontend:
+    depends_on:
+      - user-service
+      - supplier-service
+      - order-service
+      - credit-service
     networks: 
       - default
       - backend
