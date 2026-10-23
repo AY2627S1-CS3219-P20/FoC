@@ -1006,5 +1006,6 @@ To go through the frontend proxy, go to the root folder `foc` and run `docker co
 - [Prisma](https://www.prisma.io/)
 - [PostgreSQL](https://www.postgresql.org/)
 - [Zod](https://zod.dev/)
-- [Argon2](https://www.npmjs.com/package/argon2)
 - [JSON Web Token](https://jwt.io/)
+- [RabbitMQ](https://www.rabbitmq.com/)
+- [Docker](https://www.docker.com/)
