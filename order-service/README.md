@@ -9,6 +9,7 @@
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [API Reference](#api-reference)
+- [Getting Started](#getting-started)
 - [Acknowledgements](#acknowledgements)
 
 ## About
@@ -286,7 +287,7 @@ Authorization: Bearer <access-token>
     "data": {
         "id": "e94ee4b9-2839-4fbd-b80e-89d1a324b96e",
         "requesterId": "5bb703e8-b4f5-4568-bb14-5a2bf9a392b0",
-        "courierId": null,
+        "courierId": null, // null because no courier has accepted this order yet
         "name": "new test",
         "description": "new test order",
         "pickupSupplierId": "3017fe6a-3577-4918-bbaa-9d91455bc38f",
@@ -398,6 +399,7 @@ Gets orders that have been accepted by the current user, with server-side pagina
 ```http
 Authorization: Bearer <access-token>
 ```
+
 #### Query Parameters
 
 ```text
@@ -970,3 +972,39 @@ Status | Description
 
 --------------------------------------------------------------------------------
 
+### Error Response Format
+
+Common error codes include:
+
+Code                    | HTTP Status | Description
+----------------------- | ----------: | ----------------------------------
+`BAD_REQUEST`           |       `400` | Invalid request
+`UNAUTHORIZED`          |       `401` | Authentication required or invalid
+`FORBIDDEN`             |       `403` | Insufficient permissions
+`NOT_FOUND`             |       `404` | Resource not found
+`CONFLICT`              |       `409` | Resource already exists
+`INTERNAL_SERVER_ERROR` |       `500` | Unexpected server error
+
+
+## Getting Started
+
+### Pre-requisites
+
+Copy `.env.example` to `.env` inside `user-service` and fill in the values.
+
+### Containerization
+
+The Order Service has been containerized with Docker. Use `docker compose up --build order-service` in the root folder to build only the `order-service` container and its dependencies `order-postgres` and `rabbitmq`. 
+
+However, building the Order Service container does not mean the API endpoints for the service can be called directly. The Order Service runs on the Docker `backend` and `order-db` networks, which are both internal networks. All calls to the Order Service must be done through the frontend proxy. 
+
+To go through the frontend proxy, go to the root folder `foc` and run `docker compose up --build`. Then from Postman or the browser's dev tools, add the Bearer authentication token, call `http://localhost:5173/api/orders` or the relevant order service endpoints. 
+
+## Acknowledgements
+
+- [Express](https://expressjs.com/)
+- [Prisma](https://www.prisma.io/)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Zod](https://zod.dev/)
+- [Argon2](https://www.npmjs.com/package/argon2)
+- [JSON Web Token](https://jwt.io/)
