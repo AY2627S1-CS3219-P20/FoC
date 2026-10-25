@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import SupplierSelect from "./SupplierSelect";
 import useCreateRequest from "@/features/order/hooks/useCreateRequest";
+import useCreditBalance from "@/features/credit/hooks/useCreditBalance";
 import DateTimePicker from "./DateTimePicker";
 
 interface CreateRequestFormProps {
@@ -14,6 +15,9 @@ interface CreateRequestFormProps {
 
 const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
     const { createRequest, isPending } = useCreateRequest();
+    const credit = useCreditBalance();
+    // A new account is granted credits asynchronously; reserving before then fails.
+    const isProvisioning = credit.state.status === "provisioning" || credit.state.status === "delayed";
 
     const form = useForm({
         defaultValues: {
@@ -29,6 +33,7 @@ const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
             onSubmit: createRequestSchema,
         },
         onSubmit: async ({ value }) => {
+            if (isProvisioning) return;
             const parsedData: CreateRequestFormData = createRequestSchema.parse(value);
             createRequest(parsedData);
             onCancel();
@@ -190,6 +195,24 @@ const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
                         }}
                     />
                 </FieldGroup>
+                {isProvisioning && (
+                    <div role="status" className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+                        <p className="font-medium text-slate-900">
+                            {credit.state.status === "delayed" ? "Credit setup is taking longer than expected" : "Setting up credits"}
+                        </p>
+                        <p className="text-slate-600">Your credit account is being set up. You can submit once it's ready.</p>
+                        {credit.state.status === "delayed" && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={credit.fetchStatus !== "idle"}
+                                onClick={() => { void credit.retry(); }}
+                            >
+                                Retry credit setup
+                            </Button>
+                        )}
+                    </div>
+                )}
                 <div className="flex flex-row gap-3 items-center justify-end">
                     <Button type="button" variant="outline" onClick={onCancel}>
                         Cancel
@@ -199,6 +222,7 @@ const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
                         className="w-fit"
                         variant="indigo"
                         isLoading={isPending}
+                        disabled={isProvisioning}
                     >
                         Submit Request
                     </Button>
