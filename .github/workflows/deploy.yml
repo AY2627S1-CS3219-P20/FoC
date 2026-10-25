@@ -85,7 +85,7 @@ jobs:
                 sleep 5
               done
             done
-            # nginx caches upstream IPs at startup; recreated services may have new ones.
+            # Load the gateway/nginx.conf that scp just copied over.
             $dc exec -T gateway nginx -s reload
             sed -i '/^IMAGE_TAG=/d' .env && echo "IMAGE_TAG=$IMAGE_TAG" >> .env
             docker image prune -af --filter "until=72h"
