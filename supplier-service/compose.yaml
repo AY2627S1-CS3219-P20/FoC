@@ -2,7 +2,7 @@ services:
   # reference for postgres: https://www.prisma.io/docs/guides/deployment/docker
   supplier-postgres:
     image: postgres:17
-    restart: always
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=suppliers
       - POSTGRES_USER=${POSTGRES_USER:?Set POSTGRES_USER in supplier-service/.env}
@@ -38,3 +38,5 @@ services:
 volumes:
   supplier_postgres_data:
   supplier_uploads:
+
+
