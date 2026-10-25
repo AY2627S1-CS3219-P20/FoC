@@ -1,0 +1,38 @@
+# Production override: docker compose -f compose.yaml -f compose.prod.yaml ...
+# Images come from ECR (pushed by .github/workflows/deploy.yml); the SPA is served by S3/CloudFront.
+services:
+  user-service:
+    build: !reset null
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY in .env}/foc/user-service:${IMAGE_TAG:-latest}
+  supplier-service:
+    build: !reset null
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY in .env}/foc/supplier-service:${IMAGE_TAG:-latest}
+  order-service:
+    build: !reset null
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY in .env}/foc/order-service:${IMAGE_TAG:-latest}
+  credit-service:
+    build: !reset null
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY in .env}/foc/credit-service:${IMAGE_TAG:-latest}
+
+  # Served from S3 + CloudFront in production.
+  frontend:
+    profiles: ["local-only"]
+
+  # Replaces the frontend container's /api reverse proxy; CloudFront sends /api/* here.
+  gateway:
+    image: nginxinc/nginx-unprivileged:stable-alpine
+    restart: unless-stopped
+    volumes:
+      # Mount the folder, not the file: scp replaces nginx.conf with a new file,
+      # and a single-file mount would keep showing the old one after a reload.
+      - ./gateway:/etc/nginx/conf.d:ro
+    ports:
+      - "80:8080"
+    depends_on:
+      - user-service
+      - supplier-service
+      - order-service
+      - credit-service
+    networks:
+      - default # publishing a port needs a non-internal network
+      - backend
