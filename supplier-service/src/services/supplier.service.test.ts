@@ -2,12 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import {
-    createSupplier,
-    updateSupplier,
-} from "../services/supplier.service.js";
 import { AppError } from "../errors/errors.js";
 import type { CreateSupplierInput } from "../schemas/supplier.schema.js";
+
+mock.module("../libs/prisma.js", { namedExports: { prisma: {} } });
+const { createSupplier, updateSupplier } = await import("./supplier.service.js");
 
 type SupplierData = {
     name: string;
@@ -16,7 +15,7 @@ type SupplierData = {
     latitude: number;
     floor: string;
     openingHours: {
-        create: Array<{ day: string }>;
+        create: Array<{ day: string; openingTime: Date; closingTime: Date }>;
         deleteMany?: unknown;
     };
 };
@@ -72,13 +71,16 @@ function createMockPrisma(config: MockConfig = {}) {
     };
 
     const captured = {
+        findManyArgs: undefined as unknown,
+        typeFindUniqueArgs: undefined as unknown,
         createArgs: undefined as unknown,
         updateArgs: undefined as unknown,
     };
 
     const prisma = {
         supplier: {
-            findMany: mock.fn(async () => {
+            findMany: mock.fn(async (args: unknown) => {
+                captured.findManyArgs = args;
                 calls.findMany++;
                 return config.findManyReturn ?? [];
             }),
@@ -98,7 +100,8 @@ function createMockPrisma(config: MockConfig = {}) {
             }),
         },
         supplierType: {
-            findUnique: mock.fn(async () => {
+            findUnique: mock.fn(async (args: unknown) => {
+                captured.typeFindUniqueArgs = args;
                 calls.typeFindUnique++;
                 return config.typeFindUnique ?? null;
             }),
@@ -109,12 +112,12 @@ function createMockPrisma(config: MockConfig = {}) {
 }
 
 test("createSupplier rejects a duplicate (case-insensitive) name", async () => {
-    const { prisma, calls } = createMockPrisma({
+    const { prisma, calls, captured } = createMockPrisma({
         findManyReturn: [MOCK_SUPPLIER],
     });
 
     await assert.rejects(
-        () => createSupplier(prisma, validCreateInput),
+        () => createSupplier(prisma, { ...validCreateInput, name: "STARBUCKS" }),
         (error: unknown) => {
             assert.ok(error instanceof AppError);
             assert.equal(error.statusCode, 409);
@@ -123,6 +126,9 @@ test("createSupplier rejects a duplicate (case-insensitive) name", async () => {
     );
 
     assert.equal(calls.create, 0);
+    assert.deepEqual(captured.findManyArgs, {
+        where: { name: { equals: "STARBUCKS", mode: "insensitive" } },
+    });
 });
 
 test("createSupplier rejects an unknown supplier type", async () => {
@@ -158,6 +164,18 @@ test("createSupplier stores a new supplier as ACTIVATED with its opening hours",
     assert.equal(data.latitude, 1.3);
     assert.equal(data.openingHours.create.length, 2);
     assert.equal(data.openingHours.create[0]!.day, "MONDAY");
+    assert.equal(data.openingHours.create[0]!.openingTime.toISOString(), "1970-01-01T08:00:00.000Z");
+    assert.equal(data.openingHours.create[0]!.closingTime.toISOString(), "1970-01-01T18:00:00.000Z");
+    assert.deepEqual(captured.typeFindUniqueArgs, { where: { type: "FOOD" } });
+    const { imageUrl: _imageUrl, ...expectedInput } = validCreateInput;
+    assert.deepEqual(captured.createArgs, {
+        data: {
+            ...expectedInput,
+            status: "ACTIVATED",
+            openingHours: data.openingHours,
+        },
+        include: { openingHours: true },
+    });
 });
 
 test("updateSupplier returns 404 for an unknown supplier", async () => {
@@ -232,7 +250,7 @@ test("updateSupplier rejects an empty payload", async () => {
 test("updateSupplier changes scalar fields and replaces opening hours", async () => {
     const { prisma, calls, captured } = createMockPrisma({
         supplierFindUnique: { ...MOCK_SUPPLIER, status: "ACTIVATED" },
-        updateReturn: { ...MOCK_SUPPLIER, name: "Starbucks Rebranded", floor: 5 },
+        updateReturn: { ...MOCK_SUPPLIER, name: "Starbucks Rebranded", floor: "5" },
     });
 
     const result = await updateSupplier(prisma, "sup_1", {
@@ -247,7 +265,107 @@ test("updateSupplier changes scalar fields and replaces opening hours", async ()
     const data = (captured.updateArgs as { data: SupplierData }).data;
     assert.equal(data.name, "Starbucks Rebranded");
     assert.equal(data.floor, "5");
-    assert.ok(data.openingHours.deleteMany);
+    assert.deepEqual(data.openingHours.deleteMany, {});
     assert.equal(data.openingHours.create.length, 1);
     assert.equal(data.openingHours.create[0]!.day, "FRIDAY");
+    assert.deepEqual(captured.updateArgs, {
+        where: { id: "sup_1" },
+        data: {
+            name: "Starbucks Rebranded",
+            floor: "5",
+            openingHours: {
+                deleteMany: {},
+                create: [{ day: "FRIDAY", openingTime: new Date("1970-01-01T09:00:00Z"), closingTime: new Date("1970-01-01T17:00:00Z") }],
+            },
+        },
+        include: { openingHours: true },
+    });
+});
+
+test("createSupplier defaults nullable coordinates and leaves the image default to the database", async () => {
+    const { latitude, longitude, imageUrl, openingHours, ...minimal } = validCreateInput;
+    const { prisma, captured } = createMockPrisma({ typeFindUnique: { type: "FOOD" } });
+
+    await createSupplier(prisma, minimal);
+
+    assert.deepEqual(captured.createArgs, {
+        data: { ...minimal, status: "ACTIVATED", latitude: null, longitude: null, openingHours: { create: [] } },
+        include: { openingHours: true },
+    });
+});
+
+test("createSupplier preserves a supplied image and zero coordinates", async () => {
+    const { prisma, captured } = createMockPrisma({ typeFindUnique: { type: "FOOD" } });
+    await createSupplier(prisma, { ...validCreateInput, latitude: 0, longitude: 0, imageUrl: "/supplier.png" });
+    const data = (captured.createArgs as { data: Record<string, unknown> }).data;
+    assert.equal(data.latitude, 0);
+    assert.equal(data.longitude, 0);
+    assert.equal(data.imageUrl, "/supplier.png");
+});
+
+for (const action of ["create", "update"] as const) {
+    test(`${action}Supplier rejects duplicate opening days without writing`, async () => {
+        const { prisma, calls } = createMockPrisma({
+            supplierFindUnique: MOCK_SUPPLIER,
+            typeFindUnique: { type: "FOOD" },
+        });
+        const openingHours = [validCreateInput.openingHours![0]!, validCreateInput.openingHours![0]!];
+        await assert.rejects(
+            () => action === "create"
+                ? createSupplier(prisma, { ...validCreateInput, openingHours })
+                : updateSupplier(prisma, "sup_1", { openingHours }),
+            { statusCode: 400, code: "BAD_REQUEST", message: "Duplicate opening hours for MONDAY" },
+        );
+        assert.equal(calls.create, 0);
+        assert.equal(calls.update, 0);
+    });
+}
+
+test("updateSupplier changes all supplied scalar fields without replacing hours or status", async () => {
+    const { prisma, captured } = createMockPrisma({
+        supplierFindUnique: { ...MOCK_SUPPLIER, status: "DEACTIVATED" },
+        typeFindUnique: { type: "RETAIL" },
+    });
+    const input = {
+        name: "New name", type: "RETAIL", building: "Library", floor: "B1",
+        description: "Snacks", address: "2 Library Lane", latitude: 0, longitude: 0, imageUrl: "/new.png",
+    };
+
+    await updateSupplier(prisma, "sup_1", input);
+
+    assert.deepEqual(captured.updateArgs, {
+        where: { id: "sup_1" }, data: input, include: { openingHours: true },
+    });
+    assert.deepEqual(captured.typeFindUniqueArgs, { where: { type: "RETAIL" } });
+});
+
+test("updateSupplier can explicitly clear optional fields and opening hours", async () => {
+    const { prisma, captured } = createMockPrisma({ supplierFindUnique: MOCK_SUPPLIER });
+    await updateSupplier(prisma, "sup_1", { latitude: null, longitude: null, imageUrl: null, openingHours: [] });
+    assert.deepEqual(captured.updateArgs, {
+        where: { id: "sup_1" },
+        data: { latitude: null, longitude: null, imageUrl: null, openingHours: { deleteMany: {}, create: [] } },
+        include: { openingHours: true },
+    });
+});
+
+test("updateSupplier accepts a case-only rename without treating itself as a duplicate", async () => {
+    const { prisma, calls, captured } = createMockPrisma({ supplierFindUnique: MOCK_SUPPLIER });
+    await updateSupplier(prisma, "sup_1", { name: "STARBUCKS" });
+    assert.equal(calls.findMany, 0);
+    assert.equal(calls.typeFindUnique, 0);
+    assert.deepEqual(captured.updateArgs, {
+        where: { id: "sup_1" }, data: { name: "STARBUCKS" }, include: { openingHours: true },
+    });
+});
+
+test("opening hours retain seconds at the midnight boundary", async () => {
+    const { prisma, captured } = createMockPrisma({ typeFindUnique: { type: "FOOD" } });
+    await createSupplier(prisma, {
+        ...validCreateInput,
+        openingHours: [{ day: "SUNDAY", openingTime: "00:00:01", closingTime: "23:59:59" }],
+    });
+    const hours = (captured.createArgs as { data: SupplierData }).data.openingHours.create[0]!;
+    assert.equal(hours.openingTime.toISOString(), "1970-01-01T00:00:01.000Z");
+    assert.equal(hours.closingTime.toISOString(), "1970-01-01T23:59:59.000Z");
 });
