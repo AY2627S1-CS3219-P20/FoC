@@ -2,12 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { activateSupplier, deactivateSupplier } from "./supplier.service.js";
 import { AppError } from "../errors/errors.js";
 
-type SupplierData = {
-    status: string;
-};
+mock.module("../libs/prisma.js", { namedExports: { prisma: {} } });
+const { activateSupplier, deactivateSupplier } = await import("./supplier.service.js");
 
 const MOCK_SUPPLIER = {
     id: "sup_1",
@@ -103,8 +101,12 @@ test("deactivateSupplier sets the supplier status to DEACTIVATED", async () => {
     assert.equal(result.status, "DEACTIVATED");
     assert.equal(calls.update, 1);
 
-    const data = (captured.updateArgs as { data: SupplierData }).data;
-    assert.equal(data.status, "DEACTIVATED");
+    assert.deepEqual(captured.findUniqueArgs, { where: { id: "sup_1" } });
+    assert.deepEqual(captured.updateArgs, {
+        where: { id: "sup_1" },
+        data: { status: "DEACTIVATED" },
+        include: { openingHours: true },
+    });
 });
 
 test("activateSupplier returns 404 without writing for an unknown supplier", async () => {
