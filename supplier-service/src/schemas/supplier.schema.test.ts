@@ -33,16 +33,20 @@ test("createSupplierSchema accepts a complete valid payload", () => {
 
 test("createSupplierSchema trims and accepts optional fields omitted", () => {
     const minimal = {
-        name: "Vending Machine",
-        type: "RETAIL",
-        building: "Library",
-        floor: "2",
+        name: "  Vending Machine  ",
+        type: "  RETAIL  ",
+        building: "  Library  ",
+        floor: "  B2  ",
         description: "Snacks",
         address: "2 Library Lane",
     };
 
     const result = createSupplierSchema.parse(minimal);
 
+    assert.equal(result.name, "Vending Machine");
+    assert.equal(result.type, "RETAIL");
+    assert.equal(result.building, "Library");
+    assert.equal(result.floor, "B2");
     assert.equal(result.latitude, undefined);
     assert.equal(result.longitude, undefined);
     assert.equal(result.imageUrl, undefined);
@@ -112,4 +116,42 @@ test("parseInput throws AppError(422) for invalid input", () => {
             return true;
         },
     );
+});
+
+for (const field of ["name", "type", "building", "floor", "description", "address"] as const) {
+    test(`F2 requires ${field}; F3 rejects an explicitly empty ${field}`, () => {
+        const { [field]: omitted, ...rest } = validCreateInput;
+        assert.equal(createSupplierSchema.safeParse(rest).success, false);
+        assert.equal(createSupplierSchema.safeParse({ ...validCreateInput, [field]: "" }).success, false);
+        assert.equal(updateSupplierSchema.safeParse({ [field]: "" }).success, false);
+    });
+}
+
+test("F2 and F3 require string floors after the floor refactor", () => {
+    assert.equal(createSupplierSchema.safeParse({ ...validCreateInput, floor: 1 }).success, false);
+    assert.equal(updateSupplierSchema.safeParse({ floor: 1 }).success, false);
+    assert.equal(updateSupplierSchema.parse({ floor: "B1" }).floor, "B1");
+});
+
+for (const time of ["24:00", "12:60", "12:00:60", "-1:00", "9:00"]) {
+    test(`opening hours reject out-of-range or malformed time ${time}`, () => {
+        const row = { day: "MONDAY", openingTime: "08:00", closingTime: "18:00" };
+        assert.equal(openingHoursSchema.safeParse({ ...row, openingTime: time }).success, false);
+        assert.equal(openingHoursSchema.safeParse({ ...row, closingTime: time }).success, false);
+    });
+}
+
+test("opening hours accept seconds and overnight closing times", () => {
+    const row = { day: "SATURDAY", openingTime: "23:59:59", closingTime: "00:00:00" };
+    assert.deepEqual(openingHoursSchema.parse(row), row);
+});
+
+test("F3 accepts explicit nulls and empty hours to clear optional data", () => {
+    const input = { latitude: null, longitude: null, imageUrl: null, openingHours: [] };
+    assert.deepEqual(updateSupplierSchema.parse(input), input);
+});
+
+test("F2 and F3 strip status so lifecycle changes use their dedicated endpoints", () => {
+    assert.equal("status" in createSupplierSchema.parse({ ...validCreateInput, status: "DEACTIVATED" }), false);
+    assert.deepEqual(updateSupplierSchema.parse({ status: "DEACTIVATED" }), {});
 });
