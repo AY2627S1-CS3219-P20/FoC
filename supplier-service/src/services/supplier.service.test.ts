@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mock, type TestContext } from "node:test";
 import { AppError } from "../errors/errors.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateSupplierInput } from "../schemas/supplier.schema.js";
 
 mock.module("../libs/prisma.js", { namedExports: { prisma: {} } });
