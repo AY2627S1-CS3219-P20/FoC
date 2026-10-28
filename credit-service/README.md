@@ -506,13 +506,22 @@ npm run db:generate
 npm run build
 ```
 
-Run input/authentication/retry tests with `npm test`. Run PostgreSQL integration tests with:
+Run F4–F7 input-validation tests with `npm test` (no database or broker required). Generate the Prisma client with `npm run db:generate` after schema changes. Run PostgreSQL integration tests with:
 
 ```sh
 CREDIT_TEST_DATABASE_URL="postgresql://username:password@localhost:5432/credit_test" npm run test:integration
 ```
 
 Use a dedicated test database, never production. The database role needs permission to create schemas.
+
+The F4–F7 tests cover:
+
+- **F4:** available-to-reserved balances and ledger entries, full-balance reservation, insufficient funds, concurrent holds, atomic rollback, and HTTP authentication/validation.
+- **F5:** payment of held credits to the courier, conservation of credits, duplicate/conflicting receipts, and rollback of both participants' balances.
+- **F6:** cancellation and expiry returning held credits with the correct release reason and ledger entry.
+- **F7:** failure returning held credits with a REFUND entry, without refunding an already transferred reservation.
+
+Settlement checks also verify exact-event replays, competing terminal outcomes, and preservation of unrelated holds for both participants. Reservation services are redirected to the isolated test schema; application databases are not used by these tests.
 
 The suite creates a schema with a random name, applies all checked-in migrations, then drops only that schema. If the integration URL is missing, the database suite is skipped.
 
@@ -522,7 +531,7 @@ These results do not verify full Order creation/recovery, live-broker behavior f
 
 ## Internal F4 reservation API
 
-These routes require `Authorization: Bearer <ORDER_CREDIT_SERVICE_TOKEN>`. A student JWT cannot access them.
+These routes require `X-Order-Credit-Service-Secret: <ORDER_CREDIT_SERVICE_TOKEN>`. A student JWT cannot access them.
 
 Keep `/internal/credits` private and use HTTPS between deployed services. The service reads the token from the environment for each request and never returns or logs it.
 
