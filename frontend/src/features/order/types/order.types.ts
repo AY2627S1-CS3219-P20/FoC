@@ -11,6 +11,8 @@ export const statusVariant: Record<OrderStatus, ButtonProps["variant"]> = {
     CANCELED: "gray",
     FAILED: "red",
     EXPIRED: "orange",
+    PENDING_RESERVATION: "cyan",
+    RESERVATION_FAILED: "pink",
 };
 
 export const ORDER_STATUSES = [
@@ -22,6 +24,16 @@ export const ORDER_STATUSES = [
     "CANCELED",
     "FAILED",
     "EXPIRED",
+    "PENDING_RESERVATION",
+    "RESERVATION_FAILED"
+] as const;
+
+export const COURIER_ORDER_STATUSES = [
+    "ACCEPTED",
+    "PICKED_UP",
+    "COMPLETED",
+    "RECEIVED",
+    "FAILED",
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -56,6 +68,11 @@ export interface Order {
 
     cancellationReason: string | null;
     failureReason: string | null;
+
+    reservationFailureCode: string | null;
+
+    renewalPending: boolean;
+    renewalFailureCode: string | null;
 }
 
 export type RequesterOrderHistoryParams = {

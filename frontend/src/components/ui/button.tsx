@@ -35,6 +35,8 @@ const buttonVariants = cva(
         orange: 'bg-orange-200 text-orange-900 hover:bg-orange-300 focus-visible:ring-orange-400',
         red: 'bg-red-200 text-red-900 hover:bg-red-300 focus-visible:ring-red-400',
         gray: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-400',
+        cyan: 'bg-cyan-200 text-cyan-900 hover:bg-cyan-300 focus-visible:ring-cyan-400',
+        pink: 'bg-pink-200 text-pink-900 hover:bg-pink-300 focus-visible:ring-pink-400',
       },
       size: {
         default: 'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',

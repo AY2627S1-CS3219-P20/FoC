@@ -202,7 +202,7 @@ const StatusUpdateDialog = ({
                                             >
                                                 <SelectValue placeholder="Select an option">
                                                     {field.state.value
-                                                        ? PRETTY_PRINT_OPTIONS[field.state.value] ?? field.state.value
+                                                        ? PRETTY_PRINT_OPTIONS[field.state.value!] ?? field.state.value
                                                         : undefined}
                                                 </SelectValue>
                                             </SelectTrigger>
