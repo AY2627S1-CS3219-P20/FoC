@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { reservationIdSchema } from "./reservation.schema.js";
 
-export const MAX_SETTLEMENT_BYTES = 65_536;
 const settlementBaseSchema = z.strictObject({
     eventId: reservationIdSchema,
     orderId: reservationIdSchema,
