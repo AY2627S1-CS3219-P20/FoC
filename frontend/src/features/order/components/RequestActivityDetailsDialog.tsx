@@ -369,7 +369,7 @@ const RequestActivityDetailsDialog = ({
                     {/* Show the renewal failure code if the order has a renewal failure */}
                     {order.renewalFailureCode && (
                         <div className="flex flex-col gap-0.5">
-                            <p className="text-sm font-medium">Renewal failure code</p>
+                            <p className="text-sm font-medium">Renewal failure reason</p>
                             <p className="text-sm text-muted-foreground text-wrap">{formatStringToSentenceCase(order.renewalFailureCode)}</p>
                         </div>
                     )}
