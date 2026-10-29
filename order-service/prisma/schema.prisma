@@ -21,15 +21,30 @@ enum OrderStatus {
   CANCELED
   EXPIRED
   FAILED
+  PENDING_RESERVATION // Credit service is reserving the credits
+  RESERVATION_FAILED // Credit service failed to reserve the credits, so the order creation fails.
 }
 
 enum OrderEventType {
+  CREDIT_RESERVATION_REQUEST // Request credit service to reserve the credits
   ORDER_OPENED // Notify users of new orders
   ORDER_CANCELED // Credit service release the reserved credits
   ORDER_COMPLETED // Notify requester of order completion
   ORDER_EXPIRED // Credit service release the reserved credits
   ORDER_RECEIVED // Credit service transfer the credits to the courier
   ORDER_FAILED // Credit service release the reserved credits
+}
+
+enum OutboxEventStatus {
+  PENDING // Waiting to be processed by the outbox publisher
+  PROCESSING // Claimed by the outbox publisher and being processed
+  PUBLISHED
+  DEAD
+}
+
+enum CreditReservationResultType {
+  CREDIT_RESERVATION_SUCCEEDED
+  CREDIT_RESERVATION_FAILED
 }
 
 model Order {
@@ -76,7 +91,12 @@ model Order {
   failureReason      String? @db.Text
 
   // Used to track the reserved credits for this order
-  creditReservationId String @unique @db.Uuid
+  creditReservationId    String? @unique @db.Uuid
+  reservationFailureCode String? @db.Text
+
+  // Used to track the renewal of this order
+  renewalPending     Boolean @default(false)
+  renewalFailureCode String? @db.VarChar(255)
 
   // Relationships
   statusHistory OrderStatusHistory[]
@@ -114,14 +134,11 @@ model OrderStatusHistory {
 }
 
 model OutboxEvent {
-  id String @id @default(uuid()) @db.Uuid
-
+  id      String @id @default(uuid()) @db.Uuid
   orderId String @db.Uuid
 
+  status    OutboxEventStatus @default(PENDING)
   eventType OrderEventType
-
-  // Useful if you change event format later
-  eventVersion Int @default(1)
 
   // Actual event payload to be published to RabbitMQ
   payload Json
@@ -131,6 +148,10 @@ model OutboxEvent {
   // NULL means it has not successfully been published
   publishedAt DateTime? @db.Timestamptz(6)
 
+  nextAttemptAt DateTime? @default(now()) @db.Timestamptz(6)
+
+  lockedUntil DateTime? @db.Timestamptz(6)
+
   // For error handling
   retryCount Int @default(0)
 
@@ -139,6 +160,16 @@ model OutboxEvent {
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@index([publishedAt, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
   @@index([orderId])
+}
+
+model CreditReservationResultInbox {
+  eventId       String                      @id @db.Uuid
+  correlationId String                      @db.Uuid // Correlation ID from the credit service to identify the request
+  eventType     CreditReservationResultType
+  payload       Json
+  processedAt   DateTime                    @default(now()) @db.Timestamptz(6)
+
+  @@index([correlationId])
 }
