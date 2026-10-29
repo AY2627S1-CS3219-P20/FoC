@@ -86,23 +86,93 @@ model CreditReservation {
   status      ReservationStatus @default(RESERVED)
   courierId   String?           @db.Uuid
 
-  // Optional fields for reservation renewal.
-  renewalKey            String? @unique
-  previousReservationId String? @db.Uuid
+  // Links a successful reservation request to the resulting reservation.
+  // One to one relationship.
+  requestEventId String             @unique @db.Uuid
+  request        ReservationRequest @relation("ReservationRequestReservation", fields: [requestEventId], references: [eventId], onDelete: Restrict, onUpdate: Restrict)
 
-  // Optional fields for settlement events.
-  settlementEventId String?             @unique @db.Uuid
-  settlementReason  SettlementReason?
   // Preserve the complete validated envelope to detect altered replays.
+  settlementEventId String?           @unique @db.Uuid
+  settlementReason  SettlementReason?
   settlementPayload Json?
-  createdAt         DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime            @updatedAt @db.Timestamptz(6)
-  settledAt         DateTime?           @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  settledAt DateTime? @db.Timestamptz(6)
+
   // Abort tombstones may precede account provisioning.
-  accountId         String?             @db.Uuid
-  account           CreditAccount?      @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  transactions      CreditTransaction[]
+  accountId String?        @db.Uuid
+  account   CreditAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  transactions CreditTransaction[]
 
   @@index([orderId, createdAt])
   @@index([status, createdAt])
+}
+
+enum ReservationRequestType {
+  CREATE
+  RENEW
+}
+
+enum ReservationRequestOutcome {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum CreditOutboxEventType {
+  CREDIT_RESERVATION_SUCCEEDED
+  CREDIT_RESERVATION_FAILED
+}
+
+enum CreditOutboxEventStatus {
+  PENDING // Waiting to be processed by the outbox publisher
+  PROCESSING // Claimed by the outbox publisher and being processed
+  PUBLISHED
+  DEAD
+}
+
+model ReservationRequest {
+  // Incoming event ID from Order Service; primary key for message deduplication.
+  eventId     String                 @id @db.Uuid
+  requestType ReservationRequestType
+  orderId     String                 @db.Uuid
+  requesterId String                 @db.Uuid
+  amount      Int
+
+  // Used for renewal requests; null for initial creation requests.
+  previousReservationId String? @db.Uuid
+
+  // The outcome is committed with the reservation decision and result outbox.
+  outcome     ReservationRequestOutcome
+  failureCode String?                   @db.Text
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  reservation         CreditReservation? @relation("ReservationRequestReservation")
+  resultEvent         CreditOutboxEvent?
+  creditReservationId String?            @db.Uuid
+
+  @@index([orderId, createdAt])
+}
+
+model CreditOutboxEvent {
+  id             String                @id @default(uuid()) @db.Uuid
+  requestEventId String                @unique @db.Uuid
+  eventType      CreditOutboxEventType
+  payload        Json
+
+  status        CreditOutboxEventStatus @default(PENDING)
+  createdAt     DateTime                @default(now()) @db.Timestamptz(6)
+  publishedAt   DateTime?               @db.Timestamptz(6)
+  nextAttemptAt DateTime                @default(now()) @db.Timestamptz(6)
+  lockedUntil   DateTime?               @db.Timestamptz(6)
+  retryCount    Int                     @default(0)
+  lastError     String?                 @db.Text
+
+  request ReservationRequest @relation(fields: [requestEventId], references: [eventId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([status, nextAttemptAt, createdAt])
 }
