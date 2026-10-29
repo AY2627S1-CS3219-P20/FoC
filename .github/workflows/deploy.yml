@@ -14,6 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  if: github.repository == 'AY2627S1-CS3219-P20/FoC' # don't run the deployment workflow for forked repositories
+
   ci:
     uses: ./.github/workflows/ci.yml
 
