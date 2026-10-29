@@ -14,13 +14,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  if: github.repository == 'AY2627S1-CS3219-P20/FoC' # don't run the deployment workflow for forked repositories
-
   ci:
     uses: ./.github/workflows/ci.yml
 
   build-push:
     needs: ci
+    if: github.repository == 'AY2627S1-CS3219-P20/FoC' # forks lack the AWS/EC2 secrets; skipping this also skips the deploy jobs that need it
     runs-on: ubuntu-latest
     strategy:
       matrix:
