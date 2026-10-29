@@ -2,62 +2,40 @@ import { OrderEventType } from "../generated/prisma/client.js";
 import { connect, type Channel, type ChannelModel, type ConfirmChannel, type Options } from "amqplib";
 import config from "../config/config.js";
 
-export type SettlementOrderEventType = Extract<
-    OrderEventType,
-    "ORDER_RECEIVED" | "ORDER_CANCELED" | "ORDER_EXPIRED" | "ORDER_FAILED"
->;
-
 const BROKER_TIMEOUT_MS = 10_000; // 10 seconds
+
+type TopologyDeclarer = (channel: Channel) => Promise<void>;
+
+export type PublishableOrderEventType = Extract<
+    OrderEventType,
+    | "CREDIT_RESERVATION_REQUEST"
+    | "ORDER_RECEIVED"
+    | "ORDER_CANCELED"
+    | "ORDER_EXPIRED"
+    | "ORDER_FAILED"
+>;
 
 export const ORDER_MESSAGING = {
     exchange: "foc.events",
-    routingKey: "order.received.v1",
     routingKeys: {
+        [OrderEventType.CREDIT_RESERVATION_REQUEST]: "credit.reservation.requested.v1",
         [OrderEventType.ORDER_RECEIVED]: "order.received.v1",
         [OrderEventType.ORDER_CANCELED]: "order.canceled.v1",
         [OrderEventType.ORDER_EXPIRED]: "order.expired.v1",
         [OrderEventType.ORDER_FAILED]: "order.failed.v1",
-    } satisfies Record<SettlementOrderEventType, string>,
-    queue: "credit.order-settlement.v1",
-    retryQueue: "credit.order-settlement.retry.v1",
-    deadQueue: "credit.order-settlement.dead.v1",
-    retryDelayMs: 10_000,
+    } satisfies Record<PublishableOrderEventType, string>,
 } as const;
 
 export async function declareOrderTopology(channel: Channel): Promise<void> {
-    const topology = ORDER_MESSAGING;
-    const queueOptions = {
-        durable: true,
-        autoDelete: false,
-        arguments: {
-            "x-queue-type": "quorum",
-            "x-delivery-limit": -1,
-            "x-overflow": "reject-publish",
-        },
-    };
-
-    await channel.assertExchange(topology.exchange, "topic", {
+    await channel.assertExchange(ORDER_MESSAGING.exchange, "topic", {
         durable: true,
         autoDelete: false,
     });
-    await channel.assertQueue(topology.queue, queueOptions);
-    await channel.bindQueue(topology.queue, topology.exchange, topology.routingKey);
-    await channel.assertQueue(topology.deadQueue, queueOptions);
-    await channel.assertQueue(topology.retryQueue, {
-        ...queueOptions,
-        arguments: {
-            ...queueOptions.arguments,
-            "x-message-ttl": topology.retryDelayMs,
-            "x-dead-letter-exchange": topology.exchange,
-            "x-dead-letter-routing-key": topology.routingKey,
-            // Retain expired retries until the destination confirms receipt.
-            "x-dead-letter-strategy": "at-least-once",
-        },
-    });
-    // Retry/dead queues are addressed by name using the default exchange ("").
 }
 
-export async function connectOrderMessaging(): Promise<{
+export async function connectOrderMessaging(
+    declareTopology: TopologyDeclarer = declareOrderTopology,
+): Promise<{
     connection: ChannelModel;
     channel: ConfirmChannel;
 }> {
@@ -93,7 +71,7 @@ export async function connectOrderMessaging(): Promise<{
         );
 
         // Assert the exchange for order events.
-        await declareOrderTopology(channel);
+        await declareTopology(channel);
         return { connection, channel };
     } catch (error) {
         await connection.close().catch(() => undefined);
@@ -173,7 +151,7 @@ export async function publishConfirmed(
 
 export function publishOrderEvent(
     channel: ConfirmChannel,
-    eventType: SettlementOrderEventType,
+    eventType: PublishableOrderEventType,
     content: Buffer,
     properties: Options.Publish = {},
 ): Promise<void> {
@@ -186,4 +164,78 @@ export function publishOrderEvent(
         content,
         properties,
     );
+}
+
+
+// ---------- For credit reservation result events ----------
+export const CREDIT_RESERVATION_RESULT_MESSAGING = {
+    exchange: "foc.events",
+    routingKeys: {
+        CREDIT_RESERVATION_SUCCEEDED:
+            "credit.reservation.succeeded.v1",
+        CREDIT_RESERVATION_FAILED:
+            "credit.reservation.failed.v1",
+    },
+    retryRoutingKey: "credit.reservation.result.retry.v1",
+    queue: "order.credit-reservation-results.v1",
+    retryQueue: "order.credit-reservation-results.retry.v1",
+    deadQueue: "order.credit-reservation-results.dead.v1",
+    retryDelayMs: 10_000,
+} as const;
+
+export async function declareCreditReservationResultTopology(
+    channel: Channel,
+): Promise<void> {
+    const topology = CREDIT_RESERVATION_RESULT_MESSAGING;
+
+    const durableQuorumQueue = {
+        durable: true,
+        autoDelete: false,
+        arguments: {
+            "x-queue-type": "quorum",
+            "x-delivery-limit": -1,
+            "x-overflow": "reject-publish",
+        },
+    };
+
+    await channel.assertExchange(
+        topology.exchange,
+        "topic",
+        { durable: true, autoDelete: false },
+    );
+
+    await channel.assertQueue(topology.queue, durableQuorumQueue);
+
+    await channel.bindQueue(
+        topology.queue,
+        topology.exchange,
+        topology.routingKeys.CREDIT_RESERVATION_SUCCEEDED,
+    );
+    await channel.bindQueue(
+        topology.queue,
+        topology.exchange,
+        topology.routingKeys.CREDIT_RESERVATION_FAILED,
+    );
+    await channel.bindQueue(
+        topology.queue,
+        topology.exchange,
+        topology.retryRoutingKey,
+    );
+
+    await channel.assertQueue(topology.deadQueue, durableQuorumQueue);
+
+    await channel.assertQueue(topology.retryQueue, {
+        ...durableQuorumQueue,
+        arguments: {
+            ...durableQuorumQueue.arguments,
+            "x-message-ttl": topology.retryDelayMs,
+            "x-dead-letter-exchange": topology.exchange,
+            "x-dead-letter-routing-key": topology.retryRoutingKey,
+            "x-dead-letter-strategy": "at-least-once",
+        },
+    });
+}
+
+export function connectCreditReservationResultMessaging() {
+    return connectOrderMessaging(declareCreditReservationResultTopology);
 }
