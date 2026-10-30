@@ -38,6 +38,14 @@ export const COURIER_ORDER_STATUSES = [
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+export const REORDERABLE_STATUSES = new Set<OrderStatus>([
+    "RECEIVED",
+    "CANCELED",
+    "FAILED",
+    "EXPIRED",
+    "RESERVATION_FAILED",
+]);
+
 export interface Order {
     id: string;
     requesterId: string;
@@ -186,3 +194,16 @@ export type RenewRequestPayload = {
     orderId: string;
     payload: RenewRequestFormData;
 }
+
+export type ReorderFormInput = {
+    name: string;
+    description: string;
+    pickupSupplierId: string;
+    deliverySupplierId: string;
+    offeredCredits: string;
+    expiryAt: string;
+    remarks: string;
+    isSuppliersLoading: boolean;
+    pickupSupplierName: string;
+    deliverySupplierName: string;
+};

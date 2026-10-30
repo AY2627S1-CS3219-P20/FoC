@@ -1,6 +1,7 @@
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -8,14 +9,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import CreateRequestForm from "@/features/order/components/CreateRequestForm";
-import { useState } from "react";
+import type { ReorderFormInput } from "../types/order.types";
 
-const CreateRequestDialog = () => {
-    const [open, setOpen] = useState(false);
+type CreateRequestDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    initialValues?: Partial<ReorderFormInput>;
+    showTrigger?: boolean;
+};
+
+const CreateRequestDialog = ({
+    open,
+    onOpenChange,
+    initialValues,
+    showTrigger = true,
+}: CreateRequestDialogProps) => {
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger
+                hidden={!showTrigger}
                 render={
                     <Button
                         type="button"
@@ -30,10 +43,22 @@ const CreateRequestDialog = () => {
 
             <DialogContent className="w-full md:max-w-xl! max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Create Request</DialogTitle>
+                    <DialogTitle>
+                        {initialValues ? "Reorder Request" : "Create Request"}
+                    </DialogTitle>
+                    {initialValues &&
+                        <DialogDescription>
+                            Please review the details of your previous request.
+                        </DialogDescription>
+                    }
                 </DialogHeader>
 
-                <CreateRequestForm onCancel={() => setOpen(false)} />
+                {open && (
+                    <CreateRequestForm
+                        onCancel={() => onOpenChange(false)}
+                        initialValues={initialValues}
+                    />
+                )}
             </DialogContent>
         </Dialog>
     );

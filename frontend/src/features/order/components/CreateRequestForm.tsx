@@ -8,12 +8,17 @@ import SupplierSelect from "./SupplierSelect";
 import useCreateRequest from "@/features/order/hooks/useCreateRequest";
 import useCreditBalance from "@/features/credit/hooks/useCreditBalance";
 import DateTimePicker from "./DateTimePicker";
+import type { ReorderFormInput } from "../types/order.types";
 
 interface CreateRequestFormProps {
     onCancel: () => void;
+    initialValues?: Partial<ReorderFormInput>;
 }
 
-const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
+const CreateRequestForm = ({
+    onCancel,
+    initialValues
+}: CreateRequestFormProps) => {
     const { createRequest, isPending } = useCreateRequest();
     const credit = useCreditBalance();
     // A new account is granted credits asynchronously; reserving before then fails.
@@ -21,13 +26,13 @@ const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
 
     const form = useForm({
         defaultValues: {
-            name: "",
-            description: "",
-            pickupSupplierId: "",
-            deliverySupplierId: "",
-            offeredCredits: "",
-            expiryAt: "",
-            remarks: "",
+            name: initialValues?.name ?? "",
+            description: initialValues?.description ?? "",
+            pickupSupplierId: initialValues?.pickupSupplierId ?? "",
+            deliverySupplierId: initialValues?.deliverySupplierId ?? "",
+            offeredCredits: initialValues?.offeredCredits ?? "",
+            expiryAt: initialValues?.expiryAt ?? "", // Don’t reuse an old deadline; it may already have passed.
+            remarks: initialValues?.remarks ?? "",
         },
         validators: {
             onSubmit: createRequestSchema,
@@ -104,6 +109,11 @@ const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
                                             isInvalid={isInvalid}
                                             onChange={field.handleChange}
                                             placeholder="Select pickup location"
+                                            displayName={
+                                                initialValues?.isSuppliersLoading
+                                                    ? "Loading pickup location…"
+                                                    : initialValues?.pickupSupplierName
+                                            }
                                         />
                                         {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
                                     </Field>
@@ -122,6 +132,11 @@ const CreateRequestForm = ({ onCancel }: CreateRequestFormProps) => {
                                             isInvalid={isInvalid}
                                             onChange={field.handleChange}
                                             placeholder="Select delivery location"
+                                            displayName={
+                                                initialValues?.isSuppliersLoading
+                                                    ? "Loading delivery location…"
+                                                    : initialValues?.deliverySupplierName
+                                            }
                                         />
                                         {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
                                     </Field>

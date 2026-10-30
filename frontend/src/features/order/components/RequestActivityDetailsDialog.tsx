@@ -21,6 +21,7 @@ import { createRequestSchema } from "../schemas/create-request.schema";
 import useUpdateRequest from "../hooks/useUpdateRequest";
 import useAcceptRequest from "../hooks/useAcceptRequest";
 import { formatStringToSentenceCase, formatStringToTitleCase } from "@/utils/formatText";
+import { Repeat2 } from "lucide-react";
 
 type RequestActivityDetailsDialogProps = {
     order: Order;
@@ -32,6 +33,8 @@ type RequestActivityDetailsDialogProps = {
     pickupSupplierName?: string;
     deliverySupplierName?: string;
     isSuppliersLoading: boolean;
+    canReorder: boolean;
+    handleReorder: () => void;
 };
 
 const DetailText = ({
@@ -57,6 +60,8 @@ const RequestActivityDetailsDialog = ({
     pickupSupplierName,
     deliverySupplierName,
     isSuppliersLoading,
+    canReorder,
+    handleReorder,
 }: RequestActivityDetailsDialogProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const relatedDetailsQuery = useOrderRelatedUserDetails(
@@ -437,6 +442,19 @@ const RequestActivityDetailsDialog = ({
                                 onClick={() => acceptRequest(order.id)}
                             >
                                 Accept
+                            </Button>
+                        </div>
+                    )}
+
+                    {canReorder && (
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="indigo"
+                                onClick={handleReorder}
+                            >
+                                <Repeat2 className="size-4 shrink-0" />
+                                Reorder
                             </Button>
                         </div>
                     )}
