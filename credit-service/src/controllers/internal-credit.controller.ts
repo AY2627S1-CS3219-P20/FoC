@@ -1,10 +1,7 @@
 import type { Request, Response } from "express";
 import { AppError } from "../errors/errors.js";
-import {
-    abortReservation,
-    getReservation,
-    reserveCredits,
-} from "../services/reservation.service.js";
+import { prisma } from "../libs/prisma.js";
+import { abortReservation, getReservation, reserveCredits } from "../services/credit.service.js";
 import {
     abortReservationSchema,
     renewReservationSchema,
@@ -21,7 +18,7 @@ export const createReservationController = async (
         throw new AppError("Invalid reservation", 400);
     }
 
-    const result = await reserveCredits(parsedBody.data);
+    const result = await reserveCredits(prisma, parsedBody.data);
 
     res.status(result.created ? 201 : 200).json({
         success: true,
@@ -38,7 +35,7 @@ export const getReservationController = async (
         throw new AppError("Invalid reservation ID", 400);
     }
 
-    const reservation = await getReservation(parsedId.data);
+    const reservation = await getReservation(prisma, parsedId.data);
 
     res.status(200).json({
         success: true,
@@ -60,7 +57,7 @@ export const abortReservationController = async (
         throw new AppError("Reservation ID does not match request body", 400);
     }
 
-    const result = await abortReservation(parsedBody.data);
+    const result = await abortReservation(prisma, parsedBody.data);
 
     res.status(200).json({
         success: true,
