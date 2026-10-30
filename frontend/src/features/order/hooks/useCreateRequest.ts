@@ -35,7 +35,10 @@ const useCreateRequest = () => {
                     queryKey: creditKeys.transactions(order.requesterId),
                 }),
             ]);
-            toast.success("Request created successfully and listed under Requester Activity!");
+            toast.success(`
+                Request submitted and listed under Requester Activity. 
+                Please wait for the credit reservation approval.
+            `);
         },
         onError: (error) => {
             toast.error(error.message)

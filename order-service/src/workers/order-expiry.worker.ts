@@ -1,6 +1,6 @@
 import { updateExpiredOrders } from "../services/order-expiry.service.js";
 
-const POLL_INTERVAL_MS = 10_000; // Poll every 10 seconds for new orders to expire.
+const POLL_INTERVAL_MS = 60_000; // Poll every 1 minutes for new orders to expire.
 
 export function startOrderExpiryWorker(): () => Promise<void> {
     let stopped = false;

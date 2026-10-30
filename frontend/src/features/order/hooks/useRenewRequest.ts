@@ -24,7 +24,7 @@ export function useRenewRequest() {
                 }),
             ]);
 
-            toast.success("Request renewed successfully");
+            toast.success("Renewal request submitted. Please wait for the credit reservation approval.");
         },
         onError: (error) => {
             toast.error(error.message);

@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { AppError } from "../errors/errors.js";
-import { abortReservation, renewCredits, reserveCredits } from "../integrations/credit/credit.client.js";
-import { OrderEventType, OrderStatus } from "../generated/prisma/client.js";
+import { OrderEventType, OrderStatus, Prisma } from "../generated/prisma/client.js";
 import { verifySupplierExists } from "../integrations/supplier/supplier.client.js";
 import { prisma } from "../libs/prisma.js";
 import type { CancelRequestInput, CreateRequestInput, FailRequestInput, ReceiveRequestInput, RenewExpiredRequestInput, RequesterOrderHistoryQuery, UpdateRequestInput } from "../schemas/order.requester.schema.js";
-import type { ReservationPayload } from "../types/order.types.js";
 
 export async function getRequesterOrderHistoryService(
     requesterId: string,
@@ -162,100 +160,58 @@ export async function createRequestService(
         throw new AppError("Delivery supplier does not exist", 404);
     }
 
-    // 3. Generate a new order ID 
+    // 3. Generate a new order ID and event ID for the outbox event
     const orderId = crypto.randomUUID();
+    const eventId = randomUUID();
 
-    const reservationInput: ReservationPayload = {
-        orderId,
-        requesterId,
-        amount: input.offeredCredits,
-    };
-
-    let reservationId: string | undefined;
-
-    // A timeout may happen after the credit service commits the reservation.
-    // Mark it as potentially reserved before making the request.
-    let reservationMayExist = false;
-    try {
-        // 4. Reserve credits for the order
-        reservationMayExist = true;
-        const reservationResult = await reserveCredits(reservationInput);
-        reservationId = reservationResult.id;
-
-        if (!reservationId) {
-            throw new AppError(
-                "Credit Service returned an invalid reservation",
-                502,
-            );
-        }
-
-        // 5. Create the order request + history + outbox entries atomically in a transaction
-        const orderRequest = await prisma.$transaction(async (tx) => {
-            const createOrder = await tx.order.create({
-                data: {
-                    id: orderId,
-                    requesterId: requesterId,
-                    courierId: null,
-                    name: input.name,
-                    description: input.description,
-                    pickupSupplierId: input.pickupSupplierId,
-                    deliverySupplierId: input.deliverySupplierId,
-                    offeredCredits: input.offeredCredits,
-                    remarks: input.remarks ?? null,
-                    expiryAt: input.expiryAt,
-                    status: OrderStatus.OPEN,
-                    version: 1,
-                    creditReservationId: reservationId!,
-                },
-            });
-
-            await tx.orderStatusHistory.create({
-                data: {
-                    orderId: createOrder.id,
-                    fromStatus: null,
-                    toStatus: OrderStatus.OPEN,
-                    changedBy: requesterId,
-                    reason: null,
-                },
-            });
-
-            return createOrder;
+    // 4. Create the order request + history + outbox entries atomically in a transaction
+    return prisma.$transaction(async (tx) => {
+        const createOrder = await tx.order.create({
+            data: {
+                id: orderId,
+                requesterId: requesterId,
+                courierId: null,
+                name: input.name,
+                description: input.description,
+                pickupSupplierId: input.pickupSupplierId,
+                deliverySupplierId: input.deliverySupplierId,
+                offeredCredits: input.offeredCredits,
+                remarks: input.remarks ?? null,
+                expiryAt: input.expiryAt,
+                status: OrderStatus.PENDING_RESERVATION,
+                version: 1,
+                creditReservationId: null,
+            },
         });
 
-        return orderRequest;
-    } catch (error) {
-        if (reservationMayExist) {
-            let existingOrder;
-            try {
-                existingOrder = await prisma.order.findUnique({
-                    where: { id: orderId },
-                });
-            } catch (lookupError) {
-                console.error(`CRITICAL: Failed to look up order ${orderId} after reservation`, lookupError);
-                throw error; // Don't abort the reservation if we can't confirm the order's existence
-            }
+        await tx.orderStatusHistory.create({
+            data: {
+                orderId: createOrder.id,
+                fromStatus: null,
+                toStatus: OrderStatus.PENDING_RESERVATION,
+                changedBy: requesterId,
+                reason: "Waiting for credit reservation to be confirmed",
+            },
+        });
 
-            if (existingOrder) {
-                return existingOrder;
-            }
+        await tx.outboxEvent.create({
+            data: {
+                id: eventId,
+                orderId: createOrder.id,
+                eventType: OrderEventType.CREDIT_RESERVATION_REQUEST,
+                payload: {
+                    eventId: eventId,
+                    eventType: OrderEventType.CREDIT_RESERVATION_REQUEST,
+                    requestType: "CREATE",
+                    orderId: createOrder.id,
+                    requesterId: requesterId,
+                    amount: input.offeredCredits,
+                } as Prisma.InputJsonValue,
+            },
+        });
 
-            // If the order was not created, attempt to abort the reservation
-            if (reservationId) {
-                try {
-                    console.error(`Attempting to abort reservation ${reservationId} for order ${orderId} due to order creation failure`);
-                    await abortReservation({ reservationId, ...reservationInput });
-                } catch (abortError) {
-                    console.error(`CRITICAL: Failed to abort reservation ${reservationId} for order ${orderId}`, abortError);
-                }
-            } else {
-                // The credit reservations may have timed out after committing the reservation,
-                // but its reservation ID was not returned. This needs a manual investigation to ensure the reservation is aborted.
-                console.error(`CRITICAL: Reservation may exist for order ${orderId} but no reservation ID was returned. Manual investigation required.`);
-            }
-        }
-
-        throw error;
-    }
+        return createOrder;
+    });
 };
 
 export async function receiveRequestService(
@@ -538,6 +494,10 @@ export async function renewExpiredRequestService(
     orderId: string,
     input: RenewExpiredRequestInput,
 ) {
+    if (input.expiryAt <= new Date()) {
+        throw new AppError("Expiry date must be in the future", 400);
+    }
+
     const existingOrder = await prisma.order.findUnique({
         where: { id: orderId },
     });
@@ -545,14 +505,6 @@ export async function renewExpiredRequestService(
     // Ensure the order exists and belongs to the requester
     if (!existingOrder || existingOrder.requesterId !== requesterId) {
         throw new AppError("Order not found", 404);
-    }
-
-    // If the request is already OPEN and the version is exactly one more than the expected version, 
-    // it means that the request has already been renewed by another process.
-    // Then we can return the existing order without making any changes.
-    if (existingOrder.status === OrderStatus.OPEN &&
-        existingOrder.version === input.expectedVersion + 1) {
-        return existingOrder;
     }
 
     // Ensure the order is in EXPIRED status before allowing it to be renewed
@@ -570,84 +522,53 @@ export async function renewExpiredRequestService(
         throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
     }
 
-    // Generate a unique renewal key for this renewal attempt.
-    // This key is used to ensure that the credit service can identify,
-    // and handle duplicate renewal requests for the same order.
-    const renewalKey = `${orderId}:RENEWAL:${input.expectedVersion}`;
+    // Check if a renewal is already pending for this order
+    if (existingOrder.renewalPending) {
+        throw new AppError("A renewal request is already being processed", 409);
+    }
 
-    let newReservation:
-        | Awaited<ReturnType<typeof renewCredits>>
-        | undefined;
-
-    try {
-        newReservation = await renewCredits({
-            renewalKey,
-            previousReservationId: existingOrder.creditReservationId,
-            orderId: existingOrder.id,
-            requesterId: requesterId,
-            amount: existingOrder.offeredCredits,
+    const eventId = randomUUID();
+    return prisma.$transaction(async (tx) => {
+        const renewedOrder = await tx.order.updateMany({
+            where: {
+                id: orderId,
+                requesterId: requesterId,
+                creditReservationId: existingOrder.creditReservationId,
+                status: OrderStatus.EXPIRED,
+                version: input.expectedVersion,
+                renewalPending: false, // Ensure no other renewal is pending
+            },
+            data: {
+                renewalPending: true, // Mark the order as having a pending renewal
+                renewalFailureCode: null,
+            },
         });
 
-        console.log(`Successfully renewed reservation for order ${orderId}. New reservation ID: ${newReservation.id}`);
-
-        return await prisma.$transaction(async (tx) => {
-            const updatedOrder = await tx.order.updateMany({
-                where: {
-                    id: orderId,
-                    requesterId: requesterId,
-                    creditReservationId: existingOrder.creditReservationId,
-                    status: OrderStatus.EXPIRED,
-                    version: input.expectedVersion,
-                },
-                data: {
-                    status: OrderStatus.OPEN,
-                    expiryAt: input.expiryAt,
-                    expiredAt: null,
-                    creditReservationId: newReservation!.id,
-                    version: { increment: 1 },
-                },
-            });
-
-            if (updatedOrder.count !== 1) {
-                throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
-            }
-
-            return tx.order.findUniqueOrThrow({
-                where: { id: orderId },
-            });
-        });
-    } catch (error) {
-        if (newReservation) {
-            // If the renewal was successful but the order update failed, we need to check if the order is still expired.
-            const currentOrder = await prisma.order.findUnique({
-                where: { id: orderId },
-            }).catch(() => null);
-
-            // If the current order's credit reservation ID matches the new reservation ID,
-            //  it means that the renewal was successful and the order has already been updated.
-            if (currentOrder?.creditReservationId === newReservation.id) {
-                return currentOrder;
-            }
-
-            const orderStillExpired =
-                currentOrder?.status === OrderStatus.EXPIRED &&
-                currentOrder?.version === input.expectedVersion;
-
-            // If the order is no longer expired, we should abort the new reservation.
-            if (!orderStillExpired) {
-                try {
-                    await abortReservation({
-                        reservationId: newReservation.id,
-                        orderId: existingOrder.id,
-                        requesterId: requesterId,
-                        amount: existingOrder.offeredCredits,
-                    });
-                } catch (abortError) {
-                    console.error(`CRITICAL: Failed to abort reservation ${newReservation.id} for order ${orderId}`, abortError);
-                }
-            }
+        if (renewedOrder.count !== 1) {
+            throw new AppError("The request changed while you were renewing it. Reload and try again.", 409);
         }
 
-        throw error;
-    }
-}
+        await tx.outboxEvent.create({
+            data: {
+                id: eventId,
+                orderId: existingOrder.id,
+                eventType: OrderEventType.CREDIT_RESERVATION_REQUEST,
+                payload: {
+                    eventId: eventId,
+                    eventType: "CREDIT_RESERVATION_REQUEST",
+                    requestType: "RENEW",
+                    orderId: existingOrder.id,
+                    requesterId,
+                    amount: existingOrder.offeredCredits,
+                    previousReservationId: existingOrder.creditReservationId,
+                    expectedVersion: input.expectedVersion,
+                    expiryAt: input.expiryAt.toISOString(),
+                } as Prisma.InputJsonValue,
+            },
+        });
+
+        return tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+        });
+    });
+};

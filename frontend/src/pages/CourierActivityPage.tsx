@@ -4,7 +4,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RequestActivityCard from "@/features/order/components/RequestActivityCard";
 import { useCourierOrderHistory } from "@/features/order/hooks/useCourierOrderHistory";
 import { useSuppliersByIds } from "@/features/order/hooks/useSuppliersByIds";
-import { ORDER_STATUSES, type OrderStatus, type SortBy, type SortOrder } from "@/features/order/types/order.types";
+import { COURIER_ORDER_STATUSES, type OrderStatus, type SortBy, type SortOrder } from "@/features/order/types/order.types";
+import { formatStringToTitleCase } from "@/utils/formatText";
 import { useState } from "react";
 
 const LIMIT = 15;
@@ -64,9 +65,9 @@ const CourierActivityPage = () => {
                     <TabsList className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-1 overflow-x-auto overflow-y-hidden">
                         <TabsTrigger value="ALL">All</TabsTrigger>
 
-                        {ORDER_STATUSES.map((status) => (
+                        {COURIER_ORDER_STATUSES.map((status) => (
                             <TabsTrigger key={status} value={status}>
-                                {status.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                                {formatStringToTitleCase(status)}
                             </TabsTrigger>
                         ))}
                     </TabsList>

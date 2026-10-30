@@ -1,198 +1,272 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { OrderEventType, type PrismaClient } from "../generated/prisma/client.js";
-import { connectOrderMessaging, publishOrderEvent, type SettlementOrderEventType } from "../libs/rabbitmq.js";
+import { OrderEventType, OutboxEventStatus } from "../generated/prisma/client.js";
+import { connectOrderMessaging, ORDER_MESSAGING, publishConfirmed, type PublishableOrderEventType } from "../libs/rabbitmq.js";
+import { prisma } from "../libs/prisma.js";
 
-const BATCH_SIZE = 30; // The maximum number of outbox events to fetch and publish in a single batch.
-const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds for new orders to publish to RabbitMQ.
-const MAX_BACKOFF_SECONDS = 60; // Wait up to 60 seconds before reconnecting to RabbitMQ after a failure.
+// Maximum number of outbox events to fetch and publish in a single batch.
+const BATCH_SIZE = 30;
 
-// The types of event this publisher is responsible for
-const SETTLEMENT_ORDER_EVENT_TYPES: SettlementOrderEventType[] = [
-    OrderEventType.ORDER_RECEIVED,
-    OrderEventType.ORDER_CANCELED,
-    OrderEventType.ORDER_EXPIRED,
-    OrderEventType.ORDER_FAILED,
-];
+// Polling interval for checking the outbox for new events to publish.
+const POLL_INTERVAL_MS = 30_000;
 
-// Check if the given event type is one of the settlement order event typesD
-function isSettlementOrderEventType(
-    eventType: OrderEventType
-): eventType is SettlementOrderEventType {
-    return SETTLEMENT_ORDER_EVENT_TYPES.includes(eventType as SettlementOrderEventType);
-}
+// Maximum backoff time for retrying failed outbox event publications.
+const MAX_BACKOFF_MS = 60_000;
 
-// Ensure the payload is a valid object and that the eventId in the payload matches the outbox entry ID. 
-// Serialize the payload to a Buffer for publishing to RabbitMQ.
-function serializePayload(payload: unknown, outboxId: string): Buffer {
-    if (
-        typeof payload !== "object" ||
-        payload === null ||
-        Array.isArray(payload)
-    ) {
-        throw new Error(`Outbox entry ${outboxId} has invalid payload`);
-    }
-    const eventPayload = payload as Record<string, unknown>;
+// Controls how long a claimed row stays reserved for the current publisher before it can be claimed by another publisher.
+const CLAIM_LEASE_MS = 30_000;
 
-    if (eventPayload.eventId !== outboxId) {
-        throw new Error(
-            `Outbox entry ${outboxId} has mismatched eventId in payload`
-        );
-    }
+// Maximum number of retries before marking an outbox event as dead.
+const MAX_RETRIES = 5;
 
-    return Buffer.from(JSON.stringify(eventPayload), "utf-8");
-}
+type ClaimedEvent = {
+    id: string;
+    orderId: string;
+    eventType: OrderEventType;
+    payload: unknown;
+    retryCount: number;
+    lockedUntil: Date;
+};
 
-// Fetch up to BATCH_SIZE outbox events from the database, oldest first.
-// Publish them one at a time and waits for publisher confirms from RabbitMQ before marking them as published in the database.
-async function publishBatch(
-    prisma: PrismaClient,
-    channel: Awaited<ReturnType<typeof connectOrderMessaging>>["channel"],
-): Promise<boolean> {
+const routingKeys: Record<PublishableOrderEventType, string> = {
+    [OrderEventType.CREDIT_RESERVATION_REQUEST]: ORDER_MESSAGING.routingKeys.CREDIT_RESERVATION_REQUEST,
+    [OrderEventType.ORDER_RECEIVED]: ORDER_MESSAGING.routingKeys.ORDER_RECEIVED,
+    [OrderEventType.ORDER_CANCELED]: ORDER_MESSAGING.routingKeys.ORDER_CANCELED,
+    [OrderEventType.ORDER_EXPIRED]: ORDER_MESSAGING.routingKeys.ORDER_EXPIRED,
+    [OrderEventType.ORDER_FAILED]: ORDER_MESSAGING.routingKeys.ORDER_FAILED,
+};
 
-    // Fetch the oldest unpublished outbox events with supported event types, up to the batch size.
-    const outboxEvents = await prisma.outboxEvent.findMany({
-        where: {
-            publishedAt: null,
-            eventType: {
-                in: SETTLEMENT_ORDER_EVENT_TYPES,
-            },
-        },
-        orderBy: [
-            { createdAt: "asc" },
-            { id: "asc" } // Ensure deterministic ordering for entries with the same createdAt timestamp
-        ],
-        take: BATCH_SIZE,
+/**
+ * The SQL:
+ * - Finds due PENDING rows and PROCESSING rows whose lease has expired.
+ * - Locks them for update to prevent other publishers from claiming them.
+ * - Updates their status to PROCESSING and sets a new lease expiration time.
+ * - Returns the claimed rows for processing.
+ * This is done in a single transaction to ensure atomicity and prevent race conditions.
+ */
+async function claimBatch(): Promise<ClaimedEvent[]> {
+    const now = new Date();
+    const leaseUntil = new Date(now.getTime() + CLAIM_LEASE_MS);
+
+    return prisma.$transaction(async (tx) => {
+        return tx.$queryRaw<ClaimedEvent[]>`
+            WITH candidates AS (
+                SELECT "id"
+                FROM "OutboxEvent"
+                WHERE
+                    (
+                        "status" = 'PENDING'::"OutboxEventStatus"
+                        AND "nextAttemptAt" <= ${now}
+                    )
+                    OR (
+                        "status" = 'PROCESSING'::"OutboxEventStatus"
+                        AND (
+                            "lockedUntil" IS NULL
+                            OR "lockedUntil" <= ${now}
+                        )
+                    )
+                ORDER BY "createdAt" ASC, "id" ASC
+                FOR UPDATE SKIP LOCKED
+                LIMIT ${BATCH_SIZE}
+            )
+            UPDATE "OutboxEvent" AS event
+            SET
+                "status" = 'PROCESSING'::"OutboxEventStatus",
+                "lockedUntil" = ${leaseUntil}
+            FROM candidates
+            WHERE event."id" = candidates."id"
+            RETURNING
+                event."id",
+                event."orderId",
+                event."eventType",
+                event."payload",
+                event."retryCount",
+                event."lockedUntil"
+        `;
     });
-
-    for (const entry of outboxEvents) {
-        try {
-            // Skip entries with unsupported event types, even though the query should have filtered them out.
-            if (!isSettlementOrderEventType(entry.eventType)) {
-                console.warn(
-                    `Outbox entry ${entry.id} has unsupported event type ${entry.eventType}; skipping`
-                );
-                continue;
-            }
-
-            console.log(`Publishing outbox entry ${entry.id} of type ${entry.eventType} to RabbitMQ`);
-            // Publish the event to RabbitMQ with publisher confirms.
-            await publishOrderEvent(
-                channel,
-                entry.eventType,
-                serializePayload(entry.payload, entry.id),
-                {
-                    messageId: entry.id,
-                    correlationId: entry.orderId
-                }
-            );
-
-            // Mark the entry as published in the database.
-            await prisma.outboxEvent.updateMany({
-                where: {
-                    id: entry.id,
-                    publishedAt: null
-                },
-                data: {
-                    publishedAt: new Date(),
-                    lastError: null
-                }
-            });
-        } catch (error) {
-            // If publishing fails, increment the retry count and log the error. 
-            // The entry will be retried in the next polling cycle.
-            await prisma.outboxEvent.updateMany({
-                where: {
-                    id: entry.id,
-                    publishedAt: null
-                },
-                data: {
-                    retryCount: { increment: 1 },
-                    lastError: "PUBLISH_FAILED",
-                }
-            });
-
-            console.error("Outbox publish failed", {
-                outboxEventId: entry.id,
-                retryCount: entry.retryCount + 1,
-                error: error instanceof Error ? error.message : String(error),
-            });
-            throw new Error("OUTBOX_PUBLISH_FAILED");
-        }
-    }
-
-    return outboxEvents.length > 0;
 }
 
-export function startOrderOutboxPublisher(
-    prisma: PrismaClient,
-): () => Promise<void> {
+// Serialize the payload of an outbox event to a Buffer for publishing to RabbitMQ.
+function serializePayload(payload: unknown, eventId: string): Buffer {
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+        throw new Error("INVALID_OUTBOX_PAYLOAD");
+    }
+
+    const record = payload as Record<string, unknown>;
+    if (record.eventId !== eventId) {
+        throw new Error("OUTBOX_EVENT_ID_MISMATCH");
+    }
+
+    return Buffer.from(JSON.stringify(record), "utf8");
+}
+
+export function isPublishableOrderEventType(
+    eventType: OrderEventType,
+): eventType is PublishableOrderEventType {
+    return Object.prototype.hasOwnProperty.call(routingKeys, eventType);
+}
+
+// Use a random jitter to help avoid simultaneous retries from multiple workers.
+function backoffMs(retryCount: number): number {
+    const exponential = Math.min(1_000 * 2 ** Math.max(0, retryCount - 1), MAX_BACKOFF_MS);
+    const jitter = Math.floor(Math.random() * 500);
+    return Math.min(exponential + jitter, MAX_BACKOFF_MS);
+}
+
+async function publishOne(
+    event: ClaimedEvent,
+    channel: Awaited<ReturnType<typeof connectOrderMessaging>>["channel"],
+): Promise<void> {
+    // 1. Validate that the event type is publishable before attempting to publish it.
+    // 2. If not, mark the outbox event as DEAD and return early.
+    if (!isPublishableOrderEventType(event.eventType)) {
+        await prisma.outboxEvent.updateMany({
+            where: {
+                id: event.id,
+                status: OutboxEventStatus.PROCESSING,
+                lockedUntil: event.lockedUntil, // Ensure we only update if the lease is still valid.
+            },
+            data: {
+                status: OutboxEventStatus.DEAD,
+                lockedUntil: null,
+                lastError: "UNSUPPORTED_EVENT_TYPE",
+            },
+        });
+        return;
+    }
+
+    // 3. Get the routing key for the event type from the routingKeys mapping.
+    const routingKey = routingKeys[event.eventType];
+
+    try {
+        // 4. Publish the event to RabbitMQ with publisher confirms.
+        await publishConfirmed(
+            channel,
+            ORDER_MESSAGING.exchange,
+            routingKey,
+            serializePayload(event.payload, event.id),
+            {
+                messageId: event.id,
+                correlationId: event.orderId,
+            },
+        );
+
+        // 5. If successful, update the outbox event status to PUBLISHED and clear the lease.
+        await prisma.outboxEvent.updateMany({
+            where: {
+                id: event.id,
+                status: OutboxEventStatus.PROCESSING,
+                lockedUntil: event.lockedUntil
+            },
+            data: {
+                status: OutboxEventStatus.PUBLISHED,
+                publishedAt: new Date(),
+                lockedUntil: null, // Clear the lease after successful publication.
+                lastError: null,
+            },
+        });
+        console.log("Outbox event published successfully", {
+            eventId: event.id,
+            orderId: event.orderId,
+            eventType: event.eventType,
+        });
+
+    } catch (error) {
+        const nextRetryCount = event.retryCount + 1;
+        const dead = nextRetryCount >= MAX_RETRIES;
+
+        // 6. If publishing fails, update the outbox event status to PENDING or DEAD, 
+        // increment the retry count, and set the next attempt time with backoff.
+        await prisma.outboxEvent.updateMany({
+            where: {
+                id: event.id,
+                status: OutboxEventStatus.PROCESSING,
+                lockedUntil: event.lockedUntil
+            },
+            data: {
+                status: dead
+                    ? OutboxEventStatus.DEAD
+                    : OutboxEventStatus.PENDING,
+                retryCount: nextRetryCount,
+                nextAttemptAt: new Date(Date.now() + backoffMs(nextRetryCount)),
+                lockedUntil: null,
+                lastError: error instanceof Error
+                    ? error.message.slice(0, 1_000)
+                    : "UNKNOWN_PUBLISH_ERROR",
+            },
+        });
+
+        console.error("Outbox publish failed", {
+            eventId: event.id,
+            retryCount: nextRetryCount,
+            dead,
+        });
+
+        // Reconnect before the next publish when the channel may be unhealthy.
+        throw error;
+    }
+}
+
+export function startOrderOutboxPublisher(): () => Promise<void> {
     const abortController = new AbortController();
 
-    async function runSession(): Promise<void> {
-        console.log("Starting order outbox publisher session");
-        const { connection, channel } = await connectOrderMessaging();
+    const run = async () => {
+        let retry = 0; // Track the number of consecutive failures for backoff.
 
-        try {
-            while (!abortController.signal.aborted) {
-                const foundEvents = await publishBatch(prisma, channel);
-                // If no events were found, wait for the poll interval before checking again.
-                if (!foundEvents) {
-                    console.log("No outbox events found; waiting for next poll interval");
+        while (!abortController.signal.aborted) {
+            let connection:
+                | Awaited<ReturnType<typeof connectOrderMessaging>>["connection"]
+                | undefined;
+            let channel:
+                | Awaited<ReturnType<typeof connectOrderMessaging>>["channel"]
+                | undefined;
+
+            try {
+                const messaging = await connectOrderMessaging();
+                connection = messaging.connection;
+                channel = messaging.channel;
+                retry = 0;
+
+                // Claim a batch of outbox events to publish.
+                const events = await claimBatch();
+
+                if (events.length === 0) {
+                    console.debug("No outbox events to publish; waiting for next poll");
                     await delay(POLL_INTERVAL_MS, undefined, {
                         signal: abortController.signal
                     });
-                }
-            };
-        } finally {
-            await channel.close().catch(() => undefined);
-            await connection.close().catch(() => undefined);
-        }
-    }
-
-    async function runWithBackoff(): Promise<void> {
-        let retryCount = 0;
-
-        while (!abortController.signal.aborted) {
-            const sessionStartTime = Date.now();
-            try {
-                await runSession();
-            } catch {
-                if (abortController.signal.aborted) {
-                    break; // Exit the loop if the publisher is being stopped
+                    continue;
                 }
 
-                // If the session fails, log a warning and retry with exponential backoff.
-                console.warn(`Order outbox publisher session failed; retrying with backoff (attempt ${retryCount + 1})`);
-                if (Date.now() - sessionStartTime >= MAX_BACKOFF_SECONDS * 1000) {
-                    retryCount = 0; // Reset retry count if the session ran for a long time before failing
-                }
-
-                // Exponential backoff with a maximum wait time of MAX_BACKOFF_SECONDS.
-                const backoffMs =
-                    Math.min(2 ** Math.min(retryCount++, 6), MAX_BACKOFF_SECONDS) *
-                    1_000;
-
-                // Wait for the backoff period before retrying,
-                // but allow the wait to be interrupted if the publisher is being stopped.
-                try {
-                    await delay(backoffMs, undefined, {
-                        signal: abortController.signal
-                    });
-                } catch {
-                    if (!abortController.signal.aborted) {
-                        console.error("Error during backoff delay");
-                        throw new Error("OUTBOX_RECONNECT_DELAY_FAILED");
+                // Publish each claimed event sequentially to ensure order and avoid concurrent publishes on the same channel.
+                for (const event of events) {
+                    if (abortController.signal.aborted) {
+                        break;
                     }
+                    await publishOne(event, channel);
                 }
+            } catch (error) {
+                if (!abortController.signal.aborted) {
+                    retry++;
+                    console.error("Outbox publisher iteration failed", {
+                        retry,
+                        error: error instanceof Error ? error.message : "UNKNOWN_ERROR",
+                    });
+
+                    await delay(backoffMs(retry), undefined, {
+                        signal: abortController.signal
+                    }).catch(() => undefined);
+                }
+            } finally {
+                await channel?.close().catch(() => undefined);
+                await connection?.close().catch(() => undefined);
             }
         }
-    }
+    };
 
-    // Start the publisher in the background and return a function to stop it gracefully.
-    const complete = runWithBackoff();
+    const completion = run();
 
     return async () => {
         abortController.abort();
-        await complete;
-    }
+        await completion;
+    };
 }

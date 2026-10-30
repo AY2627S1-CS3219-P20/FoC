@@ -1,9 +1,10 @@
-import { MAX_SETTLEMENT_BYTES, settlementEventSchema } from "../schemas/settlement-event.schema.js";
+import { settlementEventSchema } from "../schemas/settlement-event.schema.js";
 import {
     connectSettlementMessaging,
     publishConfirmed,
     SETTLEMENT_MESSAGING,
 } from "../libs/rabbitmq.js";
+import { MAX_SETTLEMENT_BYTES } from "../constants/consumer.constant.js";
 
 const usage = "Usage: npm run redrive:settlement -- --limit <positive integer>";
 

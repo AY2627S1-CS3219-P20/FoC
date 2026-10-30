@@ -3,7 +3,6 @@ import { AppError } from "../errors/errors.js";
 import {
     abortReservation,
     getReservation,
-    renewReservation,
     reserveCredits,
 } from "../services/reservation.service.js";
 import {
@@ -68,20 +67,3 @@ export const abortReservationController = async (
         data: result.reservation,
     });
 };
-
-export const renewReservationController = async (
-    req: Request, res: Response
-) => {
-    const parsedBody = renewReservationSchema.safeParse(req.body);
-
-    if (!parsedBody.success) {
-        throw new AppError("Invalid reservation", 400);
-    }
-
-    const result = await renewReservation(parsedBody.data);
-
-    res.status(result.created ? 201 : 200).json({
-        success: true,
-        data: result.reservation,
-    });
-}

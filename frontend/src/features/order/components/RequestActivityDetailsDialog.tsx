@@ -20,6 +20,7 @@ import { useOrderRelatedUserDetails } from "../hooks/useOrderRelatedUserDetails"
 import { createRequestSchema } from "../schemas/create-request.schema";
 import useUpdateRequest from "../hooks/useUpdateRequest";
 import useAcceptRequest from "../hooks/useAcceptRequest";
+import { formatStringToSentenceCase, formatStringToTitleCase } from "@/utils/formatText";
 
 type RequestActivityDetailsDialogProps = {
     order: Order;
@@ -335,9 +336,9 @@ const RequestActivityDetailsDialog = ({
                         <Button
                             type="button"
                             variant={statusVariant[order.status]}
-                            className="pointer-events-none w-fit rounded-4xl h-6.5 px-2 py-0 font-normal text-xs"
+                            className="pointer-events-none w-fit rounded-4xl h-6.5 px-2 py-0 font-normal text-sm"
                         >
-                            {order.status}
+                            {formatStringToTitleCase(order.status)}
                         </Button>
                     </div>
 
@@ -354,6 +355,22 @@ const RequestActivityDetailsDialog = ({
                         <div className="flex flex-col gap-0.5">
                             <p className="text-sm font-medium">Cancellation reason</p>
                             <p className="text-sm text-muted-foreground text-wrap">{order.cancellationReason}</p>
+                        </div>
+                    )}
+
+                    {/* Show the reservation failure code if the order has a reservation failure */}
+                    {order.reservationFailureCode && (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-medium">Credits reservation failure reason</p>
+                            <p className="text-sm text-muted-foreground text-wrap">{formatStringToSentenceCase(order.reservationFailureCode)}</p>
+                        </div>
+                    )}
+
+                    {/* Show the renewal failure code if the order has a renewal failure */}
+                    {order.renewalFailureCode && (
+                        <div className="flex flex-col gap-0.5">
+                            <p className="text-sm font-medium">Renewal failure reason</p>
+                            <p className="text-sm text-muted-foreground text-wrap">{formatStringToSentenceCase(order.renewalFailureCode)}</p>
                         </div>
                     )}
 

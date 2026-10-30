@@ -6,6 +6,7 @@ import RequestActivityCard from "@/features/order/components/RequestActivityCard
 import { useRequesterOrderHistory } from "@/features/order/hooks/useRequesterOrderHistory";
 import { useSuppliersByIds } from "@/features/order/hooks/useSuppliersByIds";
 import { ORDER_STATUSES, type OrderStatus, type SortBy, type SortOrder } from "@/features/order/types/order.types";
+import { formatStringToTitleCase } from "@/utils/formatText";
 import { useState } from "react";
 
 const PAGE_SIZE = 15;
@@ -70,7 +71,7 @@ const RequesterActivtyPage = () => {
 
                         {ORDER_STATUSES.map((status) => (
                             <TabsTrigger key={status} value={status}>
-                                {status.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                                {formatStringToTitleCase(status)}
                             </TabsTrigger>
                         ))}
                     </TabsList>

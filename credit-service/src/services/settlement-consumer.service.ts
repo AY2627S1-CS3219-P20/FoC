@@ -4,15 +4,15 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import { isTemporaryDatabaseError } from "../libs/credit-transaction.js";
 import { AppError } from "../errors/errors.js";
 import { reservationIdSchema } from "../schemas/reservation.schema.js";
-import { MAX_SETTLEMENT_BYTES, settlementEventSchema } from "../schemas/settlement-event.schema.js";
+import { settlementEventSchema } from "../schemas/settlement-event.schema.js";
 import { refundCredits, releaseCredits, transferCredits } from "./settlement.service.js";
 import {
     connectSettlementMessaging,
     publishConfirmed,
     SETTLEMENT_MESSAGING,
 } from "../libs/rabbitmq.js";
+import { MAX_RETRIES, MAX_SETTLEMENT_BYTES } from "../constants/consumer.constant.js";
 
-const MAX_RETRIES = 5;
 function record(value: unknown): Record<string, unknown> {
     return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
 }
@@ -93,8 +93,8 @@ export async function processSettlementMessage(
         applied = parsed.data.eventType === "ORDER_RECEIVED"
             ? (await transferCredits(prisma, parsed.data)).transferred
             : parsed.data.eventType === "ORDER_FAILED"
-            ? (await refundCredits(prisma, parsed.data)).refunded
-            : (await releaseCredits(prisma, parsed.data)).released;
+                ? (await refundCredits(prisma, parsed.data)).refunded
+                : (await releaseCredits(prisma, parsed.data)).released;
     } catch (error) {
         // Close/reconnect on outages without spending per-event retry budgets.
         if (error instanceof AppError && error.statusCode === 503 && isTemporaryDatabaseError(error.cause)) {
