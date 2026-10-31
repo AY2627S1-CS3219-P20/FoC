@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { statusVariant, type Order, type OrderStatus, type ViewerRole } from "../types/order.types";
-import { AlarmClockIcon, CoinsIcon, FlagIcon, InfoIcon, MapPinIcon, PencilIcon } from "lucide-react";
+import { REORDERABLE_STATUSES, statusVariant, type Order, type OrderStatus, type ReorderFormInput, type ViewerRole } from "../types/order.types";
+import { AlarmClockIcon, CoinsIcon, FlagIcon, InfoIcon, MapPinIcon, PencilIcon, Repeat2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -11,6 +11,8 @@ import useAuth from "@/hooks/useAuth";
 import { ROLES } from "@/features/auth/types/auth.types";
 import RenewRequestDialog from "./RenewRequestDialog";
 import { formatStringToTitleCase } from "@/utils/formatText";
+import CreateRequestDialog from "./CreateRequestDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type RequestActivityCardProps = {
     order: Order;
@@ -26,14 +28,20 @@ const RequestActivityCard = ({
     order, isEditable, isAcceptable, viewerRole,
     pickupSupplierName, deliverySupplierName, isSuppliersLoading
 }: RequestActivityCardProps) => {
+    const { user } = useAuth();
+    const userRole = user?.role;
+
+    // Opening the RequestActivityDetailsDialog
+    const [open, setOpen] = useState(false);
+
+    // Editing requests
     const canEditRequest =
         (isEditable ?? true) &&
         viewerRole === "requester" &&
         order.status === "OPEN" &&
         order.courierId === null;
 
-    const canAccept = isAcceptable ?? false;
-    const [open, setOpen] = useState(false);
+    // Editing request status
     const editableStatuses: Partial<Record<OrderStatus, ViewerRole>> = {
         "ACCEPTED": "courier",
         "PICKED_UP": "courier",
@@ -43,9 +51,10 @@ const RequestActivityCard = ({
     const canEditStatus = Object.keys(editableStatuses).includes(order.status) && editableStatuses[order.status] === viewerRole;
     const [openStatusUpdateDialog, setOpenStatusUpdateDialog] = useState(false);
 
-    const { user } = useAuth();
-    const userRole = user?.role;
+    // Accepting requests
+    const canAccept = isAcceptable ?? false;
 
+    // Renewing expired requests
     const canRenewRequest =
         viewerRole === "requester" &&
         order.status === "EXPIRED" &&
@@ -64,6 +73,33 @@ const RequestActivityCard = ({
                         ? "Renewal failed. Your request is still expired. Please try again."
                         : null;
 
+    // Re-Ordering
+    const canReorder =
+        viewerRole === "requester" &&
+        REORDERABLE_STATUSES.has(order.status) &&
+        !order.renewalPending;
+
+    const [openCreateRequestDialog, setOpenCreateRequestDialog] = useState(false);
+    const [reorderPrefill, setReorderPrefill] =
+        useState<Partial<ReorderFormInput> | null>(null);
+
+    const handleReorder = () => {
+        setReorderPrefill({
+            name: order.name,
+            description: order.description,
+            pickupSupplierId: order.pickupSupplierId,
+            deliverySupplierId: order.deliverySupplierId,
+            offeredCredits: String(order.offeredCredits),
+            remarks: order.remarks ?? "",
+            isSuppliersLoading: isSuppliersLoading,
+            pickupSupplierName: pickupSupplierName,
+            deliverySupplierName: deliverySupplierName,
+        });
+
+        setOpen(false); // close the RequestActivityDetailsDialog
+        setOpenCreateRequestDialog(true);
+    }
+
     return (
         <>
             <Card
@@ -78,9 +114,31 @@ const RequestActivityCard = ({
             >
                 <div className="flex flex-col gap-2.5">
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-lg lg:text-xl leading-none font-bold text-wrap">
-                            {order.name}
-                        </span>
+                        <div className="flex flex-row items-center justify-between">
+                            <span className="text-lg lg:text-xl leading-none font-bold text-wrap">
+                                {order.name}
+                            </span>
+                            <Tooltip>
+                                <TooltipTrigger 
+                                render={
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleReorder();
+                                        }}
+                                        hidden={!canReorder}
+                                    >
+                                        <Repeat2 className="size-4 shrink-0 text-slate-500" />
+                                    </Button>
+                                } />
+                                <TooltipContent>
+                                    <p>Reorder</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
                         <span className="text-sm leading-none text-slate-500 text-wrap">
                             {order.description}
                         </span>
@@ -186,6 +244,8 @@ const RequestActivityCard = ({
                 pickupSupplierName={pickupSupplierName}
                 deliverySupplierName={deliverySupplierName}
                 isSuppliersLoading={isSuppliersLoading}
+                canReorder={canReorder}
+                handleReorder={handleReorder}
             />
 
             <StatusUpdateDialog
@@ -201,6 +261,12 @@ const RequestActivityCard = ({
                 onOpenChange={setOpenRenewRequestDialog}
             />
 
+            <CreateRequestDialog
+                open={openCreateRequestDialog}
+                onOpenChange={setOpenCreateRequestDialog}
+                initialValues={reorderPrefill!}
+                showTrigger={false}
+            />
         </>
     );
 };

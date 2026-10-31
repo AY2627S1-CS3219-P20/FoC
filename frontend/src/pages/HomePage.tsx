@@ -19,6 +19,7 @@ const HomePage = () => {
     const { user } = useAuth();
     const isAdmin = user?.role === ROLES.ADMIN;
 
+    const [openCreateRequestDialog, setOpenCreateRequestDialog] = useState(false);
     const [page, setPage] = useState(1);
     const [sortBy, setSortBy] = useState<SortBy>("expiryAt");
     const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -72,7 +73,12 @@ const HomePage = () => {
                         <h1 className="text-xl md:text-2xl font-bold">{totalCount} Open Requests</h1>
                         <p className="text-sm text-muted-foreground">Click on any request to view its full details.</p>
                     </div>
-                    {!isAdmin && <CreateRequestDialog />}
+                    {!isAdmin &&
+                        <CreateRequestDialog
+                            open={openCreateRequestDialog}
+                            onOpenChange={setOpenCreateRequestDialog}
+                        />
+                    }
                 </div>
 
                 <div className="flex flex-col gap-1 w-full md:w-1/2">

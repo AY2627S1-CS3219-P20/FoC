@@ -169,7 +169,7 @@ const StatusUpdateDialog = ({
                 </DialogHeader>
 
                 <div className="flex flex-row items-center justify-start gap-2">
-                    <span className="font-bold">Current status:</span>
+                    <span className="font-medium">Current status:</span>
                     <span>{prettyPrintCurrentStatus(order.status)}</span>
                 </div>
 
@@ -187,7 +187,7 @@ const StatusUpdateDialog = ({
                                 const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
                                 return (
                                     <Field data-invalid={isInvalid} className="flex-1 flex-col md:flex-row items-start md:items-center justify-start gap-2 *:w-auto">
-                                        <FieldLabel htmlFor={field.name} className="font-bold shrink-0">
+                                        <FieldLabel htmlFor={field.name} className="shrink-0">
                                             New status:
                                         </FieldLabel>
                                         <Select

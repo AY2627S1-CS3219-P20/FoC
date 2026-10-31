@@ -12,6 +12,7 @@ import { useState } from "react";
 const PAGE_SIZE = 15;
 
 const RequesterActivtyPage = () => {
+    const [openCreateRequestDialog, setOpenCreateRequestDialog] = useState(false);
     const [page, setPage] = useState(1);
     const [selectedStatus, setSelectedStatus] = useState<OrderStatus | "ALL">("ALL");
     const [sortBy, setSortBy] = useState<SortBy>("createdAt");
@@ -62,7 +63,10 @@ const RequesterActivtyPage = () => {
                         <h1 className="text-xl md:text-2xl font-bold">My Requester Activities</h1>
                         <p className="text-sm text-muted-foreground">Click on any request to view its full details.</p>
                     </div>
-                    <CreateRequestDialog />
+                    <CreateRequestDialog
+                        open={openCreateRequestDialog}
+                        onOpenChange={setOpenCreateRequestDialog}
+                    />
                 </div>
 
                 <Tabs value={selectedStatus} onValueChange={handleStatusChange} className="w-full">
