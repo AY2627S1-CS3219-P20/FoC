@@ -43,14 +43,24 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
                     assert.equal(holds.rowCount, 2);
                 });
             } else {
+                if (name === "20261028074853_support_create_renew_async") {
+                    await t.test("async migration rejects populated legacy reservations", async () => {
+                        await assert.rejects(admin.query(sql), (error: any) => error.code === "23502");
+                    });
+                    // These rows only exercise the earlier migration; the async schema requires request records.
+                    await admin.query('DELETE FROM "CreditReservation"');
+                }
                 await admin.query(sql);
             }
         }
         const input = (requesterId = randomUUID(), amount = 10) => ({ orderId: randomUUID(), requesterId, amount });
         const reservationFor = (request: ReturnType<typeof input>) => prisma.creditReservation.findFirstOrThrow({ where: { orderId: request.orderId } });
         const errorStatus = (status: number) => (e: unknown) => e instanceof AppError && e.statusCode === status;
-        await t.test("historical abort tombstones remain readable", async () => {
-            await admin.query(`INSERT INTO "CreditReservation" ("id", "orderId", "requesterId", "amount", "status", "updatedAt") VALUES ($1, $2, $3, 10, 'ABORTED', CURRENT_TIMESTAMP)`, [legacyId, randomUUID(), randomUUID()]);
+        await t.test("abort tombstones with request records remain readable", async () => {
+            const request = await prisma.reservationRequest.create({ data: {
+                eventId: randomUUID(), requestType: "CREATE", orderId: randomUUID(), requesterId: randomUUID(), amount: 10, outcome: "SUCCEEDED",
+            } });
+            await admin.query(`INSERT INTO "CreditReservation" ("id", "orderId", "requesterId", "amount", "status", "updatedAt", "requestEventId") VALUES ($1, $2, $3, 10, 'ABORTED', CURRENT_TIMESTAMP, $4)`, [legacyId, request.orderId, request.requesterId, request.eventId]);
             const legacy = await getReservation(legacyId);
             assert.equal(legacy.status, "ABORTED");
         });
@@ -83,7 +93,7 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             assert.equal(new Set(results.map(result => result.reservation.id)).size, 3);
             assert.equal(await prisma.creditTransaction.count({ where: { orderId: request.orderId } }), 3);
         });
-        await t.test("CS F4: reserving the full balance succeeds; an unfunded hold leaves no state", async () => {
+        await t.test("CS F4: reserving the full balance succeeds; an unfunded request leaves balances and ledger unchanged", async () => {
             const request = input(undefined, 50);
             await grantInitialCredits(prisma, request.requesterId);
             const { reservation } = await reserveCredits(request);
@@ -178,7 +188,7 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
             const account = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
             assert.deepEqual([account.availableCredits, account.reservedCredits], [40, 10]);
         });
-        await t.test("HTTP reserve creates a new hold per call; lookup and abort use returned ID", async () => {
+        await t.test("HTTP rejects invalid creation requests; lookup and abort use the async reservation ID", async () => {
             const request = input();
             await grantInitialCredits(prisma, request.requesterId);
             const app = express();
@@ -202,14 +212,9 @@ test("F4 PostgreSQL atomicity, races, recovery and ledger regressions", { skip: 
                 assert.equal(await prisma.creditTransaction.count({ where: { orderId: request.orderId } }), 0);
                 const untouched = await prisma.creditAccount.findUniqueOrThrow({ where: { userId: request.requesterId } });
                 assert.deepEqual([untouched.availableCredits, untouched.reservedCredits], [50, 0]);
-                const created = await post(url, request);
-                assert.equal(created.status, 201);
-                const reservationId = (await created.json()).data.id;
-                assert.ok(reservationId);
+                const { reservation } = await reserveCredits(request);
+                const reservationId = reservation.id;
                 assert.equal((await post(url, { ...request, reservationId: randomUUID() })).status, 400);
-                const second = await post(url, request);
-                assert.equal(second.status, 201);
-                assert.notEqual((await second.json()).data.id, reservationId);
                 const lookup = await fetch(`${url}/${reservationId}`, { headers: { "X-Order-Credit-Service-Secret": "test-token" } });
                 assert.equal(lookup.status, 200);
                 assert.equal((await lookup.json()).data.status, "RESERVED");
