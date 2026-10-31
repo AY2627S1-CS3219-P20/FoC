@@ -153,7 +153,7 @@ async function applyRenewResult(
                 orderId: order.id,
                 fromStatus: OrderStatus.EXPIRED,
                 toStatus: OrderStatus.OPEN,
-                changedBy: payload.requesterId,
+                changedBy: null,
                 reason: "Request renewed",
             },
         });

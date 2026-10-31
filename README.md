@@ -1,8 +1,8 @@
 # CS3219 — Software Design and Architecture (AY2627 Sem 1)
 
-## Friend on Campus (FoC)
+## Aaron
 
-**Friend on Campus (FoC)** is a peer-to-peer campus errand platform where
+**Aaron** is a peer-to-peer campus errand platform where
 students can request items to be collected from stores or facilities on
 campus, and other students can fulfil (and deliver) those requests. The
 platform runs on a closed credit economy — credits cannot be bought,
@@ -12,13 +12,12 @@ withdrawn, or exchanged for money, and only circulate within the platform.
 
 ## Team Members
 
-| Name      | Role           |
+| Name | Role |
 | --------- | -------------- |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
-| Your Name | Your ownership |
+| Amber Tan Junning | Your ownership |
+| Duong Ngoc Mai | Your ownership |
+| Lim Shao Qi | Your ownership |
+| Ng See Pui | Your ownership |
 
 ---
 
@@ -78,3 +77,46 @@ The deploy workflow reads these repository settings
 | `EC2_SSH_KEY` | Private key of the deploy SSH key pair |
 
 ---
+
+## RabbitMQ and Service Startup
+
+RabbitMQ runs in Docker; no native RabbitMQ installation is needed. Start Docker Desktop/the Docker engine first. From the repository root:
+
+```sh
+docker compose config --quiet
+docker compose up -d rabbitmq
+docker compose ps
+docker compose logs --tail=50 rabbitmq
+```
+
+If macOS reports `docker: command not found` and Docker Desktop installed its CLI under `~/.docker/bin`, run `export PATH="$HOME/.docker/bin:$PATH"` in your terminal. Add that export to `~/.zshrc` to keep it for new shells.
+
+Compose downloads `rabbitmq:4.2-management` and stores broker data in a named volume. Both ports are bound to localhost:
+
+- AMQP: `5672`
+- Management UI: `15672`, at <http://localhost:15672>
+
+The development login is `foc` / `foc-local-only`. Override it using `RABBITMQ_USER` and `RABBITMQ_PASSWORD` in the **root** `.env`. These settings create users when the broker volume is first initialized. Changing them later does not update existing broker users.
+
+Set `RABBITMQ_URL` in **both service directories'** `.env` files using the same credentials. URL-encode any special characters in the credentials.
+
+Services running on your host use `localhost`. A future service running in a container on the same Compose network would use `rabbitmq`. Host service processes do not automatically load the root `.env`.
+
+Apply migrations and generate clients in each service before startup:
+
+```sh
+cd user-service && npm ci && npm run db:deploy && npm run db:generate && npm run build
+cd supplier-service && npm ci && npm run db:deploy && npm run db:generate && npm run build
+cd order-service && npm ci && npm run db:deploy && npm run db:generate && npm run build
+cd credit-service && npm ci && npm run db:deploy && npm run db:generate && npm run build
+```
+
+Run `npm start` from each service directory in separate terminals, or use `npm run dev`. The user-service publisher and credit-service consumer run inside those processes; you do not need separate worker commands.
+
+Either service can start first. Each connection sets up the required exchanges, queues and bindings before processing messages. The HTTP servers can start while RabbitMQ is down.
+
+Stop services with Ctrl+C. They try to finish work already in progress before a 15-second shutdown deadline.
+
+Use `docker compose stop rabbitmq` to stop the broker and `docker compose start rabbitmq` to restart it. These commands and ordinary `docker compose down` preserve the volume. **`docker compose down -v` deletes broker data.**
+
+This local setup uses one broker node. Data survives restarts, but the setup does not provide high availability or recovery from permanent volume loss.

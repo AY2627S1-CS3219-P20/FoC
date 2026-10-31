@@ -9,9 +9,9 @@
 - [Project Structure](#project-structure)
 - [API Reference](#api-reference)
 - [Getting Started](#getting-started)
-- [Configuration](#configuration)
 - [Credit provisioning outbox](#credit-provisioning-outbox)
 - [Security](#security)
+- [Docker (local demo)](#docker-local-demo)
 - [Acknowledgements](#acknowledgements)
 
 ## About
@@ -46,11 +46,6 @@ It manages user accounts and provides authentication services to the other micro
 - Request validation using Zod
 - Centralized error handling
 
-### Database
-
-- PostgreSQL database
-- Prisma ORM for database management
-
 ## Tech Stack
 
 Technology    | Purpose
@@ -68,6 +63,8 @@ CORS          | Cross-origin resource sharing
 Nodemailer    | Email sending
 
 ## Architecture
+
+### Overview Architecture Diagram
 
 The User Service is one of the backend microservices in Aaron.
 
@@ -126,18 +123,36 @@ The User Service issues access and refresh tokens.
 
 ### Database
 
+- PostgreSQL database
+- Prisma ORM for database management
+
 The User Service has its own PostgreSQL database.
 
 ```text
 User Service
-     │
-     ▼
+    │
+    ▼
   PostgreSQL
-     │
-     ├── User
-     │
-     └── RefreshToken
+    │
+    ├── User
+    │
+    ├── RefreshToken
+    │
+    ├── OutboxEvent
+    │
+    ├── PendingRegistration
+    │
+    ├── RegistrationOtpRequest
+    │
+    ├── AdminInvitation
+    │
+    ├── PendingEmailChange
+    │
+    └── EmailChangeOtpRequest
+
 ```
+
+Alongside these tables, enums `Role` and `BootstrapState` are created.
 
 Other microservices do not directly access the User Service database. Cross-service references use the user's user id.
 
@@ -175,8 +190,6 @@ user-service/
 ```
 
 ## API Reference
-
-The User Service exposes REST APIs under the `/api` prefix.
 
 ### Authentication
 
@@ -571,89 +584,14 @@ Code                    | HTTP Status | Description
 
 Make sure the following are installed:
 
-- Node.js
-- npm
-- PostgreSQL
-
-### Installation
-
-Clone the repository and navigate to the User Service:
-
-```bash
-cd user-service
-```
-
-Install the dependencies:
-
-```bash
-npm install
-```
-
-### Database Setup
-
-Make sure your local PostgreSQL database is running and that the `DATABASE_URL` in your `.env` file points to the correct database.
-
-Apply the existing Prisma migrations:
-
-```bash
-npx prisma migrate deploy
-```
-
-Generate the Prisma Client:
-
-```bash
-npx prisma generate
-```
-
-### Running the Service
-
-Run the service in development mode:
-
-```bash
-npm run dev
-```
-
-The User Service runs on:
-
-```text
-http://localhost:3000
-```
-
-### Prisma Studio
-
-To inspect the local database:
-
-```bash
-npx prisma studio
-```
-
-## Configuration
-
-Create a `.env` file in the root of the User Service.
-
-Example:
-
-```env
-PORT=3000
-
-NODE_ENV=development
-
-FRONTEND_URL="http://localhost:5173"
-
-DATABASE_URL="postgresql://username:password@localhost:5432/users"
-
-RABBITMQ_URL="amqp://foc:foc-local-only@localhost:5672?heartbeat=20"
-
-JWT_PRIVATE_KEY_PATH="./keys/private.pem"
-
-JWT_PUBLIC_KEY_PATH="./keys/public.pem"
-
-JWT_REFRESH_TOKEN_KEY="your_refresh_token_secret_here"
-
-COOKIE_SECRET="your_cookie_secret_here"
-```
+- Node.js compatible with the project’s installed Prisma version.
+- npm.
+- PostgreSQL.
+- Docker Desktop or another Docker Engine for local RabbitMQ.
 
 ### Environment Variables
+
+Create a `.env` file in the root of the User Service and fill in the required environment variables. You can use the provided `.env.example` as a template.
 
 Variable                | Description
 ----------------------- | ------------------------------------------------------
@@ -661,28 +599,55 @@ Variable                | Description
 `NODE_ENV`              | Node environment (development, production, etc.)
 `FRONTEND_URL`          | Frontend URL allowed by CORS
 `DATABASE_URL`          | PostgreSQL connection string
+`USER_POSTGRES_DB` | Name of the PostgreSQL database for the User Service
+`USER_POSTGRES_USER` | Username for the PostgreSQL database
+`USER_POSTGRES_PASSWORD` | Password for the PostgreSQL database
 `RABBITMQ_URL`          | Broker connection URL for the background outbox publisher
 `JWT_PRIVATE_KEY_PATH`  | Path to the RSA private key used to sign access tokens
 `JWT_PUBLIC_KEY_PATH`   | Path to the RSA public key used to verify access tokens
 `JWT_REFRESH_TOKEN_KEY` | Secret used to sign refresh tokens
 `COOKIE_SECRET`         | Secret used for cookie signing
+`BOOTSTRAP_ADMIN_EMAIL` | Email for the first administrator account
+`BOOTSTRAP_ADMIN_USERNAME` | Username for the first administrator account
+`BOOTSTRAP_ADMIN_PHONE_NUMBER` | Phone number for the first administrator account
+`BOOTSTRAP_ADMIN_PASSWORD` | Password for the first administrator account
+`BREVO_SMTP_USER` | Brevo SMTP username for sending emails
+`BREVO_SMTP_KEY` | Brevo SMTP key for sending emails
+`EMAIL_FROM` | Email address used as the sender for outgoing emails
 
 > Do not commit `.env`, private keys, or other secrets to the repository.
+
+### Database Setup
+
+From the repository root:
+
+```sh
+cd user-service
+npm ci
+```
+
+Apply the database migrations and generate the Prisma client:
+
+```sh
+npm run db:deploy
+npm run db:generate
+```
+
+To inspect the database schema, run:
+
+```sh
+npm run db:studio
+```
+
+Start development with `npm run dev`, or run the compiled application with `npm start`.
+
+The registration consumer starts after the HTTP server begins listening. It reconnects if RabbitMQ becomes unavailable. `GET /healthz` only confirms that the HTTP server is running; it does not check RabbitMQ or whether students have received credits.
 
 ## Credit provisioning outbox
 
 Successful student OTP verification consumes the pending challenge, creates the student, and inserts a `USER_REGISTERED` outbox event in one PostgreSQL transaction. Any failure rolls back all three writes. Failed/unverified registration, OTP resends, admin bootstrap, and admin activation emit no registration event. No broker calls run inside this transaction, and no existing users are backfilled.
 
-Deploy the outbox migration before starting the updated service:
-
-```sh
-npm ci
-npm run db:deploy
-npm run db:generate
-npm run build
-```
-
-Configure the existing HTTP/database/auth/email environment plus `RABBITMQ_URL` in `user-service/.env`. The local default is `amqp://foc:foc-local-only@localhost:5672?heartbeat=20`; match the broker credentials and URL-encode special characters. See [RabbitMQ and service startup](../credit-service/README.md#rabbitmq-and-service-startup) for Docker commands and the full [event contract](../credit-service/README.md#registration-delivery-contract).
+Configure the existing HTTP/database/auth/email environment plus `RABBITMQ_URL` in `user-service/.env`. The local default is `amqp://foc:foc-local-only@localhost:5672?heartbeat=20`; match the broker credentials and URL-encode special characters. See [RabbitMQ and service startup](../README.md#rabbitmq-and-service-startup) for Docker commands and the full [event contract](../credit-service/README.md#registration-and-initial-credit-grant).
 
 `npm run dev` or `npm start` starts the publisher in the background after HTTP begins listening. Run one active user-service publisher instance for this version; there are no leases or distributed worker coordination. Accidental duplicate publication cannot grant credits twice, but coordinated multi-instance scheduling is not implemented.
 
@@ -715,7 +680,7 @@ No automated tests were added for this workflow. Use `npx prisma validate`, `npm
 
 ## Security
 
-### First administrator setup
+### First Administrator Setup
 
 The user service can create its first administrator before accepting requests.
 Apply migrations with `npx prisma migrate deploy` and generate the client with
@@ -915,7 +880,7 @@ With the database container running, open Studio on your laptop:
 
 ```sh
 cd user-service
-npx prisma studio
+npm run db:studio
 ```
 
 Studio accesses the existing container database and its persisted records.

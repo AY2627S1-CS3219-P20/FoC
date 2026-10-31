@@ -5,7 +5,7 @@ import {
     REGISTRATION_MESSAGING,
 } from "../libs/rabbitmq.js";
 
-const usage = "Usage: npm run redrive -- --limit <positive integer>";
+const usage = "Usage: npm run redrive:registration -- --limit <positive integer>";
 
 async function redrive(limit: number): Promise<void> {
     const { connection, channel } = await connectRegistrationMessaging();
