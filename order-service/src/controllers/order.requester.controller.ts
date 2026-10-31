@@ -23,6 +23,7 @@ export async function getRequesterOrderHistory(
     const result = await getRequesterOrderHistoryService(requesterId, parsedQuery.data);
 
     res.status(200).json({
+        success: true,
         message: "Requester order history retrieved successfully",
         data: {
             orders: result.orders,
@@ -55,6 +56,7 @@ export async function updateRequest(
     );
 
     res.status(200).json({
+        success: true,
         message: "Order updated successfully",
         data: order,
     });
@@ -73,6 +75,7 @@ export async function createRequest(
     const order = await createRequestService(requesterId, requestBody.data);
 
     res.status(201).json({
+        success: true,
         message: "Order created successfully",
         data: order,
     });
@@ -100,6 +103,7 @@ export async function receiveRequest(
     const order = await receiveRequestService(requesterId, orderId, requestBody.data);
 
     res.status(200).json({
+        success: true,
         message: "Order marked as received successfully",
         data: order,
     });
@@ -127,6 +131,7 @@ export async function failRequest(
     const order = await failRequestService(requesterId, orderId, requestBody.data);
 
     res.status(200).json({
+        success: true,
         message: "Order marked as failed successfully",
         data: order,
     });
@@ -154,6 +159,7 @@ export async function cancelRequest(
     const order = await cancelRequestService(requesterId, orderId, requestBody.data);
 
     res.status(200).json({
+        success: true,
         message: "Order marked as canceled successfully",
         data: order,
     });
@@ -181,6 +187,7 @@ export async function renewExpiredRequest(
     const order = await renewExpiredRequestService(requesterId, orderId, requestBody.data);
 
     res.status(200).json({
+        success: true,
         message: "Order renewed successfully",
         data: order,
     });

@@ -63,6 +63,7 @@ export async function getSuppliersByIds(req: Request, res: Response) {
     const suppliers = await getSuppliersByIdsService(parsedQuery.data.ids);
 
     res.status(200).json({
+        success: true,
         message: "Suppliers retrieved successfully",
         data: suppliers,
     });
