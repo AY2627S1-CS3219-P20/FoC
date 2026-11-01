@@ -567,6 +567,28 @@ test("pickUpAcceptedOrder returns error code 400 when the order is not in the AC
     assert.equal(calls.update, 0);
 });
 
+test("pickUpAcceptedOrder returns error code 409 when the time stated in expiryAt has passed", async (t) => {
+    const { calls } = useSharedMockPrisma(t, {
+        findUniqueReturn: { ...MOCK_ACCEPTED_ORDER, expiryAt: new Date(Date.now() - 1) },
+    });
+
+    await assert.rejects(
+        () => pickUpAcceptedOrder("stu_2", MOCK_PICKED_UP_ORDER.id),
+        (error: unknown) => {
+            assert.ok(error instanceof AppError);
+            assert.equal(error.statusCode, 409); 
+            assert.equal(error.code, "CONFLICT");
+            return true;
+        },
+    );
+    
+    // check number of calls
+    assert.equal(calls.findUnique, 1);
+    assert.equal(calls.transaction, 0);
+    assert.equal(calls.update, 0);
+    assert.equal(calls.orderStatusHistoryCreate, 0);
+});
+
 test("pickUpAcceptedOrder updates order status successfully with valid inputs", async (t) => {
     const orderStatusChange  = {
         orderId: MOCK_ACCEPTED_ORDER.id,
@@ -735,6 +757,28 @@ test("completePickedUpOrder returns error code 400 when the order is not in the 
     assert.equal(calls.update, 0);
 });
 
+test("completePickedUpOrder returns error code 409 when the time stated in expiryAt has passed", async (t) => {
+    const { calls } = useSharedMockPrisma(t, {
+        findUniqueReturn: { ...MOCK_PICKED_UP_ORDER, expiryAt: new Date(Date.now() - 1) },
+    });
+
+    await assert.rejects(
+        () => completePickedUpOrder("stu_2", MOCK_ACCEPTED_ORDER.id),
+        (error: unknown) => {
+            assert.ok(error instanceof AppError);
+            assert.equal(error.statusCode, 409);
+            assert.equal(error.code, "CONFLICT");
+            return true;
+        },
+    );
+    
+    // check number of calls
+    assert.equal(calls.findUnique, 1);
+    assert.equal(calls.transaction, 0);
+    assert.equal(calls.update, 0);
+    assert.equal(calls.orderStatusHistoryCreate, 0);
+});
+
 test("completePickedUpOrder updates order status successfully with valid inputs", async (t) => {
     const orderStatusChange  = {
         orderId: MOCK_PICKED_UP_ORDER.id,
@@ -894,6 +938,28 @@ test("dropAcceptedOrder returns error code 400 when the order is not in the ACCE
             assert.ok(error instanceof AppError);
             assert.equal(error.statusCode, 400);
             assert.equal(error.code, "BAD_REQUEST");
+            return true;
+        },
+    );
+    
+    // check number of calls
+    assert.equal(calls.findUnique, 1);
+    assert.equal(calls.transaction, 0);
+    assert.equal(calls.update, 0);
+    assert.equal(calls.orderStatusHistoryCreate, 0);
+});
+
+test("dropAcceptedOrder returns error code 409 when the time stated in expiryAt has passed", async (t) => {
+    const { calls } = useSharedMockPrisma(t, {
+        findUniqueReturn: { ...MOCK_OPEN_ORDER, expiryAt: new Date(Date.now() - 1) },
+    });
+
+    await assert.rejects(
+        () => dropAcceptedOrder("stu_2", MOCK_PICKED_UP_ORDER.id),
+        (error: unknown) => {
+            assert.ok(error instanceof AppError);
+            assert.equal(error.statusCode, 409);
+            assert.equal(error.code, "CONFLICT");
             return true;
         },
     );

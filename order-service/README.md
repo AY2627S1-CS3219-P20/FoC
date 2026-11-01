@@ -24,22 +24,26 @@ In the Order Service, there are two main roles: Requester (user who created an o
 
 ## Features
 
-### Order Management
+### Requester Features
 
-- View all open order requests not posted by the caller, with filter, sort and pagination available
-- View past order requests made as a requester, with filter, sort and pagination available
-- View past order requests accepted as courier, with filter, sort and pagination available
-- Create a new order
-- Update an existing order
-- Accept an open order as a courier
-- Mark an accepted order as picked up as a courier
-- Complete a picked up order as a courier
-- Mark a completed order as received as a requester
-- Mark a completed order as failed as a requester
-- Mark a completed order as received as a requester
-- Renew an expired order as a requester
-- Cancel an open order as a requester
-- Reorder existing order as a requester
+- Create, update, cancel, and reorder requests
+- View the requester’s order history with filtering, sorting, and pagination
+- Renew an expired request by setting a new `expiryAt`
+- Mark a completed order as received or report it as failed
+
+### Courier Features
+
+- Browse open requests not posted by the courier, with filtering, sorting, and pagination
+- View accepted orders with filtering, sorting, and pagination
+- Accept an open request
+- Mark an accepted request as picked up
+- Mark a picked-up request as completed
+
+### Automatic Order Handling
+
+- Expire open requests with no assigned courier when `expiryAt` passes
+- Mark accepted or picked-up requests as failed if they have not reached `COMPLETED` by `expiryAt`
+- Publish the corresponding credit event so Credit Service can release or return the reserved credits
 
 ## Order Lifecycle
 
@@ -56,9 +60,9 @@ In the Order Service, there are two main roles: Requester (user who created an o
 | PENDING_RESERVATION | Credit Service cannot reserve the requested credits. | RESERVATION_FAILED | NULL (system) | Credit Service publishes an `CREDIT_RESERVATION_FAILED` outbox event. Order Service consumes it and updates the order to `RESERVATION_FAILED`. No credits are reserved. |
 | OPEN | Requester owns the request, no courier is assigned, supplies exits, expected version matches, editable fields are valid, order must be in OPEN status. | OPEN | Requester ID | Requester updates the request. Offered credits cannot be changed after it is created. No change to credit reservations. |
 | OPEN | No courier assigned, the user is not the requester, order has not expired, order must be in OPEN status. | ACCEPTED | Courier ID | Courier accepts the request. No change in credit reservations. |
-| ACCEPTED | The user is the assigned courier,  order must be in ACCEPTED status. | OPEN | Courier ID | Courier drops the request. No change in credit reservations. |
-| ACCEPTED | The user is the assigned courier, order must be in ACCEPTED status. | PICKED_UP | Courier ID | Courier picks up the item. No change in credit reservations. |
-| PICKED_UP | The user is the assigned courier, order must be in PICKED_UP status. | COMPLETED | Courier ID | Courier marks delivery as completed. No change in credit reservations. |
+| ACCEPTED | The user is the assigned courier,  order has not expired, order must be in ACCEPTED status. | OPEN | Courier ID | Courier drops the request. No change in credit reservations. |
+| ACCEPTED | The user is the assigned courier,  order has not expired, order must be in ACCEPTED status. | PICKED_UP | Courier ID | Courier picks up the item. No change in credit reservations. |
+| PICKED_UP | The user is the assigned courier,  order has not expired, order must be in PICKED_UP status. | COMPLETED | Courier ID | Courier marks delivery as completed. No change in credit reservations. |
 | COMPLETED | The order belongs to the requester, order must be in COMPLETED status, a courier must be assigned, credit reservationId must exist, expected version matches. | RECEIVED | Requester ID | Requester confirms they received the item. Order Service publishes an `ORDER_RECEIVED` outbox event, triggering the credit service to transfer the reserved credits to the courier. |
 | COMPLETED | The order belongs to the requester, order must be in COMPLETED status, a courier must be assigned, credit reservationId must exist, expected version matches. | FAILED | Requester ID | Requester reports that the delivery failed. Order Service publishes an `ORDER_FAILED` outbox event, triggering the credit service to refund the reservation. |
 | OPEN | The order belongs to the requester, order must be in OPEN status, no courier is assigned, credit reservationId must exist, expected version matches. | CANCELED | Requester ID | Requester cancels the request. Order Service publishes an `ORDER_CANCELED` outbox event, triggering the credit service to release the reservation. |
@@ -66,6 +70,8 @@ In the Order Service, there are two main roles: Requester (user who created an o
 | EXPIRED | The order belongs to the requester, order must be in EXPIRED status, credit reservationId must exist, expiry date in the future, expected version matches. | EXPIRED | Requester ID | Requester requests renewal. Order Service set `renewalPending` to true and publishes a new `CREDIT_RESERVATION_REQUEST` outbox event. Credit Service attempts to create a new reservation. The existing expired status is retained while the reservation is pending. |
 | EXPIRED | Credit Service successfully reserves the credits for the renewal attempt. | OPEN | NULL (system) | Credit Service publishes an `CREDIT_RESERVATION_SUCCEEDED` outbox event. Order Service consumes it, records the new reservation ID, updates the expiry date, and reopens the order. |
 | EXPIRED | Credit Service cannot reserve the credits for the renewal attempt. | EXPIRED | NULL (system) | Credit Service publishes an `CREDIT_RESERVATION_FAILED` outbox event. Order Service consumes it, sets `renewalPending` to false and stores the renewal failure code. The order remains expired. |
+| ACCEPTED | The order must be in ACCEPTED status, a courier must be assigned, and the expiry date has passed. | FAILED | NULL (system) | The system’s expiry worker automatically fails the request. The expiry worker polls every 1 minute to check if any order has expired, and updates the order status accordingly. Order Service publishes an `ORDER_FAILED` outbox event, triggering the credit service to refund the reservation. |
+| PICKED_UP | The order must be in PICKED_UP status, a courier must be assigned, and the expiry date has passed. | FAILED | NULL (system) | The system’s expiry worker automatically fails the request. The expiry worker polls every 1 minute to check if any order has expired, and updates the order status accordingly. Order Service publishes an `ORDER_FAILED` outbox event, triggering the credit service to refund the reservation. |
 
 For each transition, the order service performs the below in one database transaction:
 
@@ -195,23 +201,21 @@ A crash after forwarding but before acknowledgment can create a duplicate delive
 
 ## Background Workers
 
-### Background Order Expiry Worker
+### Order Deadline Worker
 
-The Order Service runs a background worker that expires requests whose acceptance deadline has passed. `expiryAt` is the deadline for a courier to accept an order; it is not the deadline for completing delivery.
+`expiryAt` is a deadline for an order to be completed. The Order Service runs a background worker that checks orders whose `expiryAt` deadline has passed. The deadline has different effects depending on the order’s current status:
 
-The worker periodically checks for orders matching all of these conditions:
+| Current status | Condition | Result |
+| --- | --- | --- |
+| `OPEN` | No courier is assigned | `EXPIRED`; the requester can renew the order |
+| `ACCEPTED` or `PICKED_UP` | Delivery has not reached `COMPLETED` | `FAILED`; the reserved credits are returned to the requester |
+| `COMPLETED` | Delivery was completed by the deadline | No deadline transition |
 
-- The status is `OPEN`.
-- No courier has been assigned.
-- `expiryAt` is earlier than or equal to the current time.
+For each matching order, the worker updates its status, sets `expiredAt` or `failedAt`, records the reason when it fails an order, and increments the order version. It also records a status-history entry and creates the corresponding outbox event in the same database transaction.
 
-For each matching order, the worker changes its status to `EXPIRED`, sets `expiredAt`, and increments the order version. It also records an `OPEN → EXPIRED` status-history entry and creates an `ORDER_EXPIRED` outbox event. These changes are performed in a database transaction so the order update, history entry, and outbox event stay consistent.
+For an `OPEN` order with no assigned courier, the worker creates an `ORDER_EXPIRED` event. Credit Service consumes it and releases the reservation. For an `ACCEPTED` or `PICKED_UP` order that has not reached `COMPLETED`, the worker creates an `ORDER_FAILED` event. Credit Service consumes it and returns the reserved credits to the requester.
 
-The outbox publisher later sends the `ORDER_EXPIRED` event to RabbitMQ. The Credit Service consumes it and releases the reserved credits. The expiry worker does not call the Credit Service directly.
-
-The status and courier conditions also protect against an acceptance racing with expiry. If the courier accepts first, the order no longer matches the worker’s expiry criteria. If expiry wins first, the courier’s conditional acceptance update no longer matches an open order.
-
-The worker runs on the interval configured in the Order Service and is stopped during graceful service shutdown.
+The worker polls every minute and runs immediately when the service starts. It is stopped during graceful service shutdown. Because status changes use conditional updates, a concurrent acceptance or completion cannot be overwritten by the worker. The acceptance, pickup, completion, and drop actions also check that `expiryAt` has not passed.
 
 ## Tech Stack
 
