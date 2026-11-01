@@ -47,7 +47,6 @@ const ManageSupplierTypesPage = () => {
                     <Button
                         type="button"
                         variant="indigo"
-                        size="lg"
                         onClick={() => setIsCreateOpen(true)}
                         className="self-start"
                     >

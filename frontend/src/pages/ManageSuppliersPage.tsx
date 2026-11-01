@@ -22,21 +22,23 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 import DeactivateModal from "@/features/supplier/components/DeactivateModal";
-import type { Supplier, 
-    SupplierDay, 
-    CreateSupplierInput, 
-    SupplierType, 
-    SuppliersQueryParams, 
-    SuppliersQueryResponse 
+import type {
+    Supplier,
+    SupplierDay,
+    CreateSupplierInput,
+    SupplierType,
+    SuppliersQueryParams,
+    SuppliersQueryResponse
 } from "@/features/supplier/types/supplier.types";
 import type { SupplierFormValues } from "@/features/supplier/schemas/supplier.schema";
 import { Button } from "@/components/ui/button";
 import SupplierCard from "@/features/supplier/components/SupplierCard";
 import { Field } from "@/components/ui/field";
-import { Menubar, MenubarMenu, MenubarTrigger } from "@/components/ui/menubar";
 import SupplierForm from "@/features/supplier/components/SupplierForm";
 import SupplierModal from "@/features/supplier/components/SupplierModal";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatStringToTitleCase } from "@/utils/formatText";
 
 interface OpeningHourRow {
     day: SupplierDay;
@@ -83,7 +85,7 @@ const ManageSuppliersPage = () => {
         sessionStorage.setItem("searchString", searchString);
         sessionStorage.setItem("typeFilter", typeFilter);
     }, [searchString, typeFilter]);
-    
+
     const suppliersQueryParams: SuppliersQueryParams = {
         page: currentPage,
         searchString: searchString,
@@ -199,8 +201,24 @@ const ManageSuppliersPage = () => {
             <div className="flex flex-col gap-4 px-5 md:px-10 py-5">
                 <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                     <h1 className="text-xl md:text-2xl font-bold">Manage Suppliers</h1>
-                    <Field className="w-full md:w-1/3">
-                        <InputGroup className="bg-white h-10">
+                    <SupplierModal
+                        open={isCreateOpen}
+                        onClose={() => setIsCreateOpen(!isCreateOpen)}
+                        title="Create Supplier"
+                        icon={<PlusIcon className="stroke-3" />}
+                    >
+                        <SupplierForm
+                            submitLabel="Create Supplier"
+                            isPending={createMutation.isPending}
+                            onSubmit={handleSubmitForm}
+                            onCancel={() => setIsCreateOpen(false)}
+                        />
+                    </SupplierModal>
+                </div>
+
+                <div className="flex flex-col gap-1 w-full md:w-1/2">
+                    <Field className="w-full">
+                        <InputGroup className="bg-white">
                             <InputGroupAddon align="inline-start">
                                 <SearchIcon />
                             </InputGroupAddon>
@@ -219,40 +237,19 @@ const ManageSuppliersPage = () => {
                     <p className="text-sm text-muted-foreground">No supplier types yet.</p>
                 )}
 
-                <Menubar className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-2.5 overflow-x-auto overflow-y-hidden">
-                    <MenubarMenu>
-                        <MenubarTrigger
-                            key="all"
-                            className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === "ALL" ? "bg-accent text-accent-foreground" : ""}`}
-                            onClick={() => handleFilterInput("ALL")}
-                        >
-                            ALL
-                        </MenubarTrigger>
-                    </MenubarMenu>
-                    {supplierTypes.map(type => (
-                        <MenubarMenu key={type.id}>
-                            <MenubarTrigger
-                                className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === type.type ? "bg-accent text-accent-foreground" : ""}`}
-                                onClick={() => handleFilterInput(type.type)}
-                            >
-                                {type.type}
-                            </MenubarTrigger>
-                        </MenubarMenu>
-                    ))}
-                </Menubar>
-            </div>
+                <Tabs value={typeFilter} onValueChange={setTypeFilter} className="w-full">
+                    <TabsList className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-1 overflow-x-auto overflow-y-hidden">
+                        <TabsTrigger value="ALL" onClick={() => handleFilterInput("ALL")}>
+                            All
+                        </TabsTrigger>
 
-            <div className="px-5 md:px-10 pb-4">
-                <Button
-                    type="button"
-                    variant="indigo"
-                    size="lg"
-                    onClick={() => setIsCreateOpen(true)}
-                    className="w-full self-start md:w-auto"
-                >
-                    <PlusIcon />
-                    Create Supplier
-                </Button>
+                        {supplierTypes.map((type) => (
+                            <TabsTrigger key={type.id} value={type.type} onClick={() => handleFilterInput(type.type)}>
+                                {formatStringToTitleCase(type.type)}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
             </div>
 
             <div className="px-5 md:px-10 pb-10">
@@ -341,21 +338,6 @@ const ManageSuppliersPage = () => {
                     </div>
                 )}
             </div>
-
-            {isCreateOpen && (
-                <SupplierModal
-                    open={isCreateOpen}
-                    onClose={() => setIsCreateOpen(false)}
-                    title="Create Supplier"
-                >
-                    <SupplierForm
-                        submitLabel="Create Supplier"
-                        isPending={createMutation.isPending}
-                        onSubmit={handleSubmitForm}
-                        onCancel={() => setIsCreateOpen(false)}
-                    />
-                </SupplierModal>
-            )}
 
             {editingSupplier && (
                 <SupplierModal

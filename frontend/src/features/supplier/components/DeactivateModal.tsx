@@ -36,7 +36,6 @@ const DeactivateModal = ({ supplier, isPending, onConfirm, onCancel }: Deactivat
                 <Button
                     type="button"
                     variant="destructive"
-                    size="lg"
                     isLoading={isPending}
                     onClick={onConfirm}
                 >
