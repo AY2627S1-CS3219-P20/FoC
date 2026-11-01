@@ -30,10 +30,10 @@ export const createRequestSchema = z.object({
         ),
     expiryAt: z
         .string()
-        .min(1, "Expiry date and time is required")
+        .min(1, "Expiry deadline is required")
         .refine(
             (value) => new Date(value) > new Date(),
-            "Expiry date and time must be in the future"
+            "Expiry deadline must be in the future"
         )
         .transform((value) => new Date(value).toISOString()),
 
