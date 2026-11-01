@@ -163,7 +163,7 @@ const RequestActivityDetailsDialog = ({
                                 value={String(order.offeredCredits)}
                             />
                             <DetailText
-                                label="Expiry deadline"
+                                label="Completion deadline"
                                 value={format(
                                     new Date(order.expiryAt),
                                     "MMM d, yyyy, h:mm a",
@@ -308,7 +308,7 @@ const RequestActivityDetailsDialog = ({
 
                                         return (
                                             <Field data-invalid={isInvalid}>
-                                                <FieldLabel htmlFor={field.name}>Expiry Deadline</FieldLabel>
+                                                <FieldLabel htmlFor={field.name}>Completion Deadline</FieldLabel>
                                                 <DateTimePicker
                                                     value={field.state.value}
                                                     isInvalid={isInvalid}

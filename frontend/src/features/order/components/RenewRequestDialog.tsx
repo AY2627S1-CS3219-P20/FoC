@@ -82,7 +82,7 @@ const RenewRequestDialog = ({
 
                                 return (
                                     <Field data-invalid={isInvalid}>
-                                        <FieldLabel htmlFor={field.name}>New Expiry Deadline</FieldLabel>
+                                        <FieldLabel htmlFor={field.name}>New Completion Deadline</FieldLabel>
                                         <div className="w-full lg:w-3/4">
                                             <DateTimePicker
                                                 value={field.state.value}

@@ -85,7 +85,7 @@ export async function updateRequestService(
     }
 
     if (changes.expiryAt && changes.expiryAt <= now) {
-        throw new AppError("Expiry date and time must be in the future", 400);
+        throw new AppError("Completion deadline must be in the future", 400);
     }
 
     if (changes.pickupSupplierId) {
@@ -145,9 +145,9 @@ export async function createRequestService(
     requesterId: string,
     input: CreateRequestInput,
 ) {
-    // 1. Validate the expiry date is in the future
+    // 1. Validate the completion deadline is in the future
     if (input.expiryAt <= new Date()) {
-        throw new AppError("Expiry date must be in the future", 400);
+        throw new AppError("Completion deadline must be in the future", 400);
     }
 
     // 2. Verify that the pickup and delivery suppliers exist
@@ -501,7 +501,7 @@ export async function renewExpiredRequestService(
     input: RenewExpiredRequestInput,
 ) {
     if (input.expiryAt <= new Date()) {
-        throw new AppError("Expiry date must be in the future", 400);
+        throw new AppError("Completion deadline must be in the future", 400);
     }
 
     const existingOrder = await prisma.order.findUnique({

@@ -188,7 +188,7 @@ const CreateRequestForm = ({
 
                                 return (
                                     <Field data-invalid={isInvalid}>
-                                        <FieldLabel htmlFor={field.name}>Expiry Deadline</FieldLabel>
+                                        <FieldLabel htmlFor={field.name}>Completion Deadline</FieldLabel>
                                         <DateTimePicker
                                             value={field.state.value}
                                             isInvalid={isInvalid}

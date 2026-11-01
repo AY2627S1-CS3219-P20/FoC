@@ -41,7 +41,7 @@ export const requestFieldsSchema = z.object({
         )
         .refine(
             date => date > new Date(),
-            "Expiry date and time must be in the future",
+            "Completion deadline must be in the future",
         ),
 });
 
@@ -94,7 +94,7 @@ export type CancelRequestInput = z.infer<typeof cancelRequestSchema>;
 
 export const renewExpiredRequestSchema = z.strictObject({
     expiryAt: z.coerce.date()
-        .refine((date) => date > new Date(), "Expiry must be in the future"),
+        .refine((date) => date > new Date(), "Completion deadline must be in the future"),
     expectedVersion: z.number().int().positive(),
 });
 export type RenewExpiredRequestInput = z.infer<typeof renewExpiredRequestSchema>;

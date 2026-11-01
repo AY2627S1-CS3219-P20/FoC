@@ -1,4 +1,3 @@
-
 import { format, parse } from "date-fns";
 import { useState } from "react";
 
@@ -35,7 +34,7 @@ const DateTimePicker = ({
     isInvalid,
     onChange,
     onBlur,
-    placeholder = "Select expiry deadline",
+    placeholder = "Select completion deadline",
     disabled = false,
 }: DateTimePickerProps) => {
     const [isOpen, setIsOpen] = useState(false);
