@@ -43,6 +43,7 @@ const RenewRequestDialog = ({
             });
 
             onOpenChange(false);
+            resetForm();
         }
     });
 
@@ -81,15 +82,15 @@ const RenewRequestDialog = ({
 
                                 return (
                                     <Field data-invalid={isInvalid}>
-                                        <FieldLabel htmlFor={field.name}>New Expiry Date and Time</FieldLabel>
-                                       <div className="w-full lg:w-3/4">
+                                        <FieldLabel htmlFor={field.name}>New Expiry Deadline</FieldLabel>
+                                        <div className="w-full lg:w-3/4">
                                             <DateTimePicker
                                                 value={field.state.value}
                                                 isInvalid={isInvalid}
                                                 onChange={field.handleChange}
                                                 onBlur={field.handleBlur}
                                             />
-                                       </div>
+                                        </div>
                                         {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
                                     </Field>
                                 );

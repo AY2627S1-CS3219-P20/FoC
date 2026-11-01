@@ -35,7 +35,7 @@ const DateTimePicker = ({
     isInvalid,
     onChange,
     onBlur,
-    placeholder = "Select expiry date and time",
+    placeholder = "Select expiry deadline",
     disabled = false,
 }: DateTimePickerProps) => {
     const [isOpen, setIsOpen] = useState(false);
