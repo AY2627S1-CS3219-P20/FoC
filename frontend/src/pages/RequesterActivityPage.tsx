@@ -96,7 +96,7 @@ const RequesterActivtyPage = () => {
                             </SelectTrigger>
                             <SelectContent alignItemWithTrigger={false}>
                                 <SelectItem value="createdAt">Created date</SelectItem>
-                                <SelectItem value="expiryAt">Expiry date</SelectItem>
+                                <SelectItem value="expiryAt">Completion deadline</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

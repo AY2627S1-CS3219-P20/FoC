@@ -411,7 +411,7 @@ const SupplierForm = ({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" variant="indigo" size="lg" isLoading={isPending}>
+        <Button type="submit" variant="indigo" isLoading={isPending}>
           {submitLabel}
         </Button>
       </div>

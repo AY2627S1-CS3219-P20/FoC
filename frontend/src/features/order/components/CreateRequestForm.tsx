@@ -40,8 +40,11 @@ const CreateRequestForm = ({
         onSubmit: async ({ value }) => {
             if (isProvisioning) return;
             const parsedData: CreateRequestFormData = createRequestSchema.parse(value);
-            createRequest(parsedData);
-            onCancel();
+            createRequest(parsedData, {
+                onSuccess: () => {
+                    onCancel();
+                },
+            });
         },
     });
 
@@ -122,7 +125,18 @@ const CreateRequestForm = ({
                         />
                         <form.Field
                             name="deliverySupplierId"
-                            children={field => {
+                            validators={{
+                                onChangeListenTo: ["pickupSupplierId"],
+                                onChange: ({ value, fieldApi }) => {
+                                    const pickupId = fieldApi.form.getFieldValue("pickupSupplierId");
+
+                                    return value && pickupId === value
+                                        ? { message: "Pickup and delivery locations must be different" }
+                                        : undefined;
+                                },
+                            }}
+                        >
+                            {field => {
                                 const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
                                 return (
                                     <Field data-invalid={isInvalid} className="min-w-0 flex-1">
@@ -138,11 +152,11 @@ const CreateRequestForm = ({
                                                     : initialValues?.deliverySupplierName
                                             }
                                         />
-                                        {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
+                                        {isInvalid && <FieldError errors={field.state.meta.errors} />}
                                     </Field>
                                 );
                             }}
-                        />
+                        </form.Field>
                     </div>
                     <div className="flex w-full flex-col md:flex-row gap-5">
                         <form.Field
@@ -174,13 +188,12 @@ const CreateRequestForm = ({
 
                                 return (
                                     <Field data-invalid={isInvalid}>
-                                        <FieldLabel htmlFor={field.name}>Expiry Date and Time</FieldLabel>
+                                        <FieldLabel htmlFor={field.name}>Completion Deadline</FieldLabel>
                                         <DateTimePicker
                                             value={field.state.value}
                                             isInvalid={isInvalid}
                                             onChange={field.handleChange}
                                             onBlur={field.handleBlur}
-                                            placeholder="Select expiry date and time"
                                         />
                                         {isInvalid && (<FieldError errors={field.state.meta.errors} />)}
                                     </Field>
@@ -237,7 +250,7 @@ const CreateRequestForm = ({
                         className="w-fit"
                         variant="indigo"
                         isLoading={isPending}
-                        disabled={isProvisioning}
+                        disabled={isProvisioning || isPending}
                     >
                         Submit Request
                     </Button>

@@ -116,7 +116,7 @@ const RequestActivityDetailsDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={closeDialog}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogContent className="w-full md:max-w-xl! max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>
                         {isEditing
@@ -163,7 +163,7 @@ const RequestActivityDetailsDialog = ({
                                 value={String(order.offeredCredits)}
                             />
                             <DetailText
-                                label="Expiry date and time"
+                                label="Completion deadline"
                                 value={format(
                                     new Date(order.expiryAt),
                                     "MMM d, yyyy, h:mm a",
@@ -243,7 +243,18 @@ const RequestActivityDetailsDialog = ({
                                 />
                                 <form.Field
                                     name="deliverySupplierId"
-                                    children={field => {
+                                    validators={{
+                                        onChangeListenTo: ["pickupSupplierId"],
+                                        onChange: ({ value, fieldApi }) => {
+                                            const pickupId = fieldApi.form.getFieldValue("pickupSupplierId");
+
+                                            return value && pickupId === value
+                                                ? { message: "Pickup and delivery locations must be different" }
+                                                : undefined;
+                                        },
+                                    }}
+                                >
+                                    {field => {
                                         const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
                                         return (
                                             <Field data-invalid={isInvalid} className="min-w-0 flex-1">
@@ -264,7 +275,7 @@ const RequestActivityDetailsDialog = ({
                                             </Field>
                                         );
                                     }}
-                                />
+                                </form.Field>
                             </div>
 
                             <div className="flex w-full flex-col gap-4 md:flex-row">
@@ -297,7 +308,7 @@ const RequestActivityDetailsDialog = ({
 
                                         return (
                                             <Field data-invalid={isInvalid}>
-                                                <FieldLabel htmlFor={field.name}>Expiry Date and Time</FieldLabel>
+                                                <FieldLabel htmlFor={field.name}>Completion Deadline</FieldLabel>
                                                 <DateTimePicker
                                                     value={field.state.value}
                                                     isInvalid={isInvalid}

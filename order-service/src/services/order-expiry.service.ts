@@ -3,71 +3,107 @@ import { prisma } from "../libs/prisma.js";
 import { OrderEventType, OrderStatus } from "../generated/prisma/client.js";
 import { randomUUID } from "node:crypto";
 
-// order lifecycle statuses
-const STATUS = OrderStatus;
+/* 
+expiryAt is the deadline for the order to be completed by the courier.
+1. If the order is not accepted by a courier before the expiryAt timestamp, 
+the order will be marked as expired and the credits will be released back to the requester. 
+The requester can renew the order by setting a new expiryAt timestamp, and the order will be re-opened for couriers to accept.
 
-// expiryAt is the deadline for a courier to accept the request.
+2. If the order is accepted by a courier but not completed before the expiryAt timestamp,
+the order will be marked as failed and the credits will be released back to the requester. 
+*/
 
-// This function finds all orders that have not been ACCEPTED by a courier,
-// and checks if the current time is past the expiry time for all orders that are expired. 
-// If an order is expired, it updates the order's status to EXPIRED, logs the status change, and creates an outbox event.
-export async function updateExpiredOrders() {
+const COMPLETION_FAILURE_REASON = "The courier did not complete the delivery before the request expiry time";
+
+const OPEN_EXPIRY_REASON = "No courier accepted the request before its expiry time";
+
+export async function updateExpiredOrders(): Promise<number> {
     const now: Date = new Date();
     console.log(`Checking for expired orders at ${now.toISOString()}`);
 
-    // update database
-    const result = await prisma.$transaction(async (tx) => {
-        // update rows in the Order table
-        const ordersUpdated = await tx.order.updateManyAndReturn({
-            where: {
-                status: STATUS.OPEN, // only update orders that are still open
-                courierId: null, // only update orders that have not been accepted by a courier
-                expiryAt: {
-                    lte: now, // currently past the expired time (expiry time <= current time), need to update
-                }
+    const candidateOrders = await prisma.order.findMany({
+        where: {
+            status: {
+                in: [
+                    OrderStatus.OPEN,
+                    OrderStatus.PICKED_UP,
+                    OrderStatus.ACCEPTED,
+                ]
             },
-            data: {
-                status: STATUS.EXPIRED, // change to expired status
-                version: { increment: 1 }, // increment version number
-                expiredAt: now // set the expiredAt timestamp to the time that we marked the order as expired
+            expiryAt: {
+                lte: now, // currently past the expired time (expiry time <= current time), need to update
             }
-        })
+        },
+        select: {
+            id: true,
+            requesterId: true,
+            courierId: true,
+            status: true,
+            version: true,
+            offeredCredits: true,
+            creditReservationId: true,
+        }
+    });
 
-        console.log(`${ordersUpdated.length} open orders updated to expired`)
+    let expiredOrdersCount = 0;
 
-        // update OrderStatusHistory table
-        for (const order of ordersUpdated) {
-            const transactionRecord = await tx.orderStatusHistory.create({
+    for (const order of candidateOrders) {
+        const expiredBeforeAcceptance = order.status === OrderStatus.OPEN && (!order.courierId || order.courierId === null);
+        const nextStatus = expiredBeforeAcceptance ? OrderStatus.EXPIRED : OrderStatus.FAILED;
+        const eventType = expiredBeforeAcceptance ? OrderEventType.ORDER_EXPIRED : OrderEventType.ORDER_FAILED;
+        const reason = expiredBeforeAcceptance ? OPEN_EXPIRY_REASON : COMPLETION_FAILURE_REASON;
+
+        if (!order.creditReservationId) {
+            throw new AppError(
+                `Expired order ${order.id} has no credit reservation`,
+                409,
+            );
+        }
+
+        const eventId = randomUUID();
+        const result = await prisma.$transaction(async (tx) => {
+            const updated = await tx.order.updateMany({
+                where: {
+                    id: order.id,
+                    status: order.status,
+                    version: order.version,
+                    expiryAt: {
+                        lte: now,
+                    }
+                },
                 data: {
-                    orderId: order.id,
-                    fromStatus: STATUS.OPEN,
-                    toStatus: STATUS.EXPIRED,
-                    changedBy: null, // indicate system update with null
-                    reason: "Request expired due to no courier acceptance before expiryAt timestamp"
+                    status: nextStatus,
+                    version: { increment: 1 },
+                    ...(expiredBeforeAcceptance
+                        ? { expiredAt: now }
+                        : { failedAt: now, failureReason: reason }),
                 }
             });
-            // check if transaction record was successfully logged
-            if (!transactionRecord) {
-                throw new AppError(`Unable to record status update for order ${order.id}`, 500);
+
+            // Another request changed the order after it was fetched, 
+            // so we skip this order and move on to the next one.
+            if (updated.count !== 1) {
+                return false;
             }
 
-            // check if the order has a credit reservation ID before attempting to release credits
-            if (!order.creditReservationId) {
-                throw new AppError(
-                    `Expired order ${order.id} has no credit reservation`,
-                    409,
-                );
-            }
+            await tx.orderStatusHistory.create({
+                data: {
+                    orderId: order.id,
+                    fromStatus: order.status,
+                    toStatus: nextStatus,
+                    changedBy: null, // indicate system update with null
+                    reason: reason,
+                }
+            });
 
-            const eventId = randomUUID();
             await tx.outboxEvent.create({
                 data: {
                     id: eventId,
                     orderId: order.id,
-                    eventType: OrderEventType.ORDER_EXPIRED,
+                    eventType: eventType,
                     payload: {
                         eventId: eventId,
-                        eventType: OrderEventType.ORDER_EXPIRED,
+                        eventType: eventType,
                         reservationId: order.creditReservationId,
                         orderId: order.id,
                         requesterId: order.requesterId,
@@ -75,10 +111,15 @@ export async function updateExpiredOrders() {
                     }
                 }
             });
+
+            return true;
+
+        });
+
+        if (result) {
+            expiredOrdersCount++;
         }
+    }
 
-        return ordersUpdated;
-    });
-
-    return result.length;
+    return expiredOrdersCount;
 }

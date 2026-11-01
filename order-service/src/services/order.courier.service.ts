@@ -177,6 +177,10 @@ export async function pickUpAcceptedOrder(courierId: string, orderId: string) {
         throw new AppError(`Order ${orderId} does not exist`, 404);
     }
 
+    if (order.expiryAt <= now) {
+        throw new AppError(`Order ${orderId} has expired`, 409);
+    }
+
     // check that the user trying to mark the order as PICKED_UP is listed as the courier of the order (F4.1.1)
     if (order.courierId !== courierId) {
         throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
@@ -244,6 +248,10 @@ export async function completePickedUpOrder(courierId: string, orderId: string) 
         throw new AppError(`Order ${orderId} does not exist`, 404);
     }
 
+    if (order.expiryAt <= now) {
+        throw new AppError(`Order ${orderId} has expired`, 409);
+    }
+
     // check that the user trying to mark the order as COMPLETED is listed as the courier of the order (F5.1.1)
     if (order.courierId !== courierId) {
         throw new AppError(`Courier ${courierId} is not assigned to order ${orderId}`, 403);
@@ -307,6 +315,10 @@ export async function dropAcceptedOrder(courierId: string, orderId: string) {
     // order id does not exist
     if (!order) {
         throw new AppError(`Order ${orderId} does not exist`, 404);
+    }
+
+    if (order.expiryAt <= new Date()) {
+        throw new AppError(`Order ${orderId} has expired`, 409);
     }
 
     // check that the user trying to drop the order is listed as the courier of the order 

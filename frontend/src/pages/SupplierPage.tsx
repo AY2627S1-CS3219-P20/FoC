@@ -6,9 +6,10 @@ import type { Supplier, SupplierType, SuppliersQueryParams, SuppliersQueryRespon
 import SupplierCard from "@/features/supplier/components/SupplierCard";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink } from "@/components/ui/pagination";
 import { Field } from '@/components/ui/field';
-import { Menubar, MenubarMenu, MenubarTrigger } from '@/components/ui/menubar';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { SearchIcon } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatStringToTitleCase } from '@/utils/formatText';
 
 const SupplierPage = () => {
     // does not use URL-based page number, similar to ManageSuppliersPage.tsx
@@ -35,7 +36,7 @@ const SupplierPage = () => {
 
     const getSuppliersParams: SuppliersQueryParams = {
         page: currentPage,
-        searchString: searchString, 
+        searchString: searchString,
         typeFilter: typeFilter
     };
 
@@ -63,10 +64,10 @@ const SupplierPage = () => {
     return (
         <>
             <div className="flex flex-col px-5 md:px-10 py-5 gap-4">
-                <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-                    <h1 className="text-xl md:text-2xl font-bold">Suppliers</h1>
-                    <Field className="w-full md:w-1/3">
-                        <InputGroup className="bg-white h-10">
+                <h1 className="text-xl md:text-2xl font-bold">Suppliers</h1>
+                <div className="flex flex-col gap-1 w-full md:w-1/2">
+                    <Field className="w-full">
+                        <InputGroup className="bg-white">
                             <InputGroupAddon align="inline-start">
                                 <SearchIcon />
                             </InputGroupAddon>
@@ -77,8 +78,8 @@ const SupplierPage = () => {
                                 onChange={handleSearchKeyInput} />
                         </InputGroup>
                     </Field>
-
                 </div>
+
                 {supplierTypesIsLoading && <p>Loading supplier types...</p>}
                 {supplierTypesIsError && <p>Failed to load supplier types: {supplierTypesQuery.error.message}</p>}
 
@@ -86,28 +87,19 @@ const SupplierPage = () => {
                     <p className="text-sm text-muted-foreground">No supplier types yet.</p>
                 )}
 
-                <Menubar className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-2.5 overflow-x-auto overflow-y-hidden">
-                    <MenubarMenu>
-                        <MenubarTrigger
-                            key="all"
-                            className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === "ALL" ? "bg-accent!" : ""}`} // ensure that the filter is shown as selected on frontend
-                            onClick={() => handleFilterInput("ALL")}
-                        >
-                            ALL
-                        </MenubarTrigger>
-                    </MenubarMenu>
-                    {supplierTypes.map(type => (
-                        <MenubarMenu>
-                            <MenubarTrigger
-                                key={type.id}
-                                className={`p-2 shrink-0 whitespace-nowrap ${typeFilter === type.type ? "bg-accent!" : ""}`} // ensure that the filter is shown as selected on frontend
-                                onClick={() => handleFilterInput(type.type)}
-                            >
-                                {type.type}
-                            </MenubarTrigger>
-                        </MenubarMenu>
-                    ))}
-                </Menubar>
+                <Tabs value={typeFilter} onValueChange={setTypeFilter} className="w-full">
+                    <TabsList className="w-fit max-w-full h-full flex flex-nowrap items-center justify-start gap-1 overflow-x-auto overflow-y-hidden">
+                        <TabsTrigger value="ALL" onClick={() => handleFilterInput("ALL")}>
+                            All
+                        </TabsTrigger>
+
+                        {supplierTypes.map((type) => (
+                            <TabsTrigger key={type.id} value={type.type} onClick={() => handleFilterInput(type.type)}>
+                                {formatStringToTitleCase(type.type)}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
             </div>
 
             <div className="px-5 md:px-10 pb-10">
@@ -141,6 +133,7 @@ const SupplierPage = () => {
                                 <PaginationItem key={i}>
                                     <PaginationLink
                                         href="#"
+                                        isActive={currentPage === i + 1}
                                         onClick={(e) => { e.preventDefault(); setCurrentPage(i + 1); }}
                                     >
                                         {i + 1}

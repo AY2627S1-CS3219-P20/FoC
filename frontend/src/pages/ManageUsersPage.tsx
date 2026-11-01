@@ -10,6 +10,7 @@ import CreateAdminInvitationDialog from '@/features/user/components/CreateAdminI
 import useAdminUsers from '@/features/user/hooks/useAdminUsers';
 import useCreateAdminInvitation from '@/features/user/hooks/useCreateAdminInvitation';
 import usePromoteUser from '@/features/user/hooks/usePromoteUser';
+import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 
 const PAGE_SIZE = 20;
 
@@ -19,6 +20,7 @@ const ManageUsersPage = () => {
     const [role, setRole] = useState<Role | ''>('');
     const [page, setPage] = useState(1);
     const [userToPromote, setUserToPromote] = useState<ApiUser | null>(null);
+    const [isPromoteAdminOpen, setIsPromoteAdminOpen] = useState(false);
     const [isCreateAdminOpen, setIsCreateAdminOpen] = useState(false);
 
     const { promoteUser, isPending: isPromoting } = usePromoteUser();
@@ -61,14 +63,30 @@ const ManageUsersPage = () => {
                         Search and review registered user accounts.
                     </p>
                 </div>
-                <Button
-                    type="button"
-                    variant="indigo"
-                    onClick={() => setIsCreateAdminOpen(true)}
-                >
-                    <MailPlusIcon />
-                    Create admin
-                </Button>
+                <Dialog open={isCreateAdminOpen} onOpenChange={setIsCreateAdminOpen}>
+                    <DialogTrigger
+                        render={
+                            <Button
+                                type="button"
+                                variant="indigo"
+                            >
+                                <MailPlusIcon />
+                                Create admin
+                            </Button>
+                        }
+                    />
+                    {isCreateAdminOpen && (
+                        <CreateAdminInvitationDialog
+                            isPending={isCreatingAdmin}
+                            onClose={() => setIsCreateAdminOpen(false)}
+                            onSubmit={payload => {
+                                createAdminInvitation(payload, {
+                                    onSuccess: () => setIsCreateAdminOpen(false),
+                                });
+                            }}
+                        />
+                    )}
+                </Dialog>
             </div>
 
             <section className="rounded-xl bg-card p-4 shadow-md ring-1 ring-foreground/10 md:p-6">
@@ -164,14 +182,35 @@ const ManageUsersPage = () => {
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 {user.role === ROLES.STUDENT ? (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => setUserToPromote(user)}
-                                                    >
-                                                        Make admin
-                                                    </Button>
+                                                    <Dialog open={isPromoteAdminOpen} onOpenChange={setIsPromoteAdminOpen}>
+                                                        <DialogTrigger
+                                                            render={
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => setUserToPromote(user)}
+                                                                >
+                                                                    Make admin
+                                                                </Button>
+                                                            }
+                                                        />
+                                                        {userToPromote && (
+                                                            <PromoteUserDialog
+                                                                user={userToPromote}
+                                                                isPending={isPromoting}
+                                                                onClose={() => setUserToPromote(null)}
+                                                                onConfirm={() => {
+                                                                    promoteUser(userToPromote.id, {
+                                                                        onSuccess: () => {
+                                                                            setUserToPromote(null);
+                                                                            setPage(1);
+                                                                        },
+                                                                    });
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </Dialog>
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground">
                                                         Already admin
@@ -213,34 +252,6 @@ const ManageUsersPage = () => {
                     </>
                 )}
             </section>
-
-            {userToPromote && (
-                <PromoteUserDialog
-                    user={userToPromote}
-                    isPending={isPromoting}
-                    onClose={() => setUserToPromote(null)}
-                    onConfirm={() => {
-                        promoteUser(userToPromote.id, {
-                            onSuccess: () => {
-                                setUserToPromote(null);
-                                setPage(1);
-                            },
-                        });
-                    }}
-                />
-            )}
-
-            {isCreateAdminOpen && (
-                <CreateAdminInvitationDialog
-                    isPending={isCreatingAdmin}
-                    onClose={() => setIsCreateAdminOpen(false)}
-                    onSubmit={payload => {
-                        createAdminInvitation(payload, {
-                            onSuccess: () => setIsCreateAdminOpen(false),
-                        });
-                    }}
-                />
-            )}
         </main>
     );
 };

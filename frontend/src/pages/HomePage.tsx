@@ -124,7 +124,7 @@ const HomePage = () => {
                             </SelectTrigger>
                             <SelectContent alignItemWithTrigger={false}>
                                 <SelectItem value="offeredCredits">Offered Credits</SelectItem>
-                                <SelectItem value="expiryAt">Expiry date</SelectItem>
+                                <SelectItem value="expiryAt">Completion deadline</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
