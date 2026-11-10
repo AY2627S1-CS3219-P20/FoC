@@ -280,6 +280,8 @@ retention), and Grafana shows them.
 service stdout (JSON) → Docker → Alloy → Loki → Grafana
 ```
 
+![Centralized logging architecture](docs/centralized-logging.png)
+
 - **Open Grafana:** <http://localhost:3030> locally (user `admin`, password
   `foc-local-only` unless `GRAFANA_ADMIN_PASSWORD` is set). On EC2 it
   listens on localhost only, so use a tunnel:
